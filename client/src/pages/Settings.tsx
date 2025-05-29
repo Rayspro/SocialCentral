@@ -1,3 +1,4 @@
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { 
   User, 
   Bell, 
@@ -18,13 +21,37 @@ import {
   Key,
   AlertTriangle,
   Save,
-  RefreshCw
+  RefreshCw,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useTheme } from "@/contexts/ThemeContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import type { ApiKey } from "@shared/schema";
+
+const apiKeyFormSchema = z.object({
+  service: z.string().min(1, "Service is required"),
+  keyName: z.string().min(1, "Key name is required"),
+  keyValue: z.string().min(1, "API key is required"),
+});
+
+type ApiKeyForm = z.infer<typeof apiKeyFormSchema>;
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
+  const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
+  const [editingApiKey, setEditingApiKey] = useState<ApiKey | null>(null);
+  const [showKeyValue, setShowKeyValue] = useState<{ [key: number]: boolean }>({});
+  
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
     pushNotifications: false,
@@ -46,6 +73,117 @@ export default function Settings() {
     autoApprove: false,
     contentModeration: true,
   });
+
+  const { data: apiKeys, isLoading: apiKeysLoading } = useQuery({
+    queryKey: ["/api/api-keys"],
+  });
+
+  const form = useForm<ApiKeyForm>({
+    resolver: zodResolver(apiKeyFormSchema),
+    defaultValues: {
+      service: "",
+      keyName: "",
+      keyValue: "",
+    },
+  });
+
+  const createApiKeyMutation = useMutation({
+    mutationFn: async (data: ApiKeyForm) => {
+      return apiRequest("POST", "/api/api-keys", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      setShowApiKeyDialog(false);
+      form.reset();
+      toast({
+        title: "API key added",
+        description: "Your API key has been securely stored.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add API key",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateApiKeyMutation = useMutation({
+    mutationFn: async (data: { id: number; updates: Partial<ApiKeyForm> }) => {
+      return apiRequest("PUT", `/api/api-keys/${data.id}`, data.updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      setEditingApiKey(null);
+      toast({
+        title: "API key updated",
+        description: "Your API key has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update API key",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteApiKeyMutation = useMutation({
+    mutationFn: async (id: number) => {
+      return apiRequest("DELETE", `/api/api-keys/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/api-keys"] });
+      toast({
+        title: "API key deleted",
+        description: "Your API key has been removed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete API key",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: ApiKeyForm) => {
+    if (editingApiKey) {
+      updateApiKeyMutation.mutate({ id: editingApiKey.id, updates: data });
+    } else {
+      createApiKeyMutation.mutate(data);
+    }
+  };
+
+  const handleEditApiKey = (apiKey: ApiKey) => {
+    setEditingApiKey(apiKey);
+    form.reset({
+      service: apiKey.service,
+      keyName: apiKey.keyName,
+      keyValue: "",
+    });
+    setShowApiKeyDialog(true);
+  };
+
+  const toggleKeyVisibility = (keyId: number) => {
+    setShowKeyValue(prev => ({
+      ...prev,
+      [keyId]: !prev[keyId]
+    }));
+  };
+
+  const getServiceDisplayName = (service: string) => {
+    const serviceNames = {
+      openai: "OpenAI",
+      runway: "RunwayML",
+      pika: "Pika Labs",
+      stable: "Stable Diffusion",
+    };
+    return serviceNames[service as keyof typeof serviceNames] || service;
+  };
 
   return (
     <div className="space-y-6">
@@ -270,10 +408,181 @@ export default function Settings() {
           <TabsContent value="api">
             <Card>
               <CardHeader>
-                <CardTitle>API & AI Configuration</CardTitle>
+                <div className="flex items-center justify-between">
+                  <CardTitle>API Keys & Configuration</CardTitle>
+                  <Dialog open={showApiKeyDialog} onOpenChange={setShowApiKeyDialog}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                        onClick={() => {
+                          setEditingApiKey(null);
+                          form.reset();
+                        }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add API Key
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>
+                          {editingApiKey ? "Edit API Key" : "Add API Key"}
+                        </DialogTitle>
+                      </DialogHeader>
+                      <Form {...form}>
+                        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="service"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Service</FormLabel>
+                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select service" />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="openai">OpenAI</SelectItem>
+                                    <SelectItem value="runway">RunwayML</SelectItem>
+                                    <SelectItem value="pika">Pika Labs</SelectItem>
+                                    <SelectItem value="stable">Stable Diffusion</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="keyName"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Key Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="e.g., OPENAI_API_KEY" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="keyValue"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>API Key</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    type="password"
+                                    placeholder="Enter your API key"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <Button 
+                            type="submit" 
+                            className="w-full"
+                            disabled={createApiKeyMutation.isPending || updateApiKeyMutation.isPending}
+                          >
+                            {createApiKeyMutation.isPending || updateApiKeyMutation.isPending 
+                              ? "Saving..." 
+                              : editingApiKey ? "Update Key" : "Add Key"
+                            }
+                          </Button>
+                        </form>
+                      </Form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* API Keys List */}
                 <div className="space-y-4">
+                  <h3 className="font-medium">Configured API Keys</h3>
+                  {apiKeysLoading ? (
+                    <div className="text-center py-4 text-gray-500">Loading API keys...</div>
+                  ) : apiKeys && apiKeys.length > 0 ? (
+                    <div className="space-y-3">
+                      {apiKeys.map((apiKey: ApiKey) => (
+                        <div
+                          key={apiKey.id}
+                          className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-semibold">
+                              <Key className="h-5 w-5" />
+                            </div>
+                            <div>
+                              <h4 className="font-medium text-gray-900 dark:text-white">
+                                {getServiceDisplayName(apiKey.service)}
+                              </h4>
+                              <p className="text-sm text-gray-600 dark:text-gray-400">
+                                {apiKey.keyName}
+                              </p>
+                              <div className="flex items-center gap-2">
+                                <code className="text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
+                                  {showKeyValue[apiKey.id] ? apiKey.keyValue : apiKey.keyValue}
+                                </code>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => toggleKeyVisibility(apiKey.id)}
+                                >
+                                  {showKeyValue[apiKey.id] ? (
+                                    <EyeOff className="h-3 w-3" />
+                                  ) : (
+                                    <Eye className="h-3 w-3" />
+                                  )}
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant={apiKey.isActive ? "default" : "secondary"}>
+                              {apiKey.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleEditApiKey(apiKey)}
+                            >
+                              <Edit className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => deleteApiKeyMutation.mutate(apiKey.id)}
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                      <Key className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No API keys configured</p>
+                      <p className="text-xs">Add your API keys to enable AI features</p>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* AI Settings */}
+                <div className="space-y-4">
+                  <h3 className="font-medium">AI Configuration</h3>
+                  
                   <div className="space-y-2">
                     <Label>OpenAI Model</Label>
                     <Select value={apiSettings.openaiModel} onValueChange={(value) => setApiSettings(prev => ({ ...prev, openaiModel: value }))}>
@@ -286,9 +595,6 @@ export default function Settings() {
                         <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Model used for text generation and content optimization
-                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -299,21 +605,15 @@ export default function Settings() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="runway">RunwayML</SelectItem>
-                        <SelectItem value="stable-video">Stable Video Diffusion</SelectItem>
                         <SelectItem value="pika">Pika Labs</SelectItem>
-                        <SelectItem value="custom">Custom Provider</SelectItem>
+                        <SelectItem value="stable">Stable Video Diffusion</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">
-                      Service used for text-to-video generation
-                    </p>
                   </div>
-
-                  <Separator />
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-medium">Auto-approve AI Content</h3>
+                      <h4 className="font-medium">Auto-approve AI Content</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Automatically approve generated content</p>
                     </div>
                     <Switch
@@ -324,7 +624,7 @@ export default function Settings() {
 
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-medium">Content Moderation</h3>
+                      <h4 className="font-medium">Content Moderation</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-400">Enable AI content filtering</p>
                     </div>
                     <Switch
@@ -334,28 +634,9 @@ export default function Settings() {
                   </div>
                 </div>
 
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 mt-0.5" />
-                    <div>
-                      <h4 className="font-medium text-yellow-800 dark:text-yellow-200">API Configuration</h4>
-                      <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                        For text-to-video generation, you'll need API keys from your chosen provider. 
-                        Current implementation uses placeholder generation - integrate with services like:
-                      </p>
-                      <ul className="list-disc list-inside text-sm text-yellow-700 dark:text-yellow-300 mt-2 space-y-1">
-                        <li>RunwayML API for high-quality video generation</li>
-                        <li>Stable Video Diffusion for open-source video creation</li>
-                        <li>Pika Labs for AI video generation</li>
-                        <li>Custom endpoints for specialized workflows</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
                 <Button className="bg-purple-600 hover:bg-purple-700 text-white">
                   <Save className="h-4 w-4 mr-2" />
-                  Save API Settings
+                  Save AI Settings
                 </Button>
               </CardContent>
             </Card>

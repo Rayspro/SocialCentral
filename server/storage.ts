@@ -1,10 +1,13 @@
 import { 
+  users, platforms, accounts, content, schedules,
   Platform, InsertPlatform, 
   Account, InsertAccount,
   Content, InsertContent,
   Schedule, InsertSchedule,
   User, InsertUser
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -40,6 +43,13 @@ export interface IStorage {
   createSchedule(schedule: InsertSchedule): Promise<Schedule>;
   updateSchedule(id: number, schedule: Partial<InsertSchedule>): Promise<Schedule | undefined>;
 
+  // API Key methods
+  getApiKeys(): Promise<ApiKey[]>;
+  getApiKeyByService(service: string): Promise<ApiKey | undefined>;
+  createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
+  updateApiKey(id: number, apiKey: Partial<InsertApiKey>): Promise<ApiKey | undefined>;
+  deleteApiKey(id: number): Promise<boolean>;
+
   // Stats
   getStats(): Promise<{
     connectedAccounts: number;
@@ -47,6 +57,194 @@ export interface IStorage {
     postsThisMonth: number;
     generatedMedia: number;
   }>;
+}
+
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async getPlatforms(): Promise<Platform[]> {
+    return await db.select().from(platforms);
+  }
+
+  async getPlatform(id: number): Promise<Platform | undefined> {
+    const [platform] = await db.select().from(platforms).where(eq(platforms.id, id));
+    return platform || undefined;
+  }
+
+  async createPlatform(platform: InsertPlatform): Promise<Platform> {
+    const [newPlatform] = await db
+      .insert(platforms)
+      .values(platform)
+      .returning();
+    return newPlatform;
+  }
+
+  async updatePlatform(id: number, platform: Partial<InsertPlatform>): Promise<Platform | undefined> {
+    const [updated] = await db
+      .update(platforms)
+      .set(platform)
+      .where(eq(platforms.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getAccounts(): Promise<Account[]> {
+    return await db.select().from(accounts);
+  }
+
+  async getAccountsByPlatform(platformId: number): Promise<Account[]> {
+    return await db.select().from(accounts).where(eq(accounts.platformId, platformId));
+  }
+
+  async getAccount(id: number): Promise<Account | undefined> {
+    const [account] = await db.select().from(accounts).where(eq(accounts.id, id));
+    return account || undefined;
+  }
+
+  async createAccount(account: InsertAccount): Promise<Account> {
+    const [newAccount] = await db
+      .insert(accounts)
+      .values({
+        ...account,
+        createdAt: new Date(),
+        isActive: account.isActive ?? true,
+        metadata: account.metadata ?? {}
+      })
+      .returning();
+    return newAccount;
+  }
+
+  async updateAccount(id: number, account: Partial<InsertAccount>): Promise<Account | undefined> {
+    const [updated] = await db
+      .update(accounts)
+      .set(account)
+      .where(eq(accounts.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteAccount(id: number): Promise<boolean> {
+    const result = await db.delete(accounts).where(eq(accounts.id, id));
+    return result.rowCount > 0;
+  }
+
+  async getContent(): Promise<Content[]> {
+    return await db.select().from(content);
+  }
+
+  async getContentByStatus(status: string): Promise<Content[]> {
+    return await db.select().from(content).where(eq(content.status, status));
+  }
+
+  async getContentById(id: number): Promise<Content | undefined> {
+    const [contentItem] = await db.select().from(content).where(eq(content.id, id));
+    return contentItem || undefined;
+  }
+
+  async createContent(contentData: InsertContent): Promise<Content> {
+    const [newContent] = await db
+      .insert(content)
+      .values({
+        ...contentData,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: contentData.status ?? "pending",
+        metadata: contentData.metadata ?? {},
+        description: contentData.description ?? null,
+        contentUrl: contentData.contentUrl ?? null,
+        thumbnailUrl: contentData.thumbnailUrl ?? null,
+        sourceText: contentData.sourceText ?? null,
+        generationPrompt: contentData.generationPrompt ?? null,
+        platformId: contentData.platformId ?? null,
+        accountId: contentData.accountId ?? null
+      })
+      .returning();
+    return newContent;
+  }
+
+  async updateContent(id: number, contentData: Partial<InsertContent>): Promise<Content | undefined> {
+    const [updated] = await db
+      .update(content)
+      .set({
+        ...contentData,
+        updatedAt: new Date()
+      })
+      .where(eq(content.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteContent(id: number): Promise<boolean> {
+    const result = await db.delete(content).where(eq(content.id, id));
+    return result.rowCount > 0;
+  }
+
+  async getSchedules(): Promise<Schedule[]> {
+    return await db.select().from(schedules);
+  }
+
+  async getSchedulesByAccount(accountId: number): Promise<Schedule[]> {
+    return await db.select().from(schedules).where(eq(schedules.accountId, accountId));
+  }
+
+  async createSchedule(schedule: InsertSchedule): Promise<Schedule> {
+    const [newSchedule] = await db
+      .insert(schedules)
+      .values({
+        ...schedule,
+        createdAt: new Date(),
+        status: schedule.status ?? "pending",
+        publishedAt: null
+      })
+      .returning();
+    return newSchedule;
+  }
+
+  async updateSchedule(id: number, schedule: Partial<InsertSchedule>): Promise<Schedule | undefined> {
+    const [updated] = await db
+      .update(schedules)
+      .set(schedule)
+      .where(eq(schedules.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getStats(): Promise<{
+    connectedAccounts: number;
+    pendingApprovals: number;
+    postsThisMonth: number;
+    generatedMedia: number;
+  }> {
+    const [accountsCount] = await db.select().from(accounts);
+    const pendingContent = await db.select().from(content).where(eq(content.status, "pending"));
+    const allContent = await db.select().from(content);
+    
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    
+    return {
+      connectedAccounts: accountsCount ? accountsCount.length || 0 : 0,
+      pendingApprovals: pendingContent.length,
+      postsThisMonth: allContent.filter(c => new Date(c.createdAt) >= startOfMonth).length,
+      generatedMedia: allContent.length
+    };
+  }
 }
 
 export class MemStorage implements IStorage {
@@ -401,4 +599,4 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

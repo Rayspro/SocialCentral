@@ -57,6 +57,16 @@ export const schedules = pgTable("schedules", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+export const apiKeys = pgTable("api_keys", {
+  id: serial("id").primaryKey(),
+  service: text("service").notNull(), // openai, runway, pika, etc.
+  keyName: text("key_name").notNull(), // OPENAI_API_KEY, RUNWAY_API_KEY, etc.
+  keyValue: text("key_value").notNull(), // encrypted value
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertPlatformSchema = createInsertSchema(platforms).omit({
   id: true,
@@ -79,6 +89,12 @@ export const insertScheduleSchema = createInsertSchema(schedules).omit({
   publishedAt: true,
 });
 
+export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Platform = typeof platforms.$inferSelect;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -91,6 +107,9 @@ export type InsertContent = z.infer<typeof insertContentSchema>;
 
 export type Schedule = typeof schedules.$inferSelect;
 export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
+
+export type ApiKey = typeof apiKeys.$inferSelect;
+export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

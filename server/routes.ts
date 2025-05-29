@@ -304,6 +304,137 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Text generation endpoint
+  app.post("/api/content/generate-text", async (req, res) => {
+    try {
+      const { prompt, type, tone, length } = req.body;
+      
+      if (!prompt || !prompt.trim()) {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+
+      const openaiKey = await storage.getApiKeyByService('openai');
+      if (!openaiKey || !openaiKey.keyValue) {
+        return res.status(400).json({ 
+          error: "OpenAI API key not configured. Please add your API key in Settings." 
+        });
+      }
+
+      try {
+        const systemPrompt = `You are a social media content expert. Generate ${type || 'social media'} content that is ${tone || 'engaging'} and approximately ${length || 'medium'} length. Focus on creating content that drives engagement and fits platform best practices.`;
+
+        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey.keyValue}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: prompt }
+            ],
+            max_tokens: length === 'short' ? 150 : length === 'long' ? 800 : 400,
+            temperature: 0.7
+          }),
+        });
+
+        if (!openaiResponse.ok) {
+          const errorData = await openaiResponse.json();
+          throw new Error(errorData.error?.message || 'OpenAI API request failed');
+        }
+
+        const openaiData = await openaiResponse.json();
+        const generatedText = openaiData.choices[0].message.content;
+        
+        res.json({
+          success: true,
+          generatedText,
+          originalPrompt: prompt,
+          type,
+          tone,
+          length
+        });
+      } catch (aiError: any) {
+        console.error("OpenAI API Error:", aiError);
+        res.status(500).json({ 
+          error: "Failed to generate text. Please check your API key configuration." 
+        });
+      }
+    } catch (error: any) {
+      console.error("Text generation error:", error);
+      res.status(500).json({ 
+        error: error.message || "Text generation failed" 
+      });
+    }
+  });
+
+  // Content enhancement endpoint
+  app.post("/api/content/enhance-text", async (req, res) => {
+    try {
+      const { text, platform, objective } = req.body;
+      
+      if (!text || !text.trim()) {
+        return res.status(400).json({ error: "Text content is required" });
+      }
+
+      const openaiKey = await storage.getApiKeyByService('openai');
+      if (!openaiKey || !openaiKey.keyValue) {
+        return res.status(400).json({ 
+          error: "OpenAI API key not configured. Please add your API key in Settings." 
+        });
+      }
+
+      try {
+        const systemPrompt = `You are a social media optimization expert. Enhance the given text for ${platform || 'social media'} to ${objective || 'increase engagement'}. Improve clarity, add relevant hashtags if appropriate, and optimize for platform best practices. Keep the core message intact while making it more compelling.`;
+
+        const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${openaiKey.keyValue}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: `Enhance this text: "${text}"` }
+            ],
+            max_tokens: 500,
+            temperature: 0.6
+          }),
+        });
+
+        if (!openaiResponse.ok) {
+          const errorData = await openaiResponse.json();
+          throw new Error(errorData.error?.message || 'OpenAI API request failed');
+        }
+
+        const openaiData = await openaiResponse.json();
+        const enhancedText = openaiData.choices[0].message.content;
+        
+        res.json({
+          success: true,
+          originalText: text,
+          enhancedText,
+          platform,
+          objective
+        });
+      } catch (aiError: any) {
+        console.error("OpenAI API Error:", aiError);
+        res.status(500).json({ 
+          error: "Failed to enhance text. Please check your API key configuration." 
+        });
+      }
+    } catch (error: any) {
+      console.error("Text enhancement error:", error);
+      res.status(500).json({ 
+        error: error.message || "Text enhancement failed" 
+      });
+    }
+  });
+
   // Approval routes
   app.put("/api/content/:id/approve", async (req, res) => {
     try {

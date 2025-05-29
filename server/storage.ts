@@ -57,7 +57,7 @@ export interface IStorage {
 
   // API Key methods
   getApiKeys(): Promise<ApiKey[]>;
-  getApiKeyByService(service: string): Promise<Api| undefined>;
+  getApiKeyByService(service: string): Promise<ApiKey | undefined>;
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   updateApiKey(id: number, apiKey: Partial<InsertApiKey>): Promise<ApiKey | undefined>;
   deleteApiKey(id: number): Promise<boolean>;

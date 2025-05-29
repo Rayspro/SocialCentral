@@ -321,6 +321,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // API Keys endpoints
+  app.get("/api/api-keys", async (req: Request, res: Response) => {
+    try {
+      const apiKeys = await storage.getApiKeys();
+      // Don't expose the actual key values in the response
+      const sanitizedKeys = apiKeys.map(key => ({
+        ...key,
+        keyValue: key.keyValue ? '***' + key.keyValue.slice(-4) : ''
+      }));
+      res.json(sanitizedKeys);
+    } catch (error: any) {
+      console.error("Get API keys error:", error);
+      res.status(500).json({ error: "Failed to fetch API keys" });
+    }
+  });
+
+  app.post("/api/api-keys", async (req: Request, res: Response) => {
+    try {
+      const apiKey = await storage.createApiKey(req.body);
+      res.json(apiKey);
+    } catch (error: any) {
+      console.error("Create API key error:", error);
+      res.status(500).json({ error: "Failed to create API key" });
+    }
+  });
+
+  app.put("/api/api-keys/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const apiKey = await storage.updateApiKey(id, req.body);
+      if (!apiKey) {
+        return res.status(404).json({ error: "API key not found" });
+      }
+      res.json(apiKey);
+    } catch (error: any) {
+      console.error("Update API key error:", error);
+      res.status(500).json({ error: "Failed to update API key" });
+    }
+  });
+
+  app.delete("/api/api-keys/:id", async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteApiKey(id);
+      if (!success) {
+        return res.status(404).json({ error: "API key not found" });
+      }
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("Delete API key error:", error);
+      res.status(500).json({ error: "Failed to delete API key" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

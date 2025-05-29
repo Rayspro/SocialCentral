@@ -9,6 +9,9 @@ import Dashboard from "@/pages/Dashboard";
 import Platforms from "@/pages/Platforms";
 import CreateContent from "@/pages/CreateContent";
 import Approvals from "@/pages/Approvals";
+import MediaLibrary from "@/pages/MediaLibrary";
+import Schedule from "@/pages/Schedule";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,10 +21,9 @@ function Router() {
       <Route path="/platforms" component={Platforms} />
       <Route path="/create" component={CreateContent} />
       <Route path="/approvals" component={Approvals} />
-      {/* Add more routes as needed */}
-      <Route path="/media" component={() => <div className="p-6">Media Library - Coming Soon</div>} />
-      <Route path="/schedule" component={() => <div className="p-6">Schedule - Coming Soon</div>} />
-      <Route path="/settings" component={() => <div className="p-6">Settings - Coming Soon</div>} />
+      <Route path="/media" component={MediaLibrary} />
+      <Route path="/schedule" component={Schedule} />
+      <Route path="/settings" component={Settings} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

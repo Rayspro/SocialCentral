@@ -17,7 +17,9 @@ import {
   type Schedule,
   type InsertSchedule,
   type ApiKey,
-  type InsertApiKey
+  type InsertApiKey,
+  type VastServer,
+  type InsertVastServer
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -252,6 +254,66 @@ export class DatabaseStorage implements IStorage {
       postsThisMonth: 12,
       generatedMedia: allContent.length,
     };
+  }
+
+  // Vast Server methods
+  async getVastServers(): Promise<VastServer[]> {
+    return await db.select().from(vastServers);
+  }
+
+  async getVastServer(id: number): Promise<VastServer | undefined> {
+    const results = await db.select().from(vastServers).where(eq(vastServers.id, id));
+    return results[0];
+  }
+
+  async getVastServerByVastId(vastId: string): Promise<VastServer | undefined> {
+    const results = await db.select().from(vastServers).where(eq(vastServers.vastId, vastId));
+    return results[0];
+  }
+
+  async createVastServer(server: InsertVastServer): Promise<VastServer> {
+    const results = await db.insert(vastServers).values(server).returning();
+    return results[0];
+  }
+
+  async updateVastServer(id: number, server: Partial<InsertVastServer>): Promise<VastServer | undefined> {
+    const results = await db
+      .update(vastServers)
+      .set(server)
+      .where(eq(vastServers.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteVastServer(id: number): Promise<boolean> {
+    const results = await db.delete(vastServers).where(eq(vastServers.id, id)).returning();
+    return results.length > 0;
+  }
+
+  async launchVastServer(id: number): Promise<VastServer | undefined> {
+    const results = await db
+      .update(vastServers)
+      .set({
+        isLaunched: true,
+        status: "launching",
+        launchedAt: new Date(),
+      })
+      .where(eq(vastServers.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async stopVastServer(id: number): Promise<VastServer | undefined> {
+    const results = await db
+      .update(vastServers)
+      .set({
+        isLaunched: false,
+        status: "stopping",
+        serverUrl: null,
+      })
+      .where(eq(vastServers.id, id))
+      .returning();
+    return results[0];
   }
 }
 

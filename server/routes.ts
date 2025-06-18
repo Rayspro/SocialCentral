@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertAccountSchema, insertContentSchema, insertScheduleSchema } from "@shared/schema";
@@ -496,7 +496,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // API Keys endpoints
-  app.get("/api/api-keys", async (req: Request, res: Response) => {
+  app.get("/api/api-keys", async (req, res) => {
     try {
       const apiKeys = await storage.getApiKeys();
       // Don't expose the actual key values in the response
@@ -511,7 +511,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/api-keys", async (req: Request, res: Response) => {
+  app.post("/api/api-keys", async (req, res) => {
     try {
       const apiKey = await storage.createApiKey(req.body);
       res.json(apiKey);
@@ -521,7 +521,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/api-keys/:id", async (req: Request, res: Response) => {
+  app.put("/api/api-keys/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const apiKey = await storage.updateApiKey(id, req.body);
@@ -535,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/api-keys/:id", async (req: Request, res: Response) => {
+  app.delete("/api/api-keys/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const success = await storage.deleteApiKey(id);
@@ -546,6 +546,168 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Delete API key error:", error);
       res.status(500).json({ error: "Failed to delete API key" });
+    }
+  });
+
+  // Vast.ai Server routes
+  app.get("/api/vast-servers", async (req, res) => {
+    try {
+      const servers = await storage.getVastServers();
+      res.json(servers);
+    } catch (error) {
+      console.error("Get Vast servers error:", error);
+      res.status(500).json({ error: "Failed to fetch Vast.ai servers" });
+    }
+  });
+
+  app.get("/api/vast-servers/available", async (req, res) => {
+    try {
+      // Simulate fetching available servers from Vast.ai API
+      const vastApiKey = await storage.getApiKeyByService('vast');
+      if (!vastApiKey || !vastApiKey.keyValue) {
+        return res.status(400).json({ 
+          error: "Vast.ai API key not configured. Please add your API key in Settings." 
+        });
+      }
+
+      // Mock data for demonstration - in production this would call Vast.ai API
+      const mockServers = [
+        {
+          vastId: "vast_001",
+          name: "RTX 4090 High Performance",
+          gpu: "RTX 4090",
+          gpuCount: 1,
+          cpuCores: 16,
+          ram: 64,
+          disk: 1000,
+          pricePerHour: "0.85",
+          location: "US-East",
+          isAvailable: true,
+          metadata: { bandwidth: "1Gbps", ssd: true }
+        },
+        {
+          vastId: "vast_002", 
+          name: "RTX 3080 Ti Budget",
+          gpu: "RTX 3080 Ti",
+          gpuCount: 1,
+          cpuCores: 12,
+          ram: 32,
+          disk: 500,
+          pricePerHour: "0.45",
+          location: "US-West",
+          isAvailable: true,
+          metadata: { bandwidth: "500Mbps", ssd: true }
+        },
+        {
+          vastId: "vast_003",
+          name: "Dual RTX 4080 Power",
+          gpu: "RTX 4080",
+          gpuCount: 2,
+          cpuCores: 24,
+          ram: 128,
+          disk: 2000,
+          pricePerHour: "1.25",
+          location: "Europe",
+          isAvailable: true,
+          metadata: { bandwidth: "1Gbps", ssd: true, raid: true }
+        }
+      ];
+
+      res.json(mockServers);
+    } catch (error) {
+      console.error("Get available servers error:", error);
+      res.status(500).json({ error: "Failed to fetch available servers" });
+    }
+  });
+
+  app.post("/api/vast-servers/launch/:vastId", async (req, res) => {
+    try {
+      const { vastId } = req.params;
+      const vastApiKey = await storage.getApiKeyByService('vast');
+      
+      if (!vastApiKey || !vastApiKey.keyValue) {
+        return res.status(400).json({ 
+          error: "Vast.ai API key not configured. Please add your API key in Settings." 
+        });
+      }
+
+      // Check if server already exists in our database
+      let server = await storage.getVastServerByVastId(vastId);
+      
+      if (!server) {
+        // Get server details from available servers (in real app, from Vast.ai API)
+        const serverDetails = req.body;
+        server = await storage.createVastServer({
+          vastId,
+          name: serverDetails.name,
+          gpu: serverDetails.gpu,
+          gpuCount: serverDetails.gpuCount,
+          cpuCores: serverDetails.cpuCores,
+          ram: serverDetails.ram,
+          disk: serverDetails.disk,
+          pricePerHour: serverDetails.pricePerHour,
+          location: serverDetails.location,
+          isAvailable: true,
+          isLaunched: false,
+          status: "available",
+          metadata: serverDetails.metadata
+        });
+      }
+
+      // Launch the server
+      const launchedServer = await storage.launchVastServer(server.id);
+      
+      // Simulate server launch time and update status
+      setTimeout(async () => {
+        await storage.updateVastServer(server.id, {
+          status: "running",
+          serverUrl: `https://server-${vastId}.vast.ai:8080`
+        });
+      }, 5000);
+
+      res.json(launchedServer);
+    } catch (error) {
+      console.error("Launch server error:", error);
+      res.status(500).json({ error: "Failed to launch server" });
+    }
+  });
+
+  app.post("/api/vast-servers/stop/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const server = await storage.getVastServer(id);
+      
+      if (!server) {
+        return res.status(404).json({ error: "Server not found" });
+      }
+
+      const stoppedServer = await storage.stopVastServer(id);
+      
+      // Simulate server shutdown time
+      setTimeout(async () => {
+        await storage.updateVastServer(id, { status: "stopped" });
+      }, 3000);
+
+      res.json(stoppedServer);
+    } catch (error) {
+      console.error("Stop server error:", error);
+      res.status(500).json({ error: "Failed to stop server" });
+    }
+  });
+
+  app.delete("/api/vast-servers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const success = await storage.deleteVastServer(id);
+      
+      if (!success) {
+        return res.status(404).json({ error: "Server not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete server error:", error);
+      res.status(500).json({ error: "Failed to delete server" });
     }
   });
 

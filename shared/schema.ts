@@ -67,6 +67,27 @@ export const apiKeys = pgTable("api_keys", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const vastServers = pgTable("vast_servers", {
+  id: serial("id").primaryKey(),
+  vastId: text("vast_id").notNull().unique(),
+  name: text("name").notNull(),
+  gpu: text("gpu").notNull(),
+  gpuCount: integer("gpu_count").notNull(),
+  cpuCores: integer("cpu_cores").notNull(),
+  ram: integer("ram").notNull(), // in GB
+  disk: integer("disk").notNull(), // in GB
+  pricePerHour: text("price_per_hour").notNull(), // stored as string to preserve precision
+  location: text("location").notNull(),
+  isAvailable: boolean("is_available").notNull().default(true),
+  isLaunched: boolean("is_launched").notNull().default(false),
+  launchedAt: timestamp("launched_at"),
+  serverUrl: text("server_url"),
+  status: text("status").notNull().default("available"), // available, launching, running, stopping, stopped
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Insert schemas
 export const insertPlatformSchema = createInsertSchema(platforms).omit({
   id: true,
@@ -95,6 +116,12 @@ export const insertApiKeySchema = createInsertSchema(apiKeys).omit({
   updatedAt: true,
 });
 
+export const insertVastServerSchema = createInsertSchema(vastServers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 // Types
 export type Platform = typeof platforms.$inferSelect;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -110,6 +137,9 @@ export type InsertSchedule = z.infer<typeof insertScheduleSchema>;
 
 export type ApiKey = typeof apiKeys.$inferSelect;
 export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
+
+export type VastServer = typeof vastServers.$inferSelect;
+export type InsertVastServer = z.infer<typeof insertVastServerSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

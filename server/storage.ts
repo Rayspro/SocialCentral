@@ -5,6 +5,7 @@ import {
   content,
   schedules,
   apiKeys,
+  vastServers,
   type User,
   type InsertUser,
   type Platform,
@@ -61,6 +62,16 @@ export interface IStorage {
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   updateApiKey(id: number, apiKey: Partial<InsertApiKey>): Promise<ApiKey | undefined>;
   deleteApiKey(id: number): Promise<boolean>;
+
+  // Vast Server methods
+  getVastServers(): Promise<VastServer[]>;
+  getVastServer(id: number): Promise<VastServer | undefined>;
+  getVastServerByVastId(vastId: string): Promise<VastServer | undefined>;
+  createVastServer(server: InsertVastServer): Promise<VastServer>;
+  updateVastServer(id: number, server: Partial<InsertVastServer>): Promise<VastServer | undefined>;
+  deleteVastServer(id: number): Promise<boolean>;
+  launchVastServer(id: number): Promise<VastServer | undefined>;
+  stopVastServer(id: number): Promise<VastServer | undefined>;
 
   // Stats
   getStats(): Promise<{

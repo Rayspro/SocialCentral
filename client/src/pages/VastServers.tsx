@@ -45,10 +45,13 @@ export default function VastServers() {
   // Launch server mutation
   const launchMutation = useMutation({
     mutationFn: async (server: AvailableServer) => {
-      return apiRequest(`/api/vast-servers/launch/${server.vastId}`, {
+      const response = await fetch(`/api/vast-servers/launch/${server.vastId}`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(server),
       });
+      if (!response.ok) throw new Error('Failed to launch server');
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] });
@@ -70,9 +73,11 @@ export default function VastServers() {
   // Stop server mutation
   const stopMutation = useMutation({
     mutationFn: async (serverId: number) => {
-      return apiRequest(`/api/vast-servers/stop/${serverId}`, {
+      const response = await fetch(`/api/vast-servers/stop/${serverId}`, {
         method: 'POST',
       });
+      if (!response.ok) throw new Error('Failed to stop server');
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] });
@@ -93,9 +98,11 @@ export default function VastServers() {
   // Delete server mutation
   const deleteMutation = useMutation({
     mutationFn: async (serverId: number) => {
-      return apiRequest(`/api/vast-servers/${serverId}`, {
+      const response = await fetch(`/api/vast-servers/${serverId}`, {
         method: 'DELETE',
       });
+      if (!response.ok) throw new Error('Failed to delete server');
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] });

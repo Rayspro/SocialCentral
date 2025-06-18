@@ -7,6 +7,7 @@ import {
   Images, 
   Calendar, 
   Settings, 
+  Server,
   RotateCw 
 } from "lucide-react";
 
@@ -17,6 +18,7 @@ const navigationItems = [
   { path: "/approvals", label: "Approvals", icon: CheckCircle, badge: 3 },
   { path: "/media", label: "Media Library", icon: Images },
   { path: "/schedule", label: "Schedule", icon: Calendar },
+  { path: "/vast-servers", label: "Vast.ai Servers", icon: Server },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

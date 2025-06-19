@@ -567,47 +567,70 @@ export default function VastServers() {
                       )}
                     </div>
 
-                    <div className="flex gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.location.href = `/vast-servers/${server.id}`}
-                      >
-                        <BarChart3 className="h-4 w-4 mr-1" />
-                        Details
-                      </Button>
+                    <div className="flex flex-col gap-2 mt-4">
+                      {/* Primary actions row */}
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.location.href = `/vast-servers/${server.id}`}
+                          className="flex-1"
+                        >
+                          <BarChart3 className="h-4 w-4 mr-1" />
+                          Details
+                        </Button>
+                        {server.status === 'running' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSetupServer(server)}
+                            className="flex-1"
+                          >
+                            <Settings className="h-4 w-4 mr-1" />
+                            Setup
+                          </Button>
+                        )}
+                      </div>
+                      
+                      {/* Secondary actions row */}
                       {server.isLaunched && ['launching', 'running', 'configuring'].includes(server.status) && (
-                        <>
-                          {server.status === 'running' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleSetupServer(server)}
-                            >
-                              <Settings className="h-4 w-4 mr-1" />
-                              Setup
-                            </Button>
-                          )}
+                        <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => stopMutation.mutate(server.id)}
                             disabled={stopMutation.isPending || server.status === 'stopping'}
+                            className="flex-1"
                           >
                             <Square className="h-4 w-4 mr-1" />
                             {server.status === 'stopping' ? 'Stopping...' : 'Stop'}
                           </Button>
-                        </>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteMutation.mutate(server.id)}
+                            disabled={deleteMutation.isPending}
+                            className="flex-1"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
                       )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate(server.id)}
-                        disabled={deleteMutation.isPending || (server.isLaunched && server.status === 'running')}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
+                      
+                      {/* Delete button for non-running servers */}
+                      {(!server.isLaunched || !['launching', 'running', 'configuring'].includes(server.status)) && (
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() => deleteMutation.mutate(server.id)}
+                          disabled={deleteMutation.isPending}
+                          className="w-full"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

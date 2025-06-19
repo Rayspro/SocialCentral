@@ -135,6 +135,7 @@ Changelog:
 - June 19, 2025. Added server-side pagination and filtering for Available Servers page - moved all filtering logic to API level for better performance with large datasets, added pagination controls with page navigation and results count display
 - June 19, 2025. Enhanced Launched Servers page design with improved card layout, better button organization to prevent overflow, elegant spacing and typography, organized specifications grid, and enhanced empty state with call-to-action
 - June 19, 2025. Implemented collapsible sidebar with smooth animations and elegant loading states throughout the app - added custom loading components with skeleton screens, animated spinners, and improved user experience with smooth transitions
+- June 19, 2025. Fixed button overflow issues in server cards by reorganizing button layout into structured rows with proper spacing and responsive design
 ```
 
 ## User Preferences

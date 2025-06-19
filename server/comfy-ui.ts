@@ -259,6 +259,24 @@ export async function addComfyModel(req: Request, res: Response) {
   }
 }
 
+// Delete a model
+export async function deleteComfyModel(req: Request, res: Response) {
+  try {
+    const modelId = parseInt(req.params.id);
+    
+    const success = await storage.deleteComfyModel(modelId);
+    
+    if (!success) {
+      return res.status(404).json({ error: 'Model not found' });
+    }
+    
+    res.json({ success: true, message: 'Model deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting ComfyUI model:', error);
+    res.status(500).json({ error: 'Failed to delete model' });
+  }
+}
+
 // Get available models from ComfyUI server
 export async function getAvailableModels(req: Request, res: Response) {
   try {

@@ -43,6 +43,7 @@ import {
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import type { VastServer, ComfyModel, ComfyWorkflow, ComfyGeneration } from "@shared/schema";
 
@@ -59,6 +60,7 @@ export default function ComfyUI() {
   const [, setLocation] = useLocation();
   const { logout } = useAuth();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // State
   const [selectedServer, setSelectedServer] = useState<VastServer | null>(null);
@@ -239,6 +241,34 @@ export default function ComfyUI() {
     },
   });
 
+  const deleteModelMutation = useMutation({
+    mutationFn: async (modelId: number) => {
+      const response = await fetch(`/api/comfy/models/${modelId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchModels();
+      toast({
+        title: "Success",
+        description: "Model deleted successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete model",
+        variant: "destructive",
+      });
+    },
+  });
+
   const analyzeWorkflowMutation = useMutation({
     mutationFn: async (workflowJson: any) => {
       const response = await fetch('/api/comfy/analyze-workflow', {
@@ -291,6 +321,16 @@ export default function ComfyUI() {
 
   const handleAddModel = () => {
     if (!newModelName || !newModelUrl || !selectedServer) return;
+    
+    // Check for duplicates
+    if (checkDuplicateModel(newModelName, newModelUrl)) {
+      toast({
+        title: "Duplicate Model",
+        description: "A model with this name or URL already exists",
+        variant: "destructive",
+      });
+      return;
+    }
     
     addModelMutation.mutate({
       name: newModelName,
@@ -347,6 +387,17 @@ export default function ComfyUI() {
   const formatProgress = (progress: number | null) => {
     if (!progress) return '0%';
     return `${progress}%`;
+  };
+
+  const handleDeleteModel = (modelId: number) => {
+    deleteModelMutation.mutate(modelId);
+  };
+
+  const checkDuplicateModel = (name: string, url: string): boolean => {
+    if (!models || !Array.isArray(models)) return false;
+    return models.some((model: ComfyModel) => 
+      model.name === name || model.url === url
+    );
   };
 
   if (serversLoading) {
@@ -809,9 +860,21 @@ export default function ComfyUI() {
                           <div key={model.id} className="border rounded-lg p-3">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-medium">{model.name}</h4>
-                              <Badge className={getStatusColor(model.status)}>
-                                {model.status}
-                              </Badge>
+                              <div className="flex items-center gap-2">
+                                <Badge className={getStatusColor(model.status)}>
+                                  {model.status}
+                                </Badge>
+                                {(model.status === 'completed' || model.status === 'failed') && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteModel(model.id)}
+                                    className="h-7 px-2"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
                             </div>
                             <div className="text-sm text-muted-foreground mb-2">
                               Folder: {model.folder}

@@ -17,6 +17,7 @@ import {
 import {
   getComfyModels,
   addComfyModel,
+  deleteComfyModel,
   getAvailableModels,
   getComfyWorkflows,
   createComfyWorkflow,
@@ -1510,6 +1511,7 @@ echo "CUDA environment configured!"`,
   // Model management
   app.get('/api/comfy/:serverId/models', getComfyModels);
   app.post('/api/comfy/:serverId/models', addComfyModel);
+  app.delete('/api/comfy/models/:id', deleteComfyModel);
   app.get('/api/comfy/:serverId/available-models', getAvailableModels);
   
   // Workflow management

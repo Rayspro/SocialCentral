@@ -174,9 +174,19 @@ ${JSON.stringify(workflowJson, null, 2)}
       throw new Error('Server not found or not running');
     }
 
-    // Download models
+    // Get existing models for this server
+    const existingModels = await storage.getComfyModelsByServer(serverId);
+    const existingModelNames = existingModels.map(m => m.name);
+
+    // Download models (skip duplicates)
     for (const model of analysis.models.filter(m => m.required)) {
       try {
+        // Check if model already exists
+        if (existingModelNames.includes(model.name)) {
+          this.addLog('info', `Model ${model.name} already exists - skipping download`);
+          continue;
+        }
+
         this.addLog('info', `Downloading model: ${model.name}`, model);
         
         if (model.url) {

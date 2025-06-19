@@ -1341,6 +1341,9 @@ echo "CUDA environment configured!"`,
         if (server.vastId) {
           const vastInstance = instances.find(instance => instance.id.toString() === server.vastId);
           if (vastInstance) {
+            const wasNotRunning = server.status !== 'running';
+            const isNowRunning = vastInstance.status === 'running';
+            
             await storage.updateVastServer(server.id, {
               status: vastInstance.status,
               serverUrl: vastInstance.serverUrl || server.serverUrl,
@@ -1362,6 +1365,32 @@ echo "CUDA environment configured!"`,
                 }
               }
             });
+            
+            // Auto-trigger ComfyUI setup when server becomes ready
+            if (wasNotRunning && isNowRunning && server.setupStatus !== 'ready') {
+              console.log(`Server ${server.id} became ready, auto-triggering ComfyUI setup`);
+              setTimeout(async () => {
+                try {
+                  const { autoSetupComfyUI } = await import('./comfy-ui');
+                  
+                  const mockReq = {
+                    params: { serverId: server.id.toString() }
+                  } as any;
+                  
+                  const mockRes = {
+                    json: (data: any) => console.log(`Auto-setup initiated for server ${server.id}:`, data),
+                    status: (code: number) => ({
+                      json: (data: any) => console.error(`Auto-setup error for server ${server.id} (${code}):`, data)
+                    })
+                  } as any;
+                  
+                  await autoSetupComfyUI(mockReq, mockRes);
+                } catch (error) {
+                  console.error(`Failed to auto-setup ComfyUI for server ${server.id}:`, error);
+                }
+              }, 5000); // Wait 5 seconds after server becomes ready
+            }
+            
             syncedCount++;
           }
         }
@@ -1526,6 +1555,18 @@ echo "CUDA environment configured!"`,
   
   // Auto-setup ComfyUI
   app.post('/api/comfy/:serverId/auto-setup', autoSetupComfyUI);
+  
+  // Real-time execution progress
+  app.get('/api/server-executions/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const executions = await storage.getServerExecutions(serverId);
+      res.json(executions);
+    } catch (error) {
+      console.error('Error fetching executions:', error);
+      res.status(500).json({ error: 'Failed to fetch executions' });
+    }
+  });
 
   // Workflow analysis routes
   app.post('/api/comfy/analyze-workflow', async (req: Request, res: Response) => {

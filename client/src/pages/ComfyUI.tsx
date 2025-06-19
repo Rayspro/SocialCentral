@@ -95,6 +95,10 @@ export default function ComfyUI() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
+  
+  // Setup progress tracking
+  const [setupProgress, setSetupProgress] = useState<any>(null);
+  const [isAutoSetupRunning, setIsAutoSetupRunning] = useState(false);
 
   // Get running servers
   const { data: servers, isLoading: serversLoading } = useQuery({
@@ -126,6 +130,13 @@ export default function ComfyUI() {
   const { data: generations, isLoading: generationsLoading, refetch: refetchGenerations } = useQuery({
     queryKey: [`/api/comfy/${selectedServer?.id}/generations`],
     enabled: !!selectedServer,
+  });
+
+  // Get execution progress for selected server
+  const { data: executions, refetch: refetchExecutions } = useQuery({
+    queryKey: [`/api/server-executions/${selectedServer?.id}`],
+    enabled: !!selectedServer,
+    refetchInterval: 2000, // Poll every 2 seconds for real-time updates
   });
 
   // Auto-select first running server
@@ -606,6 +617,35 @@ export default function ComfyUI() {
             </Select>
           </CardContent>
         </Card>
+
+        {/* Real-time setup progress display */}
+        {selectedServer && Array.isArray(executions) && executions.length > 0 && (
+          <Card className="border-orange-200 dark:border-orange-800">
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                ComfyUI Setup in Progress
+                <Badge variant="secondary">{executions[0]?.status}</Badge>
+              </CardTitle>
+              <CardDescription>
+                Automatically installing ComfyUI on server {selectedServer.name}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 max-h-64 overflow-y-auto">
+                <pre className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                  {executions[0]?.output || "Initializing setup..."}
+                </pre>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <span>Progress automatically tracked when server becomes ready</span>
+                <Badge variant="outline" className="text-xs">
+                  {executions[0]?.status === 'completed' ? 'Ready' : 'Installing'}
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {selectedServer && (
           <Tabs defaultValue="generate" className="space-y-6">

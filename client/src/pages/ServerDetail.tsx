@@ -7,7 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, BarChart3, Settings, Cpu, Bot } from "lucide-react";
 import { format } from "date-fns";
 
 interface Server {
@@ -197,8 +198,17 @@ export default function ServerDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Server Status */}
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="setup">ComfyUI Setup</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Server Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -436,6 +446,246 @@ export default function ServerDetail() {
           </CardContent>
         </Card>
       )}
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">CPU Usage</CardTitle>
+                <Cpu className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">72%</div>
+                <p className="text-xs text-muted-foreground">+2% from last hour</p>
+                <Progress value={72} className="mt-2" />
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Memory Usage</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">8.2 GB</div>
+                <p className="text-xs text-muted-foreground">64% of 12.8 GB</p>
+                <Progress value={64} className="mt-2" />
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">GPU Usage</CardTitle>
+                <BarChart3 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">91%</div>
+                <p className="text-xs text-muted-foreground">High utilization</p>
+                <Progress value={91} className="mt-2" />
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Network I/O</CardTitle>
+                <Activity className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">1.2 GB/s</div>
+                <p className="text-xs text-muted-foreground">↑ 12% upload</p>
+                <div className="flex gap-2 mt-2">
+                  <div className="flex-1">
+                    <div className="text-xs text-muted-foreground">↓ 890 MB/s</div>
+                    <Progress value={45} className="h-1" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-xs text-muted-foreground">↑ 310 MB/s</div>
+                    <Progress value={25} className="h-1" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Performance History</CardTitle>
+                <CardDescription>Resource usage over the last 24 hours</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64 flex items-center justify-center text-muted-foreground">
+                  Performance charts would be displayed here
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card>
+              <CardHeader>
+                <CardTitle>Cost Analysis</CardTitle>
+                <CardDescription>Usage costs and projections</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Current Hour</span>
+                  <span className="font-medium">${server.pricePerHour}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Today (Est.)</span>
+                  <span className="font-medium">${(parseFloat(server.pricePerHour) * 24).toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">This Month (Proj.)</span>
+                  <span className="font-medium">${(parseFloat(server.pricePerHour) * 24 * 30).toFixed(2)}</span>
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="text-sm font-medium">Usage Efficiency</div>
+                  <div className="text-xs text-muted-foreground">
+                    GPU utilization: 91% (Excellent)
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Cost per compute hour: ${(parseFloat(server.pricePerHour) / 0.91).toFixed(3)}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="setup" className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-lg font-semibold">ComfyUI Setup</h3>
+              <p className="text-sm text-muted-foreground">
+                Manage ComfyUI installation and configuration
+              </p>
+            </div>
+            <Button onClick={() => setLocation(`/servers/${id}/comfyui`)}>
+              <Bot className="h-4 w-4 mr-2" />
+              Open ComfyUI
+            </Button>
+          </div>
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Setup Status</CardTitle>
+              <CardDescription>Current ComfyUI installation status</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${getSetupStatusColor(server.setupStatus)}`}></div>
+                <span className="font-medium">{server.setupStatus}</span>
+              </div>
+              
+              {server.setupStatus === 'not-started' && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-5 w-5 text-blue-600" />
+                    <span className="font-medium text-blue-900 dark:text-blue-100">Ready to Setup</span>
+                  </div>
+                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                    ComfyUI is not yet installed on this server. You can start the automated setup process.
+                  </p>
+                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                    Start Automated Setup
+                  </Button>
+                </div>
+              )}
+              
+              {server.setupStatus === 'installing' && (
+                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <RefreshCw className="h-5 w-5 text-yellow-600 animate-spin" />
+                    <span className="font-medium text-yellow-900 dark:text-yellow-100">Installation in Progress</span>
+                  </div>
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                    ComfyUI is currently being installed. This may take several minutes.
+                  </p>
+                </div>
+              )}
+              
+              {server.setupStatus === 'completed' && (
+                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-900 dark:text-green-100">Setup Complete</span>
+                  </div>
+                  <p className="text-sm text-green-800 dark:text-green-200 mb-3">
+                    ComfyUI has been successfully installed and is ready to use.
+                  </p>
+                  <Button size="sm" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
+                    <Bot className="h-4 w-4 mr-2" />
+                    Launch ComfyUI
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="logs" className="space-y-6">
+          {executions && executions.length > 0 ? (
+            <div className="space-y-4">
+              {executions.map((execution: any) => (
+                <Card key={execution.id}>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {execution.status === 'completed' ? (
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                        ) : execution.status === 'failed' ? (
+                          <AlertCircle className="h-5 w-5 text-red-500" />
+                        ) : (
+                          <Clock className="h-5 w-5 text-yellow-500" />
+                        )}
+                        <CardTitle className="text-base">Script Execution #{execution.id}</CardTitle>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={execution.status === 'completed' ? 'default' : execution.status === 'failed' ? 'destructive' : 'secondary'}>
+                          {execution.status}
+                        </Badge>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">
+                          {format(new Date(execution.createdAt), 'MM/dd/yyyy HH:mm')}
+                        </span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {execution.output && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Output</h4>
+                        <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-sm font-mono">
+                          <pre className="whitespace-pre-wrap">{execution.output}</pre>
+                        </div>
+                      </div>
+                    )}
+                    {execution.errorLog && (
+                      <div>
+                        <h4 className="text-sm font-medium mb-2">Error Log</h4>
+                        <div className="bg-red-50 dark:bg-red-900/20 rounded p-3 text-sm text-red-600 dark:text-red-400">
+                          {execution.errorLog}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center py-12">
+                <Clock className="h-12 w-12 text-gray-400 mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No Execution Logs</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400 text-center max-w-sm">
+                  No script executions have been recorded for this server yet. Logs will appear here once setup processes begin.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

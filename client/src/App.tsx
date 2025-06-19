@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
+import { useTabRefresh } from "@/hooks/useTabRefresh";
 import Dashboard from "@/pages/Dashboard";
 import Platforms from "@/pages/Platforms";
 import CreateContent from "@/pages/CreateContent";
@@ -44,6 +45,9 @@ function AppLayout() {
   const [location, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
   const isAuthPage = location === '/signin' || location === '/signup';
+  
+  // Enable tab refresh functionality
+  useTabRefresh();
 
   // Handle redirects with useEffect to avoid state updates during render
   useEffect(() => {

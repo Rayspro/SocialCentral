@@ -1,7 +1,7 @@
 import { StatsGrid } from "@/components/StatsGrid";
 import { PlatformManager } from "@/components/PlatformManager";
 import { QuickActions } from "@/components/QuickActions";
-import { ContentCreationWorkflow } from "@/components/ContentCreationWorkflow";
+import { ServerAnalytics } from "@/components/ServerAnalytics";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Home, ChevronRight, User, Settings, LogOut, Bell } from "lucide-react";
 import { useLocation } from "wouter";
@@ -102,7 +102,7 @@ export default function Dashboard() {
           <QuickActions />
         </div>
 
-        <ContentCreationWorkflow />
+        <ServerAnalytics />
       </div>
     </div>
   );

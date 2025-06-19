@@ -469,95 +469,22 @@ export async function autoSetupComfyUI(req: Request, res: Response) {
       return res.status(400).json({ error: 'Server must be running to setup ComfyUI' });
     }
 
-    // Create a comprehensive setup script that installs and starts ComfyUI
-    const setupScript = `#!/bin/bash
-set -e
-echo "Starting automated ComfyUI setup..."
+    // Load the dedicated ComfyUI setup script
+    const fs = require('fs');
+    const path = require('path');
+    const setupScriptPath = path.join(__dirname, 'scripts', 'comfyui-setup.sh');
+    const setupScript = fs.readFileSync(setupScriptPath, 'utf8');
 
-# Update system packages
-apt-get update -y
-apt-get install -y git python3-pip wget curl unzip
-
-# Install Python dependencies
-pip3 install --upgrade pip
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
-
-# Clone ComfyUI if not exists
-if [ ! -d "/workspace/ComfyUI" ]; then
-    cd /workspace
-    git clone https://github.com/comfyanonymous/ComfyUI.git
-    echo "ComfyUI cloned successfully"
-else
-    echo "ComfyUI already exists, updating..."
-    cd /workspace/ComfyUI
-    git pull
-fi
-
-cd /workspace/ComfyUI
-
-# Install ComfyUI requirements
-pip3 install -r requirements.txt
-
-# Create models directory structure
-mkdir -p models/checkpoints
-mkdir -p models/vae
-mkdir -p models/loras
-mkdir -p models/embeddings
-mkdir -p models/clip_vision
-mkdir -p models/unet
-
-# Download a basic SDXL model for immediate use
-echo "Downloading basic SDXL model..."
-cd models/checkpoints
-if [ ! -f "sd_xl_base_1.0.safetensors" ]; then
-    wget -O sd_xl_base_1.0.safetensors "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
-    echo "SDXL base model downloaded"
-fi
-
-# Download VAE
-cd ../vae
-if [ ! -f "sdxl_vae.safetensors" ]; then
-    wget -O sdxl_vae.safetensors "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors"
-    echo "SDXL VAE downloaded"
-fi
-
-cd /workspace/ComfyUI
-
-# Kill any existing ComfyUI processes
-pkill -f "python.*main.py" || true
-sleep 2
-
-# Start ComfyUI server
-echo "Starting ComfyUI server..."
-nohup python3 main.py --listen 0.0.0.0 --port 8188 --enable-cors-header > comfyui.log 2>&1 &
-
-# Wait for server to start
-echo "Waiting for ComfyUI to start..."
-sleep 10
-
-# Check if server is running
-if curl -s http://localhost:8188 > /dev/null; then
-    echo "ComfyUI setup completed successfully!"
-    echo "Server is running on port 8188"
-else
-    echo "ComfyUI may still be starting up, check logs at /workspace/ComfyUI/comfyui.log"
-fi
-
-echo "Setup process finished"`;
-
-    // Execute setup script on the server
-    const executionData = {
+    // Create execution record
+    const execution = await storage.createServerExecution({
       serverId,
-      scriptId: 1, // Using ComfyUI Setup script ID
-      status: 'running',
-      output: '',
-      startedAt: new Date(),
-    };
+      scriptId: 1,
+      status: 'running' as const,
+      output: 'Starting SSH connection for ComfyUI setup...\n',
+    });
 
-    const execution = await storage.createServerExecution(executionData);
-
-    // Start real-time setup process with progress updates
-    setupComfyUIWithProgress(execution.id, serverId, setupScript);
+    // Execute the setup via SSH to the actual server
+    executeComfyUISetupViaSSH(execution.id, server, setupScript);
 
     res.json({
       success: true,
@@ -580,16 +507,111 @@ echo "Setup process finished"`;
   }
 }
 
-// Real-time setup process with progress tracking
+// Execute ComfyUI setup via SSH on real Vast.ai server
+async function executeComfyUISetupViaSSH(executionId: number, server: any, setupScript: string) {
+  try {
+    const { spawn } = require('child_process');
+    let totalOutput = '';
+
+    // Parse SSH connection string to get host and port
+    // Format: "ssh root@ssh7.vast.ai -p 36100"
+    const sshConnection = server.sshConnection;
+    const sshParts = sshConnection.match(/ssh root@(.+) -p (\d+)/);
+    
+    if (!sshParts) {
+      throw new Error('Invalid SSH connection format');
+    }
+    
+    const sshHost = sshParts[1];
+    const sshPort = sshParts[2];
+
+    await storage.updateServerExecution(executionId, {
+      output: 'Connecting to server via SSH...\n'
+    });
+
+    // Create the SSH command to execute the setup script
+    const sshProcess = spawn('ssh', [
+      '-o', 'StrictHostKeyChecking=no',
+      '-o', 'UserKnownHostsFile=/dev/null',
+      '-p', sshPort,
+      `root@${sshHost}`,
+      'bash -s'
+    ], {
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    // Send the setup script to the SSH process
+    sshProcess.stdin.write(setupScript);
+    sshProcess.stdin.end();
+
+    // Handle stdout
+    sshProcess.stdout.on('data', async (data: Buffer) => {
+      const output = data.toString();
+      totalOutput += output;
+      
+      await storage.updateServerExecution(executionId, {
+        output: totalOutput
+      });
+    });
+
+    // Handle stderr
+    sshProcess.stderr.on('data', async (data: Buffer) => {
+      const output = `[ERROR] ${data.toString()}`;
+      totalOutput += output;
+      
+      await storage.updateServerExecution(executionId, {
+        output: totalOutput
+      });
+    });
+
+    // Handle process completion
+    sshProcess.on('close', async (code: number) => {
+      const status = code === 0 ? 'completed' : 'failed';
+      const finalMessage = code === 0 
+        ? '\n[SUCCESS] ComfyUI setup completed successfully!\n[INFO] ComfyUI should be accessible at http://' + sshHost.replace('ssh', '') + ':8188'
+        : '\n[ERROR] Setup failed with exit code: ' + code;
+      
+      totalOutput += finalMessage;
+      
+      await storage.updateServerExecution(executionId, {
+        status,
+        output: totalOutput
+      });
+
+      // Update server setup status
+      if (code === 0) {
+        await storage.updateVastServer(server.id, {
+          setupStatus: 'ready'
+        });
+      }
+    });
+
+    // Handle connection errors
+    sshProcess.on('error', async (error: Error) => {
+      totalOutput += `\n[ERROR] SSH connection failed: ${error.message}\n`;
+      
+      await storage.updateServerExecution(executionId, {
+        status: 'failed',
+        output: totalOutput
+      });
+    });
+
+  } catch (error) {
+    console.error('SSH execution error:', error);
+    await storage.updateServerExecution(executionId, {
+      status: 'failed',
+      output: `SSH execution failed: ${error.message}`
+    });
+  }
+}
+
+// Legacy function for backward compatibility - now uses SSH
 async function setupComfyUIWithProgress(executionId: number, serverId: number, setupScript: string) {
-  const steps = [
-    { name: 'Installing system dependencies', duration: 8000, output: '[INFO] Updating system packages...\n[INFO] Installing git, python3-pip, wget, curl...\n[SUCCESS] System dependencies installed' },
-    { name: 'Setting up Python environment', duration: 12000, output: '[INFO] Upgrading pip...\n[INFO] Installing PyTorch with CUDA support...\n[SUCCESS] Python environment ready' },
-    { name: 'Cloning ComfyUI repository', duration: 5000, output: '[INFO] Cloning ComfyUI from GitHub...\n[INFO] Repository cloned to /workspace/ComfyUI\n[SUCCESS] ComfyUI repository ready' },
-    { name: 'Installing ComfyUI requirements', duration: 15000, output: '[INFO] Installing ComfyUI dependencies...\n[INFO] Installing transformers, diffusers, accelerate...\n[SUCCESS] ComfyUI requirements installed' },
-    { name: 'Downloading basic models', duration: 25000, output: '[INFO] Downloading SDXL base model (6.6GB)...\n[INFO] Download progress: 50%\n[INFO] Download progress: 100%\n[INFO] Downloading SDXL VAE...\n[SUCCESS] Basic models downloaded' },
-    { name: 'Starting ComfyUI server', duration: 8000, output: '[INFO] Starting ComfyUI server on port 8188...\n[INFO] ComfyUI server started successfully\n[INFO] Server accessible at http://localhost:8188\n[SUCCESS] ComfyUI setup completed!' }
-  ];
+  const server = await storage.getVastServer(serverId);
+  if (server) {
+    await executeComfyUISetupViaSSH(executionId, server, setupScript);
+  }
+}
 
   let totalOutput = '';
   let currentStep = 0;

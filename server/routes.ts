@@ -783,13 +783,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Server not found" });
       }
 
-      const stoppedServer = await storage.stopVastServer(id);
-      
-      // Simulate server shutdown time
-      setTimeout(async () => {
-        await storage.updateVastServer(id, { status: "stopped" });
-      }, 3000);
+      // If server is launched on Vast.ai, stop the actual instance
+      if (server.isLaunched && server.metadata && typeof server.metadata === 'object' && 'vastInstanceId' in server.metadata) {
+        const vastApiKey = await storage.getApiKeyByService('vast');
+        const metadata = server.metadata as any;
+        
+        if (vastApiKey && vastApiKey.keyValue) {
+          try {
+            console.log("Stopping Vast.ai instance:", metadata.vastInstanceId);
+            
+            const stopResponse = await fetch(`https://console.vast.ai/api/v0/instances/${metadata.vastInstanceId}/`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${vastApiKey.keyValue}`,
+                'Content-Type': 'application/json',
+              },
+            });
 
+            if (stopResponse.ok) {
+              console.log("Successfully stopped Vast.ai instance");
+              // Update server status to stopped
+              const stoppedServer = await storage.updateVastServer(id, { 
+                status: "stopped",
+                isLaunched: false 
+              });
+              return res.json(stoppedServer);
+            } else {
+              const errorText = await stopResponse.text();
+              console.error("Failed to stop Vast.ai instance:", stopResponse.status, errorText);
+            }
+          } catch (apiError) {
+            console.error("Error calling Vast.ai stop API:", apiError);
+          }
+        }
+      }
+
+      // Fallback to local status update
+      const stoppedServer = await storage.stopVastServer(id);
       res.json(stoppedServer);
     } catch (error) {
       console.error("Stop server error:", error);
@@ -800,6 +830,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/vast-servers/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
+      
+      // Get server details before deletion
+      const server = await storage.getVastServer(id);
+      if (!server) {
+        return res.status(404).json({ error: "Server not found" });
+      }
+
+      // If server is launched on Vast.ai, destroy the actual instance
+      const metadata = server.metadata as any;
+      if (server.isLaunched && metadata?.vastInstanceId) {
+        const vastApiKey = await storage.getApiKeyByService('vast');
+        
+        if (vastApiKey && vastApiKey.keyValue) {
+          try {
+            console.log("Destroying Vast.ai instance:", metadata.vastInstanceId);
+            
+            const destroyResponse = await fetch(`https://console.vast.ai/api/v0/instances/${metadata.vastInstanceId}/`, {
+              method: 'DELETE',
+              headers: {
+                'Authorization': `Bearer ${vastApiKey.keyValue}`,
+                'Content-Type': 'application/json',
+              },
+            });
+
+            if (destroyResponse.ok) {
+              console.log("Successfully destroyed Vast.ai instance");
+            } else {
+              const errorText = await destroyResponse.text();
+              console.error("Failed to destroy Vast.ai instance:", destroyResponse.status, errorText);
+            }
+          } catch (apiError) {
+            console.error("Error calling Vast.ai destroy API:", apiError);
+          }
+        }
+      }
+
+      // Delete from our database
       const success = await storage.deleteVastServer(id);
       
       if (!success) {

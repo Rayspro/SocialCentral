@@ -26,6 +26,7 @@ import {
   getGenerations,
   autoSetupComfyUI,
 } from "./comfy-ui";
+import { startupComfyUI } from "./routes-comfy-startup";
 import { workflowAnalyzer } from "./workflow-analyzer";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
@@ -1555,6 +1556,7 @@ echo "CUDA environment configured!"`,
   
   // Auto-setup ComfyUI
   app.post('/api/comfy/:serverId/auto-setup', autoSetupComfyUI);
+  app.post('/api/comfy/:serverId/startup', startupComfyUI);
   
   // Real-time execution progress
   app.get('/api/server-executions/:serverId', async (req: Request, res: Response) => {

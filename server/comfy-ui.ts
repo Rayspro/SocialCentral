@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { storage } from './storage';
 import type { InsertComfyModel, InsertComfyWorkflow, InsertComfyGeneration } from '@shared/schema';
-import { sshTunnelManager } from './ssh-tunnel';
+import { comfyConnectionManager, ComfyUIHTTPClient } from './comfy-connection';
 
 // ComfyUI API client class
 class ComfyUIClient {
@@ -310,34 +310,25 @@ export async function getAvailableModels(req: Request, res: Response) {
       return res.status(404).json({ error: 'Server not found or not running' });
     }
 
-    // Try multiple connection methods for ComfyUI
-    const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
-    const possibleUrls = [
-      `http://${serverHost}:8188`,
-      `https://${serverHost}:8188`,
-      `http://${serverHost}:${server.metadata?.vastData?.direct_port_start || 65535}`,
-      server.serverUrl + ':8188'
-    ];
-
-    let client = null;
-    let workingUrl = null;
-
-    for (const url of possibleUrls) {
-      try {
-        const testClient = new ComfyUIClient(url);
-        const isOnline = await testClient.checkStatus();
-        if (isOnline) {
-          client = testClient;
-          workingUrl = url;
-          break;
+    // Use the new connection manager to find working ComfyUI instance
+    const connection = await comfyConnectionManager.findWorkingConnection(server);
+    
+    if (!connection) {
+      // Try to start ComfyUI if it's not running
+      const startAttempt = await comfyConnectionManager.startComfyUI(server);
+      
+      if (startAttempt) {
+        // Wait a moment and try again
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        const retryConnection = await comfyConnectionManager.findWorkingConnection(server);
+        
+        if (retryConnection) {
+          const models = await retryConnection.client.getModels();
+          return res.json({ models, connectedUrl: retryConnection.url });
         }
-      } catch (error) {
-        console.log(`Failed to connect to ComfyUI at ${url}:`, error.message);
-        continue;
       }
-    }
-
-    if (!client) {
+      
+      const testedUrls = comfyConnectionManager.getConnectionUrls(server);
       return res.status(503).json({
         error: 'ComfyUI server is not accessible',
         details: 'Tried multiple connection methods but ComfyUI is not responding',
@@ -347,12 +338,13 @@ export async function getAvailableModels(req: Request, res: Response) {
           'Ensure ComfyUI started after the setup completed',
           'Try accessing ComfyUI directly in your browser'
         ],
-        testedUrls: possibleUrls
+        testedUrls,
+        autoStartAttempted: startAttempt
       });
     }
 
-    const models = await client.getModels();
-    res.json({ models, connectedUrl: workingUrl });
+    const models = await connection.client.getModels();
+    res.json({ models, connectedUrl: connection.url });
   } catch (error) {
     console.error('Error fetching available models:', error);
     res.status(500).json({ error: 'Failed to fetch available models' });
@@ -527,18 +519,59 @@ export async function autoSetupComfyUI(req: Request, res: Response) {
       return res.status(400).json({ error: 'Server must be running to setup ComfyUI' });
     }
 
-    // Load the dedicated ComfyUI setup script
-    const fs = require('fs');
-    const path = require('path');
-    const setupScriptPath = path.join(__dirname, 'scripts', 'comfyui-setup.sh');
-    const setupScript = fs.readFileSync(setupScriptPath, 'utf8');
+    // Use the complete ComfyUI setup script directly
+    const setupScript = `#!/bin/bash
+set -e
+
+echo "=== ComfyUI Auto-Setup Starting ==="
+
+# Update system packages
+echo "Step 1/6: Updating system packages..."
+apt update -y > /dev/null 2>&1
+
+# Install system dependencies
+echo "Step 2/6: Installing system dependencies..."
+apt install -y python3 python3-pip python3-venv git wget curl unzip > /dev/null 2>&1
+
+# Create and activate virtual environment
+echo "Step 3/6: Setting up Python environment..."
+python3 -m venv /opt/comfyui-env
+source /opt/comfyui-env/bin/activate
+
+# Clone ComfyUI repository
+echo "Step 4/6: Cloning ComfyUI repository..."
+if [ ! -d "/opt/ComfyUI" ]; then
+  git clone https://github.com/comfyanonymous/ComfyUI.git /opt/ComfyUI
+fi
+cd /opt/ComfyUI
+
+# Install ComfyUI requirements
+echo "Step 5/6: Installing ComfyUI requirements..."
+pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install -r requirements.txt
+
+# Download basic SDXL model
+echo "Step 6/6: Downloading SDXL model..."
+mkdir -p models/checkpoints
+if [ ! -f "models/checkpoints/sd_xl_base_1.0.safetensors" ]; then
+  wget -O models/checkpoints/sd_xl_base_1.0.safetensors "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors"
+fi
+
+# Start ComfyUI server
+echo "Starting ComfyUI server..."
+python main.py --listen 0.0.0.0 --port 8188 > /var/log/comfyui.log 2>&1 &
+
+echo "=== ComfyUI Setup Complete ==="
+echo "ComfyUI is now running on port 8188"
+echo "Access it at: http://your-server-ip:8188"
+`;
 
     // Create execution record
     const execution = await storage.createServerExecution({
       serverId,
       scriptId: 1,
       status: 'running' as const,
-      output: 'Starting SSH connection for ComfyUI setup...\n',
+      output: 'Starting ComfyUI setup...\n',
     });
 
     // Execute the setup via SSH to the actual server
@@ -568,7 +601,7 @@ export async function autoSetupComfyUI(req: Request, res: Response) {
 // Execute ComfyUI setup via SSH on real Vast.ai server
 async function executeComfyUISetupViaSSH(executionId: number, server: any, setupScript: string) {
   try {
-    const { spawn } = require('child_process');
+    const { spawn } = await import('child_process');
     let totalOutput = '';
 
     // Parse SSH connection string to get host and port

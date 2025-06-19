@@ -34,6 +34,7 @@ export interface IStorage {
   // User methods
   getUser(id: number): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
 
   // Platform methods
@@ -111,6 +112,11 @@ export class DatabaseStorage implements IStorage {
 
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
     return user || undefined;
   }
 
@@ -392,7 +398,18 @@ export class DatabaseStorage implements IStorage {
 // export const storage = new DatabaseStorage();
 
 class MemStorage implements IStorage {
-  private users: User[] = [];
+  private users: User[] = [
+    {
+      id: 1,
+      username: "demo",
+      passwordHash: "$2b$10$TPP5DUtiI07byHlbciAbxelPY/Ik49x3i5ZMTpKXKp96IAYXDIEp2", // password: "demo123"
+      email: "demo@example.com",
+      firstName: "Demo",
+      lastName: "User",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+  ];
   private platforms: Platform[] = [
     { id: 1, name: "youtube", displayName: "YouTube", icon: "youtube", color: "#FF0000", isActive: true },
     { id: 2, name: "instagram", displayName: "Instagram", icon: "instagram", color: "#E4405F", isActive: true },
@@ -459,8 +476,18 @@ echo "Model download completed!"`,
     return this.users.find(u => u.username === username);
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return this.users.find(u => u.email === email);
+  }
+
   async createUser(user: InsertUser): Promise<User> {
-    const newUser = { ...user, id: this.users.length + 1 } as User;
+    const id = this.users.length + 1;
+    const newUser: User = {
+      ...user,
+      id,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
     this.users.push(newUser);
     return newUser;
   }
@@ -705,4 +732,4 @@ echo "Model download completed!"`,
   }
 }
 
-export const storage = new DatabaseStorage();
+export const storage = new MemStorage();

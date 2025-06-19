@@ -77,6 +77,13 @@ export default function ComfyUI() {
   const [newModelFolder, setNewModelFolder] = useState("checkpoints");
   const [newModelDescription, setNewModelDescription] = useState("");
 
+  // Workflow management state
+  const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
+  const [newWorkflowName, setNewWorkflowName] = useState("");
+  const [newWorkflowDescription, setNewWorkflowDescription] = useState("");
+  const [newWorkflowCategory, setNewWorkflowCategory] = useState("text-to-image");
+  const [newWorkflowJson, setNewWorkflowJson] = useState("");
+
   // Get running servers
   const { data: servers, isLoading: serversLoading } = useQuery({
     queryKey: ["/api/vast-servers"],
@@ -99,7 +106,7 @@ export default function ComfyUI() {
   });
 
   // Get workflows
-  const { data: workflows, isLoading: workflowsLoading } = useQuery({
+  const { data: workflows, isLoading: workflowsLoading, refetch: refetchWorkflows } = useQuery({
     queryKey: ["/api/comfy/workflows"],
   });
 
@@ -162,6 +169,32 @@ export default function ComfyUI() {
     },
   });
 
+  const createWorkflowMutation = useMutation({
+    mutationFn: async (workflowData: any) => {
+      const response = await fetch('/api/comfy/workflows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(workflowData),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchWorkflows();
+      setShowWorkflowDialog(false);
+      setNewWorkflowName("");
+      setNewWorkflowDescription("");
+      setNewWorkflowCategory("text-to-image");
+      setNewWorkflowJson("");
+    },
+  });
+
   const handleAddModel = () => {
     if (!newModelName || !newModelUrl || !selectedServer) return;
     
@@ -181,6 +214,27 @@ export default function ComfyUI() {
       negativePrompt,
       workflowId: selectedWorkflow,
       parameters: params,
+    });
+  };
+
+  const handleCreateWorkflow = () => {
+    if (!newWorkflowName || !newWorkflowJson) return;
+
+    let parsedWorkflow;
+    try {
+      parsedWorkflow = JSON.parse(newWorkflowJson);
+    } catch (error) {
+      alert("Invalid JSON format in workflow definition");
+      return;
+    }
+
+    createWorkflowMutation.mutate({
+      name: newWorkflowName,
+      description: newWorkflowDescription,
+      workflowJson: parsedWorkflow,
+      category: newWorkflowCategory,
+      serverId: selectedServer?.id,
+      isTemplate: false,
     });
   };
 
@@ -707,10 +761,81 @@ export default function ComfyUI() {
                       <CardTitle className="text-lg">Saved Workflows</CardTitle>
                       <CardDescription>Custom ComfyUI workflows</CardDescription>
                     </div>
-                    <Button variant="outline" size="sm">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Workflow
-                    </Button>
+                    <Dialog open={showWorkflowDialog} onOpenChange={setShowWorkflowDialog}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Workflow
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                          <DialogTitle>Create New Workflow</DialogTitle>
+                          <DialogDescription>
+                            Add a custom ComfyUI workflow for text-to-image generation
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <div>
+                            <Label htmlFor="workflow-name">Name</Label>
+                            <Input
+                              id="workflow-name"
+                              value={newWorkflowName}
+                              onChange={(e) => setNewWorkflowName(e.target.value)}
+                              placeholder="Enter workflow name"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="workflow-description">Description</Label>
+                            <Textarea
+                              id="workflow-description"
+                              value={newWorkflowDescription}
+                              onChange={(e) => setNewWorkflowDescription(e.target.value)}
+                              placeholder="Describe your workflow"
+                              rows={2}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="workflow-category">Category</Label>
+                            <Select value={newWorkflowCategory} onValueChange={setNewWorkflowCategory}>
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="text-to-image">Text to Image</SelectItem>
+                                <SelectItem value="img2img">Image to Image</SelectItem>
+                                <SelectItem value="inpainting">Inpainting</SelectItem>
+                                <SelectItem value="upscaling">Upscaling</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor="workflow-json">Workflow JSON</Label>
+                            <Textarea
+                              id="workflow-json"
+                              value={newWorkflowJson}
+                              onChange={(e) => setNewWorkflowJson(e.target.value)}
+                              placeholder="Paste your ComfyUI workflow JSON here"
+                              rows={5}
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setShowWorkflowDialog(false)}
+                            >
+                              Cancel
+                            </Button>
+                            <Button 
+                              onClick={handleCreateWorkflow}
+                              disabled={!newWorkflowName || !newWorkflowJson || createWorkflowMutation.isPending}
+                            >
+                              {createWorkflowMutation.isPending ? "Creating..." : "Create Workflow"}
+                            </Button>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
                 </CardHeader>
                 <CardContent>

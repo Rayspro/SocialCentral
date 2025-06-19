@@ -411,9 +411,17 @@ export async function generateImage(req: Request, res: Response) {
     const comfyUrl = `http://${serverHost}:8188`;
     const client = new ComfyUIClient(comfyUrl);
 
-    // Check if server is in demo mode with completed setup
-    const isDemoReady = server.metadata?.comfyUIStatus === 'demo-ready' || 
-                       (server.setupStatus === 'ready' && server.metadata?.setupCompletedAt);
+    // Check if server is in demo mode or setup is completed
+    const isDemoReady = server.setupStatus === 'demo-ready' || 
+                       server.setupStatus === 'ready' ||
+                       server.metadata?.comfyUIStatus === 'demo-ready';
+
+    console.log('Server status check:', {
+      serverId,
+      setupStatus: server.setupStatus,
+      metadata: server.metadata,
+      isDemoReady
+    });
 
     if (isDemoReady) {
       // Handle demo generation for ready servers

@@ -28,7 +28,9 @@ import {
   Palette,
   Save,
   Eye,
-  Trash2
+  Trash2,
+  Brain,
+  Loader2
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -84,6 +86,14 @@ export default function ComfyUI() {
   const [newWorkflowCategory, setNewWorkflowCategory] = useState("text-to-image");
   const [newWorkflowJson, setNewWorkflowJson] = useState("");
 
+  // Workflow analyzer state
+  const [analyzeWorkflowJson, setAnalyzeWorkflowJson] = useState("");
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
+
   // Get running servers
   const { data: servers, isLoading: serversLoading } = useQuery({
     queryKey: ["/api/vast-servers"],
@@ -122,6 +132,40 @@ export default function ComfyUI() {
       setSelectedServer(runningServers[0]);
     }
   }, [runningServers, selectedServer]);
+
+  // WebSocket connection for real-time logs
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/workflow-logs`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected for workflow logs');
+      setWsConnection(ws);
+    };
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'workflow_log') {
+        setLogs(prev => [...prev, data.log]);
+      } else if (data.type === 'workflow_logs_history') {
+        setLogs(data.logs);
+      } else if (data.type === 'workflow_logs_cleared') {
+        setLogs([]);
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+      setWsConnection(null);
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, []);
 
   // Mutations
   const addModelMutation = useMutation({
@@ -192,6 +236,56 @@ export default function ComfyUI() {
       setNewWorkflowDescription("");
       setNewWorkflowCategory("text-to-image");
       setNewWorkflowJson("");
+    },
+  });
+
+  const analyzeWorkflowMutation = useMutation({
+    mutationFn: async (workflowJson: any) => {
+      const response = await fetch('/api/comfy/analyze-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ workflowJson }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAnalysisResult(data);
+      setIsAnalyzing(false);
+    },
+    onError: () => {
+      setIsAnalyzing(false);
+    },
+  });
+
+  const downloadRequirementsMutation = useMutation({
+    mutationFn: async ({ serverId, analysis }: { serverId: number; analysis: any }) => {
+      const response = await fetch(`/api/comfy/${serverId}/download-requirements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ analysis }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsDownloading(false);
+      refetchModels();
+    },
+    onError: () => {
+      setIsDownloading(false);
     },
   });
 
@@ -411,10 +505,11 @@ export default function ComfyUI() {
 
         {selectedServer && (
           <Tabs defaultValue="generate" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="generate">Generate</TabsTrigger>
               <TabsTrigger value="models">Models</TabsTrigger>
               <TabsTrigger value="workflows">Workflows</TabsTrigger>
+              <TabsTrigger value="analyzer">Analyzer</TabsTrigger>
               <TabsTrigger value="gallery">Gallery</TabsTrigger>
             </TabsList>
 
@@ -872,6 +967,210 @@ export default function ComfyUI() {
                       No workflows saved yet
                     </div>
                   )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Analyzer Tab */}
+            <TabsContent value="analyzer" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Workflow Analyzer</CardTitle>
+                  <CardDescription>AI-powered workflow analysis with automatic dependency detection</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Workflow JSON</label>
+                    <Textarea
+                      placeholder="Paste your ComfyUI workflow JSON here..."
+                      value={analyzeWorkflowJson}
+                      onChange={(e) => setAnalyzeWorkflowJson(e.target.value)}
+                      className="min-h-[200px] font-mono text-sm"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        if (!analyzeWorkflowJson.trim()) return;
+                        setIsAnalyzing(true);
+                        setAnalysisResult(null);
+                        try {
+                          const parsedJson = JSON.parse(analyzeWorkflowJson);
+                          analyzeWorkflowMutation.mutate(parsedJson);
+                        } catch (error) {
+                          console.error('Invalid JSON:', error);
+                          setIsAnalyzing(false);
+                        }
+                      }}
+                      disabled={isAnalyzing || !analyzeWorkflowJson.trim()}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Brain className="h-4 w-4 mr-2" />
+                          Analyze Workflow
+                        </>
+                      )}
+                    </Button>
+                    
+                    {analysisResult && selectedServer && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsDownloading(true);
+                          downloadRequirementsMutation.mutate({
+                            serverId: selectedServer.id,
+                            analysis: analysisResult
+                          });
+                        }}
+                        disabled={isDownloading}
+                      >
+                        {isDownloading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Requirements
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setLogs([])}
+                      disabled={logs.length === 0}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear Logs
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Analysis Results */}
+              {analysisResult && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Analysis Results</CardTitle>
+                    <CardDescription>
+                      Complexity: <Badge variant="outline">{analysisResult.complexity}</Badge>
+                      Download Size: <Badge variant="outline">{analysisResult.estimatedDownloadSize}</Badge>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h4 className="font-medium mb-2">Summary</h4>
+                      <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
+                    </div>
+                    
+                    {/* Required Models */}
+                    {analysisResult.models && analysisResult.models.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-3">Required Models ({analysisResult.models.length})</h4>
+                        <div className="space-y-2">
+                          {analysisResult.models.map((model: any, index: number) => (
+                            <div key={index} className="border rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-sm">{model.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Type: {model.type} • Folder: {model.folder}
+                                  </div>
+                                  {model.description && (
+                                    <div className="text-xs text-muted-foreground mt-1">{model.description}</div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {model.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                                  {model.url && <Badge variant="outline" className="text-xs">URL Available</Badge>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Custom Nodes */}
+                    {analysisResult.nodes && analysisResult.nodes.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-3">Custom Nodes ({analysisResult.nodes.length})</h4>
+                        <div className="space-y-2">
+                          {analysisResult.nodes.map((node: any, index: number) => (
+                            <div key={index} className="border rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-sm">{node.name}</div>
+                                  <div className="text-xs text-muted-foreground">Type: {node.type}</div>
+                                  {node.description && (
+                                    <div className="text-xs text-muted-foreground mt-1">{node.description}</div>
+                                  )}
+                                  {node.installCommand && (
+                                    <code className="text-xs bg-muted px-1 rounded mt-1 block">{node.installCommand}</code>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {node.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                                  {node.gitUrl && <Badge variant="outline" className="text-xs">Git Available</Badge>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Real-time Logs */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Real-time Logs</CardTitle>
+                      <CardDescription>Live progress updates during analysis and downloads</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${wsConnection ? 'bg-green-500' : 'bg-red-500'}`} />
+                      <span className="text-xs text-muted-foreground">
+                        {wsConnection ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+                    {logs.length > 0 ? (
+                      logs.map((log, index) => (
+                        <div key={index} className="flex gap-2 mb-1">
+                          <span className="text-gray-500 shrink-0">
+                            {new Date(log.timestamp).toLocaleTimeString()}
+                          </span>
+                          <span className={`shrink-0 ${
+                            log.level === 'error' ? 'text-red-400' :
+                            log.level === 'warning' ? 'text-yellow-400' :
+                            log.level === 'success' ? 'text-green-400' :
+                            'text-blue-400'
+                          }`}>
+                            [{log.level.toUpperCase()}]
+                          </span>
+                          <span>{log.message}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-gray-500">No logs yet. Start analyzing a workflow to see real-time progress...</div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>

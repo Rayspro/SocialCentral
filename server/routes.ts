@@ -1,6 +1,8 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { workflowAnalyzer } from "./workflow-analyzer";
 import { insertAccountSchema, insertContentSchema, insertScheduleSchema, insertSetupScriptSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -22,6 +24,7 @@ import {
   getGenerationStatus,
   getGenerations,
 } from "./comfy-ui";
+import { workflowAnalyzer } from "./workflow-analyzer";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
@@ -1518,6 +1521,72 @@ echo "CUDA environment configured!"`,
   app.get('/api/comfy/generation/:generationId', getGenerationStatus);
   app.get('/api/comfy/:serverId/generations', getGenerations);
 
+  // Workflow analysis routes
+  app.post('/api/comfy/analyze-workflow', async (req: Request, res: Response) => {
+    try {
+      const { workflowJson } = req.body;
+      if (!workflowJson) {
+        return res.status(400).json({ error: 'Workflow JSON is required' });
+      }
+
+      const analysis = await workflowAnalyzer.analyzeWorkflow(workflowJson);
+      res.json(analysis);
+    } catch (error) {
+      console.error('Error analyzing workflow:', error);
+      res.status(500).json({ error: 'Failed to analyze workflow' });
+    }
+  });
+
+  app.post('/api/comfy/:serverId/download-requirements', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const { analysis } = req.body;
+      
+      if (!analysis) {
+        return res.status(400).json({ error: 'Analysis data is required' });
+      }
+
+      await workflowAnalyzer.downloadModelsAndNodes(analysis, serverId);
+      res.json({ success: true, message: 'Download process started' });
+    } catch (error) {
+      console.error('Error starting downloads:', error);
+      res.status(500).json({ error: 'Failed to start download process' });
+    }
+  });
+
+  app.get('/api/comfy/analysis-logs', async (req: Request, res: Response) => {
+    try {
+      const logs = workflowAnalyzer.getLogs();
+      res.json(logs);
+    } catch (error) {
+      console.error('Error fetching analysis logs:', error);
+      res.status(500).json({ error: 'Failed to fetch logs' });
+    }
+  });
+
+  app.delete('/api/comfy/analysis-logs', async (req: Request, res: Response) => {
+    try {
+      workflowAnalyzer.clearLogs();
+      res.json({ success: true, message: 'Logs cleared' });
+    } catch (error) {
+      console.error('Error clearing logs:', error);
+      res.status(500).json({ error: 'Failed to clear logs' });
+    }
+  });
+
   const httpServer = createServer(app);
+
+  // WebSocket server for real-time logs
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws/workflow-logs' });
+  
+  wss.on('connection', (ws) => {
+    console.log('WebSocket connection established for workflow logs');
+    workflowAnalyzer.addWebSocketConnection(ws);
+    
+    ws.on('close', () => {
+      console.log('WebSocket connection closed');
+    });
+  });
+
   return httpServer;
 }

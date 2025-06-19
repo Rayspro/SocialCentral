@@ -796,6 +796,27 @@ async function monitorGeneration(generationId: number, serverId: number, queueId
               imageUrls,
               completedAt: new Date(),
             });
+
+            // Log successful image generation
+            const generation = await storage.getComfyGeneration(generationId);
+            if (generation) {
+              await storage.createAuditLog({
+                category: 'user_action',
+                userId: 1, // Default user for now
+                action: 'comfy_generation_completed',
+                resource: 'comfy_generation',
+                resourceId: generationId.toString(),
+                details: {
+                  serverId,
+                  prompt: generation.prompt,
+                  imageCount: imageUrls.length,
+                  queueId
+                },
+                ipAddress: null,
+                userAgent: null,
+                severity: 'info'
+              });
+            }
             return;
           }
         }

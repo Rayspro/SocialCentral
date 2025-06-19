@@ -1224,6 +1224,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         startedAt: new Date(),
       });
 
+      // Log script execution start
+      const userId = (req as any).session?.userId;
+      if (userId) {
+        await storage.createAuditLog({
+          category: 'user_action',
+          userId,
+          action: 'script_execution_start',
+          resource: 'server_execution',
+          resourceId: execution.id.toString(),
+          details: {
+            serverId,
+            scriptName: script.name,
+            estimatedTime: script.estimatedTime
+          },
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent'),
+          severity: 'info'
+        });
+      }
+
       // Update server status to configuring
       await storage.updateVastServer(serverId, { 
         status: "configuring",
@@ -1247,6 +1267,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
               status: "running",
               setupStatus: "ready" 
             });
+
+            // Log successful script execution
+            if (userId) {
+              await storage.createAuditLog({
+                category: 'system_event',
+                userId,
+                action: 'script_execution_completed',
+                resource: 'server_execution',
+                resourceId: execution.id.toString(),
+                details: {
+                  serverId,
+                  scriptName: script.name,
+                  status: 'success',
+                  duration: script.estimatedTime
+                },
+                ipAddress: req.ip,
+                userAgent: req.get('User-Agent'),
+                severity: 'info'
+              });
+            }
           } else {
             await storage.updateServerExecution(execution.id, {
               status: "failed",

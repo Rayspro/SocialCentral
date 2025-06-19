@@ -730,32 +730,121 @@ echo "It will start automatically when you connect to the server"`,
   async createVastServer(server: InsertVastServer): Promise<VastServer> {
     const newServer = { ...server, id: this.vastServers.length + 1, createdAt: new Date(), updatedAt: new Date() } as VastServer;
     this.vastServers.push(newServer);
+
+    // Log server creation
+    await this.createAuditLog({
+      category: 'user_action',
+      userId: 1,
+      action: 'vast_server_created',
+      resource: 'vast_server',
+      resourceId: newServer.id.toString(),
+      details: {
+        serverName: server.name,
+        gpu: server.gpu,
+        price: server.price,
+        region: server.region
+      },
+      severity: 'info'
+    });
+
     return newServer;
   }
 
   async updateVastServer(id: number, server: Partial<InsertVastServer>): Promise<VastServer | undefined> {
     const index = this.vastServers.findIndex(s => s.id === id);
     if (index === -1) return undefined;
+    
+    const oldServer = this.vastServers[index];
     this.vastServers[index] = { ...this.vastServers[index], ...server, updatedAt: new Date() };
+    
+    // Log server update
+    await this.createAuditLog({
+      category: 'system_event',
+      userId: 1,
+      action: 'vast_server_updated',
+      resource: 'vast_server',
+      resourceId: id.toString(),
+      details: {
+        serverName: oldServer.name,
+        changes: server,
+        previousStatus: oldServer.status,
+        newStatus: server.status || oldServer.status
+      },
+      severity: 'info'
+    });
+    
     return this.vastServers[index];
   }
 
   async deleteVastServer(id: number): Promise<boolean> {
     const index = this.vastServers.findIndex(s => s.id === id);
     if (index === -1) return false;
+    
+    const server = this.vastServers[index];
     this.vastServers.splice(index, 1);
+    
+    // Log server deletion
+    await this.createAuditLog({
+      category: 'user_action',
+      userId: 1,
+      action: 'vast_server_deleted',
+      resource: 'vast_server',
+      resourceId: id.toString(),
+      details: {
+        serverName: server.name,
+        gpu: server.gpu,
+        status: server.status,
+        vastId: server.vastId
+      },
+      severity: 'warning'
+    });
+    
     return true;
   }
 
   async launchVastServer(id: number): Promise<VastServer | undefined> {
     const server = await this.getVastServer(id);
     if (!server) return undefined;
+    
+    // Log server launch
+    await this.createAuditLog({
+      category: 'user_action',
+      userId: 1,
+      action: 'vast_server_launched',
+      resource: 'vast_server',
+      resourceId: id.toString(),
+      details: {
+        serverName: server.name,
+        gpu: server.gpu,
+        pricePerHour: server.pricePerHour,
+        location: server.location
+      },
+      severity: 'info'
+    });
+    
     return this.updateVastServer(id, { status: 'running', isLaunched: true });
   }
 
   async stopVastServer(id: number): Promise<VastServer | undefined> {
     const server = await this.getVastServer(id);
     if (!server) return undefined;
+    
+    // Log server stop
+    await this.createAuditLog({
+      category: 'user_action',
+      userId: 1,
+      action: 'vast_server_stopped',
+      resource: 'vast_server',
+      resourceId: id.toString(),
+      details: {
+        serverName: server.name,
+        gpu: server.gpu,
+        pricePerHour: server.pricePerHour,
+        location: server.location
+      },
+      severity: 'info'
+    });
+    
     return this.updateVastServer(id, { status: 'stopped', isLaunched: false });
   }
 
@@ -907,6 +996,23 @@ echo "It will start automatically when you connect to the server"`,
       completedAt: null,
     };
     this.comfyGenerations.push(newGeneration);
+
+    // Log ComfyUI generation start
+    await this.createAuditLog({
+      category: 'user_action',
+      userId: 1,
+      action: 'comfy_generation_started',
+      resource: 'comfy_generation',
+      resourceId: newGeneration.id.toString(),
+      details: {
+        serverId: generation.serverId,
+        prompt: generation.prompt,
+        workflowId: generation.workflowId,
+        queueId: generation.queueId
+      },
+      severity: 'info'
+    });
+
     return newGeneration;
   }
 

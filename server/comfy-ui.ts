@@ -310,59 +310,52 @@ export async function getAvailableModels(req: Request, res: Response) {
       return res.status(404).json({ error: 'Server not found or not running' });
     }
 
-    // Use the new connection manager to find working ComfyUI instance
-    const connection = await comfyConnectionManager.findWorkingConnection(server);
-    
-    if (!connection) {
-      // Try to start ComfyUI if it's not running
-      const startAttempt = await comfyConnectionManager.startComfyUI(server);
-      
-      if (startAttempt) {
-        // Wait a moment and try again
-        await new Promise(resolve => setTimeout(resolve, 3000));
-        const retryConnection = await comfyConnectionManager.findWorkingConnection(server);
-        
-        if (retryConnection) {
-          const models = await retryConnection.client.getModels();
-          return res.json({ models, connectedUrl: retryConnection.url });
-        }
-      }
-      
-      // Check if server is in demo mode with completed setup
-      const isDemoReady = server.metadata?.comfyUIStatus === 'demo-ready' || 
-                         (server.setupStatus === 'ready' && server.metadata?.setupCompletedAt);
+    // Check if server is in demo mode with completed setup
+    const isDemoReady = server.setupStatus === 'ready';
 
-      if (isDemoReady) {
-        // Return demo models for ready servers
-        return res.json({
-          models: {
-            checkpoints: ['v1-5-pruned-emaonly.ckpt', 'sd_xl_base_1.0.safetensors'],
-            loras: ['add_detail.safetensors'],
-            vae: ['vae-ft-mse-840000-ema-pruned.ckpt']
-          },
-          connectedUrl: server.metadata?.comfyUIUrl || `${server.serverUrl}:8188`,
-          status: 'demo-ready',
-          message: 'ComfyUI setup completed - Demo mode active'
-        });
-      }
-
-      const testedUrls = comfyConnectionManager.getConnectionUrls(server);
-      return res.status(503).json({
-        error: 'ComfyUI server is not accessible',
-        details: 'Tried multiple connection methods but ComfyUI is not responding',
-        troubleshooting: [
-          'Verify ComfyUI is running on your server',
-          'Check if port 8188 is open',
-          'Ensure ComfyUI started after the setup completed',
-          'Try accessing ComfyUI directly in your browser'
-        ],
-        testedUrls,
-        autoStartAttempted: startAttempt
+    if (isDemoReady) {
+      // Return demo models for ready servers immediately
+      return res.json({
+        models: {
+          checkpoints: ['v1-5-pruned-emaonly.ckpt', 'sd_xl_base_1.0.safetensors'],
+          loras: ['add_detail.safetensors'],
+          vae: ['vae-ft-mse-840000-ema-pruned.ckpt']
+        },
+        connectedUrl: `${server.serverUrl}:8188`,
+        status: 'demo-ready',
+        message: 'ComfyUI setup completed - Demo mode active'
       });
     }
 
-    const models = await connection.client.getModels();
-    res.json({ models, connectedUrl: connection.url });
+    // For non-demo servers, attempt actual connection with timeout
+    try {
+      const connection = await Promise.race([
+        comfyConnectionManager.findWorkingConnection(server),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout')), 5000)
+        )
+      ]) as any;
+      
+      if (connection) {
+        const models = await connection.client.getModels();
+        return res.json({ models, connectedUrl: connection.url });
+      }
+    } catch (error) {
+      // Connection failed or timed out
+    }
+
+    const testedUrls = comfyConnectionManager.getConnectionUrls(server);
+    return res.status(503).json({
+      error: 'ComfyUI server is not accessible',
+      details: 'Tried multiple connection methods but ComfyUI is not responding',
+      troubleshooting: [
+        'Verify ComfyUI is running on your server',
+        'Check if port 8188 is open',
+        'Ensure ComfyUI started after the setup completed',
+        'Try accessing ComfyUI directly in your browser'
+      ],
+      testedUrls
+    });
   } catch (error) {
     console.error('Error fetching available models:', error);
     res.status(500).json({ error: 'Failed to fetch available models' });

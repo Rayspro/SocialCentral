@@ -1573,6 +1573,12 @@ echo "CUDA environment configured!"`,
   app.get('/api/comfy/:serverId/models', getComfyModels);
   app.post('/api/comfy/:serverId/models', addComfyModel);
   app.delete('/api/comfy/models/:id', deleteComfyModel);
+  
+  // Test route for debugging
+  app.get('/api/comfy/:serverId/test', async (req, res) => {
+    res.json({ message: 'ComfyUI routing works', serverId: req.params.serverId });
+  });
+  
   app.get('/api/comfy/:serverId/available-models', getAvailableModels);
   
   // Workflow management

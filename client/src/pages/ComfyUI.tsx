@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { LoadingSpinner, LoadingCard } from "@/components/ui/loading-spinner";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Download, 
   Play, 
@@ -30,7 +31,8 @@ import {
   Eye,
   Trash2,
   Brain,
-  Loader2
+  Loader2,
+  AlertTriangle
 } from "lucide-react";
 import { 
   DropdownMenu,
@@ -116,7 +118,7 @@ export default function ComfyUI() {
   });
 
   // Get available models from ComfyUI
-  const { data: availableModels, isLoading: availableModelsLoading, refetch: refetchAvailableModels } = useQuery({
+  const { data: availableModels, isLoading: availableModelsLoading, error: availableModelsError, refetch: refetchAvailableModels } = useQuery({
     queryKey: [`/api/comfy/${selectedServer?.id}/available-models`],
     enabled: !!selectedServer,
   });

@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { platforms, accounts, content, schedules } from "@shared/schema";
+import { platforms, accounts, content, schedules, apiKeys } from "@shared/schema";
 
 export async function initializeDatabase() {
   try {

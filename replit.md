@@ -37,6 +37,7 @@ SocialSync is a full-stack web application for managing social media content acr
 - **Schedules**: Content scheduling and publishing management
 - **Users**: User management system (schema defined, not fully implemented)
 - **API Keys**: Secure storage for external service credentials
+- **Vast Servers**: GPU server instances for AI workloads with pricing and status tracking
 
 ### Content Management System
 - **AI Content Generation**: Text and image generation using OpenAI API
@@ -51,6 +52,7 @@ SocialSync is a full-stack web application for managing social media content acr
 - **Content Creator**: AI-powered content generation tools
 - **Approval System**: Review and approve pending content
 - **Scheduler**: Calendar-based content scheduling
+- **Vast.ai Server Manager**: Browse, launch, and manage GPU servers for AI workloads
 - **Settings**: API key management and platform configuration
 
 ## Data Flow

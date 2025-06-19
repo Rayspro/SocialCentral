@@ -74,7 +74,7 @@ export default function Settings() {
     contentModeration: true,
   });
 
-  const { data: apiKeys, isLoading: apiKeysLoading } = useQuery({
+  const { data: apiKeys, isLoading: apiKeysLoading } = useQuery<ApiKey[]>({
     queryKey: ["/api/api-keys"],
   });
 
@@ -181,6 +181,7 @@ export default function Settings() {
       runway: "RunwayML",
       pika: "Pika Labs",
       stable: "Stable Diffusion",
+      vast: "Vast.ai",
     };
     return serviceNames[service as keyof typeof serviceNames] || service;
   };
@@ -448,6 +449,7 @@ export default function Settings() {
                                     <SelectItem value="runway">RunwayML</SelectItem>
                                     <SelectItem value="pika">Pika Labs</SelectItem>
                                     <SelectItem value="stable">Stable Diffusion</SelectItem>
+                                    <SelectItem value="vast">Vast.ai</SelectItem>
                                   </SelectContent>
                                 </Select>
                                 <FormMessage />
@@ -504,12 +506,46 @@ export default function Settings() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Vast.ai Quick Setup */}
+                <div className="p-4 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium text-blue-900 dark:text-blue-100">Vast.ai Server Management</h3>
+                      <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                        Configure your Vast.ai API key to launch GPU servers for AI workloads
+                      </p>
+                    </div>
+                    <Button
+                      onClick={() => {
+                        form.reset({
+                          service: "vast",
+                          keyName: "VAST_API_KEY",
+                          keyValue: ""
+                        });
+                        setEditingApiKey(null);
+                        setShowApiKeyDialog(true);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                    >
+                      <Key className="h-4 w-4 mr-2" />
+                      Setup Vast.ai
+                    </Button>
+                  </div>
+                  {apiKeys && Array.isArray(apiKeys) && apiKeys.find((key: ApiKey) => key.service === 'vast') && (
+                    <div className="mt-3 text-sm text-green-700 dark:text-green-300">
+                      ✓ Vast.ai API key configured - You can now launch servers
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
                 {/* API Keys List */}
                 <div className="space-y-4">
                   <h3 className="font-medium">Configured API Keys</h3>
                   {apiKeysLoading ? (
                     <div className="text-center py-4 text-gray-500">Loading API keys...</div>
-                  ) : apiKeys && apiKeys.length > 0 ? (
+                  ) : apiKeys && Array.isArray(apiKeys) && apiKeys.length > 0 ? (
                     <div className="space-y-3">
                       {apiKeys.map((apiKey: ApiKey) => (
                         <div

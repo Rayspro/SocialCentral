@@ -1,24 +1,35 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { LoadingMascot } from "@/components/ui/loading-mascot";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { 
-  Settings, 
-  Activity, 
   Server, 
   Clock, 
   HardDrive, 
   Cpu, 
-  MemoryStick,
+  MemoryStick, 
+  DollarSign, 
+  MapPin, 
+  Activity, 
+  Wrench, 
   Loader2,
+  BarChart3,
+  Settings,
+  FileText,
   Play,
-  AlertCircle,
-  CheckCircle
+  CheckCircle,
+  XCircle,
+  AlertTriangle
 } from "lucide-react";
+import { format } from "date-fns";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { apiRequest } from "@/lib/queryClient";
 
 interface ServerAnalyticsProps {
@@ -27,21 +38,17 @@ interface ServerAnalyticsProps {
 }
 
 export function ServerAnalytics({ serverId, onClose }: ServerAnalyticsProps) {
-  const queryClient = useQueryClient();
-  const [setupProgress, setSetupProgress] = useState(0);
-  const [setupLogs, setSetupLogs] = useState<string[]>([]);
-  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
 
   // Fetch server details
   const { data: server, isLoading: isLoadingServer } = useQuery({
     queryKey: [`/api/vast-servers/${serverId}`],
-    refetchInterval: 5000,
+    refetchInterval: 3000,
   });
 
-  // Fetch server executions
-  const { data: executions, isLoading: isLoadingExecutions } = useQuery({
-    queryKey: [`/api/server-executions/${serverId}`],
-  });
+  // Type-safe server data access
+  const serverData = server as any;
+  const queryClient = useQueryClient();
 
   // Fetch scheduler info
   const { data: schedulerInfo } = useQuery({
@@ -49,12 +56,18 @@ export function ServerAnalytics({ serverId, onClose }: ServerAnalyticsProps) {
     refetchInterval: 2000,
   });
 
+  // Fetch executions
+  const { data: executions, isLoading: isLoadingExecutions } = useQuery({
+    queryKey: [`/api/server-executions/${serverId}`],
+    refetchInterval: 2000,
+  });
+
   // Setup ComfyUI mutation
   const setupMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/vast-servers/${serverId}/setup`, {
+      return await fetch(`/api/comfy/startup/${serverId}`, {
         method: "POST",
-      });
+      }).then(res => res.json());
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/vast-servers/${serverId}`] });
@@ -62,382 +75,406 @@ export function ServerAnalytics({ serverId, onClose }: ServerAnalyticsProps) {
     },
   });
 
-  // WebSocket connection for real-time logs
+  // WebSocket for real-time updates
   useEffect(() => {
-    if (server?.setupStatus === 'installing' || schedulerInfo?.isActive) {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const wsUrl = `${protocol}//${window.location.host}/ws`;
-      const ws = new WebSocket(wsUrl);
+    if (!serverData?.setupStatus || serverData.setupStatus === 'completed' || serverData.setupStatus === 'failed') {
+      return;
+    }
 
-      ws.onopen = () => {
-        console.log("WebSocket connected for server analytics");
-        setWsConnection(ws);
-      };
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const socket = new WebSocket(wsUrl);
 
-      ws.onmessage = (event) => {
+    socket.onopen = () => {
+      console.log("WebSocket connected for workflow logs");
+      socket.send(JSON.stringify({ 
+        type: 'subscribe', 
+        serverId: serverId 
+      }));
+    };
+
+    socket.onmessage = (event) => {
+      try {
         const data = JSON.parse(event.data);
         if (data.type === 'setup_progress' && data.serverId === serverId) {
-          setSetupProgress(data.progress);
-          if (data.log) {
-            setSetupLogs(prev => [...prev, data.log]);
-          }
+          queryClient.invalidateQueries({ queryKey: [`/api/vast-servers/${serverId}`] });
+          queryClient.invalidateQueries({ queryKey: [`/api/server-scheduler/${serverId}`] });
         }
-      };
+      } catch (error) {
+        console.error("WebSocket message parse error:", error);
+      }
+    };
 
-      ws.onclose = () => {
-        console.log("WebSocket connection closed");
-        setWsConnection(null);
-      };
+    socket.onclose = () => {
+      console.log("WebSocket connection closed");
+    };
 
-      return () => {
-        ws.close();
-      };
-    }
-  }, [server?.setupStatus, schedulerInfo?.isActive, serverId]);
+    return () => {
+      socket.close();
+    };
+  }, [serverData?.setupStatus, serverId]);
 
   if (isLoadingServer) {
     return (
       <div className="flex items-center justify-center h-64">
-        <LoadingMascot message="Loading server details..." />
+        <LoadingMascot task="loading" message="Loading server details..." />
       </div>
     );
   }
 
   if (!server) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-          <p className="text-muted-foreground">Server not found</p>
-        </div>
-      </div>
+      <Dialog open={true} onOpenChange={onClose}>
+        <DialogContent className="max-w-md">
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Server not found</p>
+          </div>
+        </DialogContent>
+      </Dialog>
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'running': return 'text-green-600 bg-green-100 dark:bg-green-900/20';
-      case 'installing': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
-      case 'completed': return 'text-green-600 bg-green-100 dark:bg-green-900/20';
-      case 'failed': return 'text-red-600 bg-red-100 dark:bg-red-900/20';
-      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
-    }
+  const getStatusBadge = (status: string) => {
+    const statusColors = {
+      running: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+      stopped: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+      starting: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+      stopping: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200",
+      pending: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+    };
+    return statusColors[status as keyof typeof statusColors] || "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
   };
 
-  const needsSetup = server.status === 'running' && (!server.setupStatus || server.setupStatus === 'pending');
-  const setupInProgress = server.setupStatus === 'installing' || schedulerInfo?.isActive;
+  const getSetupStatusBadge = (setupStatus: string) => {
+    const setupColors = {
+      completed: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+      running: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+      pending: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+      failed: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+    };
+    return setupColors[setupStatus as keyof typeof setupColors] || "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+  };
+
+  const isSetupInProgress = serverData?.setupStatus === 'pending' || serverData?.setupStatus === 'running';
+  const needsSetup = serverData?.status === 'running' && (!serverData?.setupStatus || serverData?.setupStatus === 'failed');
+  const isSetupComplete = serverData?.setupStatus === 'completed';
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-xl font-semibold">{server.name}</h2>
-              <p className="text-sm text-muted-foreground">Server Analytics & Setup</p>
-            </div>
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-          </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Server className="h-5 w-5" />
+            {serverData?.name || `Server ${serverId}`} Analytics
+          </DialogTitle>
+        </DialogHeader>
 
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="setup">ComfyUI Setup</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              <TabsTrigger value="logs">Logs</TabsTrigger>
-            </TabsList>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="setup">ComfyUI Setup</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="logs">Logs</TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="overview" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Server className="h-4 w-4" />
-                      Server Status
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span>Status:</span>
-                        <Badge className={getStatusColor(server.status)}>
-                          {server.status}
-                        </Badge>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Setup Status:</span>
-                        <Badge className={getStatusColor(server.setupStatus || 'pending')}>
-                          {server.setupStatus || 'pending'}
-                        </Badge>
-                      </div>
-                      {server.launchedAt && (
-                        <div className="flex items-center justify-between">
-                          <span>Launched:</span>
-                          <span className="text-sm">{new Date(server.launchedAt).toLocaleString()}</span>
-                        </div>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Cpu className="h-4 w-4" />
-                      Specifications
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span>GPU:</span>
-                        <span>{server.gpu} × {server.gpuCount}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>CPU Cores:</span>
-                        <span>{server.cpuCores}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>RAM:</span>
-                        <span>{server.ram} GB</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Storage:</span>
-                        <span>{server.disk} GB</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Cost:</span>
-                        <span className="font-semibold">${server.pricePerHour}/hr</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="setup" className="space-y-4">
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Settings className="h-4 w-4" />
-                    ComfyUI Setup
-                  </CardTitle>
-                  <CardDescription>
-                    Install and configure ComfyUI on your server
-                  </CardDescription>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Server Status</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  {needsSetup && (
-                    <div className="space-y-4">
-                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <p className="text-sm text-blue-600 dark:text-blue-400">
-                          Your server is ready for ComfyUI installation. Click the button below to start the automated setup process.
-                        </p>
-                      </div>
-                      <Button 
-                        onClick={() => setupMutation.mutate()}
-                        disabled={setupMutation.isPending}
-                        className="w-full"
-                      >
-                        {setupMutation.isPending ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Starting Setup...
-                          </>
-                        ) : (
-                          <>
-                            <Play className="h-4 w-4 mr-2" />
-                            Start ComfyUI Setup
-                          </>
-                        )}
-                      </Button>
+                <CardContent className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(serverData?.status || 'unknown')}`}>
+                      {serverData?.status || 'Unknown'}
                     </div>
-                  )}
-
-                  {setupInProgress && (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                        <span className="text-sm text-blue-600 dark:text-blue-400">
-                          ComfyUI setup is in progress...
-                        </span>
+                    {serverData?.setupStatus && (
+                      <div className={`px-2 py-1 rounded-full text-xs font-medium ${getSetupStatusBadge(serverData.setupStatus)}`}>
+                        Setup: {serverData.setupStatus}
                       </div>
-                      
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Progress</span>
-                          <span>{setupProgress}%</span>
-                        </div>
-                        <Progress value={setupProgress} className="w-full" />
-                      </div>
+                    )}
+                  </div>
 
-                      {setupLogs.length > 0 && (
-                        <div className="space-y-2">
-                          <h4 className="text-sm font-medium">Real-time Logs</h4>
-                          <div className="bg-black text-green-400 p-3 rounded-lg text-xs font-mono max-h-40 overflow-y-auto">
-                            {setupLogs.map((log, index) => (
-                              <div key={index}>{log}</div>
-                            ))}
-                          </div>
-                        </div>
+                  {needsSetup && serverData?.status === 'running' && (
+                    <Button
+                      onClick={() => setupMutation.mutate()}
+                      disabled={setupMutation.isPending}
+                      className="w-full"
+                    >
+                      {setupMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Setting up ComfyUI...
+                        </>
+                      ) : (
+                        <>
+                          <Wrench className="mr-2 h-4 w-4" />
+                          Setup ComfyUI
+                        </>
                       )}
-                    </div>
+                    </Button>
                   )}
 
-                  {server.setupStatus === 'completed' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                        <span className="text-sm text-green-600 dark:text-green-400">
-                          ComfyUI setup completed successfully!
-                        </span>
-                      </div>
-                      
-                      {server.serverUrl && (
-                        <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
-                          <h4 className="text-sm font-medium mb-2">Connection Details</h4>
-                          <code className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                            {server.serverUrl}:8188
-                          </code>
-                        </div>
-                      )}
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Launch Time</p>
+                      <p className="font-medium">
+                        {serverData?.launchedAt ? 
+                          format(new Date(serverData.launchedAt), 'MMM dd, yyyy HH:mm') : 
+                          'Not available'
+                        }
+                      </p>
                     </div>
-                  )}
-
-                  {server.setupStatus === 'failed' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
-                        <AlertCircle className="h-4 w-4 text-red-500" />
-                        <span className="text-sm text-red-600 dark:text-red-400">
-                          ComfyUI setup failed. Please try again.
-                        </span>
-                      </div>
-                      
-                      <Button 
-                        onClick={() => setupMutation.mutate()}
-                        disabled={setupMutation.isPending}
-                        variant="outline"
-                        className="w-full"
-                      >
-                        <Play className="h-4 w-4 mr-2" />
-                        Retry Setup
-                      </Button>
-                    </div>
-                  )}
+                  </div>
                 </CardContent>
               </Card>
-            </TabsContent>
 
-            <TabsContent value="analytics" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Activity className="h-4 w-4" />
-                      Server Activity
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span>Uptime:</span>
-                        <span>{server.launchedAt ? 
-                          Math.floor((Date.now() - new Date(server.launchedAt).getTime()) / (1000 * 60 * 60)) + 'h' : 
-                          'N/A'}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Total Cost:</span>
-                        <span className="font-semibold">
-                          ${server.launchedAt ? 
-                            (((Date.now() - new Date(server.launchedAt).getTime()) / (1000 * 60 * 60)) * parseFloat(server.pricePerHour)).toFixed(2) : 
-                            '0.00'}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span>Location:</span>
-                        <span>{server.location}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Clock className="h-4 w-4" />
-                      Scheduler Info
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {schedulerInfo ? (
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span>Status:</span>
-                          <Badge variant={schedulerInfo.isActive ? "default" : "secondary"}>
-                            {schedulerInfo.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Checks:</span>
-                          <span>{schedulerInfo.checkCount}/40</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span>Last Status:</span>
-                          <span>{schedulerInfo.lastStatus}</span>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">No scheduler information available</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
-            <TabsContent value="logs" className="space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Activity className="h-4 w-4" />
-                    Execution History
-                  </CardTitle>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Specifications</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">GPU:</span>
+                      <span className="font-medium">{serverData?.gpu} x{serverData?.gpuCount}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Cpu className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">CPU:</span>
+                      <span className="font-medium">{serverData?.cpuCores} cores</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MemoryStick className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">RAM:</span>
+                      <span className="font-medium">{serverData?.ram} GB</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <HardDrive className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Disk:</span>
+                      <span className="font-medium">{serverData?.disk} GB</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-muted-foreground">Price:</span>
+                      <span className="font-medium">${serverData?.pricePerHour}/hr</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="setup" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Settings className="h-5 w-5" />
+                  ComfyUI Setup Status
+                </CardTitle>
+                <CardDescription>
+                  Status: <Badge variant={serverData?.status === 'running' ? 'default' : 'secondary'}>
+                    {serverData?.status || 'Unknown'}
+                  </Badge>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {isSetupInProgress && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm font-medium">Setup in progress...</span>
+                    </div>
+                    <Progress value={75} className="w-full" />
+                  </div>
+                )}
+
+                {needsSetup && serverData?.setupStatus !== 'running' && (
+                  <div className="space-y-4">
+                    <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
+                      <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
+                        ComfyUI setup required
+                      </p>
+                      <p className="text-sm text-yellow-600 dark:text-yellow-300 mt-1">
+                        Your server is running but ComfyUI needs to be installed and configured.
+                      </p>
+                    </div>
+                    
+                    <Button
+                      onClick={() => setupMutation.mutate()}
+                      disabled={setupMutation.isPending}
+                      className="w-full"
+                    >
+                      {setupMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Starting Setup...
+                        </>
+                      ) : (
+                        <>
+                          <Play className="mr-2 h-4 w-4" />
+                          Start ComfyUI Setup
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+
+                {isSetupComplete && (
+                  <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                        ComfyUI is ready
+                      </p>
+                    </div>
+                    {serverData?.serverUrl && (
+                      <div className="mt-2 space-y-1">
+                        <p className="text-sm text-green-600 dark:text-green-300">
+                          ComfyUI URL: <a 
+                            href={serverData.serverUrl} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="underline hover:no-underline"
+                          >
+                            {serverData.serverUrl}
+                          </a>
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="analytics" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Usage Overview</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {isLoadingExecutions ? (
-                    <div className="flex items-center justify-center h-32">
-                      <LoadingMascot message="Loading logs..." />
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Uptime</span>
+                      <span className="text-sm font-medium">
+                        {serverData?.launchedAt ? 
+                          (() => {
+                            const launched = new Date(serverData.launchedAt);
+                            const now = new Date();
+                            const diffMs = now.getTime() - launched.getTime();
+                            const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+                            const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            return `${diffHours}h ${diffMinutes}m`;
+                          })() : 
+                          'N/A'
+                        }
+                      </span>
                     </div>
-                  ) : executions && executions.length > 0 ? (
-                    <div className="space-y-3 max-h-64 overflow-y-auto">
-                      {executions.map((execution: any) => (
-                        <div key={execution.id} className="border rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <Badge className={getStatusColor(execution.status)}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Total Cost</span>
+                      <span className="text-sm font-medium">
+                        {serverData?.launchedAt && serverData?.pricePerHour ? 
+                          (() => {
+                            const launched = new Date(serverData.launchedAt);
+                            const now = new Date();
+                            const diffHours = (now.getTime() - launched.getTime()) / (1000 * 60 * 60);
+                            const cost = diffHours * parseFloat(serverData.pricePerHour);
+                            return `$${cost.toFixed(2)}`;
+                          })() : 
+                          'N/A'
+                        }
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Rate</span>
+                      <span className="text-sm font-medium">${serverData?.pricePerHour || '0'}/hr</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium">Location</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm">{serverData?.location || 'Unknown'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium">Scheduler Status</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {schedulerInfo ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${(schedulerInfo as any)?.isActive ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className="text-sm">{(schedulerInfo as any)?.isActive ? 'Active' : 'Inactive'}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Checks: {(schedulerInfo as any)?.checkCount || 0} | Status: {(schedulerInfo as any)?.lastStatus || 'None'}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">No scheduler data available</div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="logs" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Execution Logs
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {isLoadingExecutions ? (
+                  <LoadingMascot task="loading" message="Loading execution logs..." />
+                ) : (executions as any)?.length > 0 ? (
+                  <ScrollArea className="h-64">
+                    <div className="space-y-2">
+                      {(executions as any).map((execution: any, index: number) => (
+                        <div key={index} className="p-3 border rounded text-xs">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-medium">Execution #{execution.id}</span>
+                            <Badge variant={execution.status === 'completed' ? 'default' : 'secondary'}>
                               {execution.status}
                             </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(execution.startedAt).toLocaleString()}
-                            </span>
+                          </div>
+                          <div className="text-muted-foreground">
+                            Started: {execution.startedAt ? format(new Date(execution.startedAt), 'MMM dd, HH:mm') : 'N/A'}
                           </div>
                           {execution.output && (
-                            <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs font-mono">
-                              {execution.output.slice(0, 200)}...
+                            <div className="mt-2 p-2 bg-muted rounded text-xs">
+                              {execution.output}
                             </div>
                           )}
                         </div>
                       ))}
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No execution logs available</p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-      </div>
-    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No execution logs available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </DialogContent>
+    </Dialog>
   );
 }

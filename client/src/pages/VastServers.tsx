@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal } from "lucide-react";
+import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { VastServer } from "@shared/schema";
 
@@ -219,11 +219,13 @@ export default function VastServers() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'running': return 'bg-green-500';
-      case 'launching': return 'bg-yellow-500';
-      case 'stopping': return 'bg-orange-500';
-      case 'stopped': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'running': return 'bg-green-500 text-white';
+      case 'launching': return 'bg-blue-500 text-white';
+      case 'configuring': return 'bg-purple-500 text-white';
+      case 'stopping': return 'bg-orange-500 text-white';
+      case 'stopped': return 'bg-red-500 text-white';
+      case 'available': return 'bg-gray-500 text-white';
+      default: return 'bg-gray-400 text-white';
     }
   };
 
@@ -330,6 +332,18 @@ export default function VastServers() {
         </TabsList>
 
         <TabsContent value="launched" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Launched Servers</h2>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] })}
+              disabled={isLoadingLaunched}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${isLoadingLaunched ? 'animate-spin' : ''}`} />
+              Refresh Status
+            </Button>
+          </div>
           {isLoadingLaunched ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-8 w-8 animate-spin" />
@@ -404,25 +418,26 @@ export default function VastServers() {
                       </div>
                     )}
                     <div className="flex gap-2 mt-4">
-                      {server.status === 'running' && (
+                      {server.isLaunched && ['launching', 'running', 'configuring'].includes(server.status) && (
                         <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleSetupServer(server)}
-                            disabled={server.status === 'launching'}
-                          >
-                            <Settings className="h-4 w-4 mr-1" />
-                            Setup
-                          </Button>
+                          {server.status === 'running' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleSetupServer(server)}
+                            >
+                              <Settings className="h-4 w-4 mr-1" />
+                              Setup
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => stopMutation.mutate(server.id)}
-                            disabled={stopMutation.isPending}
+                            disabled={stopMutation.isPending || server.status === 'stopping'}
                           >
                             <Square className="h-4 w-4 mr-1" />
-                            Stop
+                            {server.status === 'stopping' ? 'Stopping...' : 'Stop'}
                           </Button>
                         </>
                       )}
@@ -430,7 +445,7 @@ export default function VastServers() {
                         variant="outline"
                         size="sm"
                         onClick={() => deleteMutation.mutate(server.id)}
-                        disabled={deleteMutation.isPending || server.status === 'running'}
+                        disabled={deleteMutation.isPending || (server.isLaunched && server.status === 'running')}
                       >
                         <Trash2 className="h-4 w-4 mr-1" />
                         Delete

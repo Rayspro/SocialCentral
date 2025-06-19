@@ -117,6 +117,7 @@ Changelog:
 - June 19, 2025. Replaced mock data system with authentic Vast.ai marketplace data - servers launched will appear in user's Vast.ai console
 - June 19, 2025. Fixed server synchronization issues - delete and stop operations now properly destroy actual Vast.ai instances
 - June 19, 2025. Implemented proper contract ID tracking for bidirectional sync between app and Vast.ai console status
+- June 19, 2025. Fixed UI issues - added refresh button for server status updates, corrected stop button visibility, and improved status display with accurate color coding
 ```
 
 ## User Preferences

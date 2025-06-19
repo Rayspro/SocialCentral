@@ -228,6 +228,15 @@ export default function ServerDetails() {
             <Button
               variant="outline"
               size="sm"
+              onClick={() => setLocation(`/server/${params.id}/comfy-ui`)}
+              className="border-purple-300 hover:border-purple-400 dark:border-purple-600 dark:hover:border-purple-500 text-purple-600 hover:text-purple-700 dark:text-purple-400"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              ComfyUI
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
               onClick={() => refetch()}
               className="border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500"
             >

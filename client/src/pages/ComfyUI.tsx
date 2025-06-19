@@ -59,14 +59,20 @@ interface GenerationParams {
   model?: string;
 }
 
-export default function ComfyUI() {
+interface ComfyUIProps {
+  serverId?: string;
+}
+
+export default function ComfyUI({ serverId: urlServerId }: ComfyUIProps) {
   const [, setLocation] = useLocation();
   const { logout } = useAuth();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  // Get server ID from URL parameters
+  const serverId = urlServerId || window.location.pathname.split('/')[2];
+
   // State
-  const [selectedServer, setSelectedServer] = useState<VastServer | null>(null);
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
   const [selectedWorkflow, setSelectedWorkflow] = useState<number | null>(null);
@@ -103,51 +109,44 @@ export default function ComfyUI() {
   const [setupProgress, setSetupProgress] = useState<any>(null);
   const [isAutoSetupRunning, setIsAutoSetupRunning] = useState(false);
 
-  // Get running servers
-  const { data: servers, isLoading: serversLoading } = useQuery({
-    queryKey: ["/api/vast-servers"],
+  // Get current server details
+  const { data: currentServer, isLoading: serverLoading } = useQuery({
+    queryKey: [`/api/vast-servers/${serverId}`],
+    enabled: !!serverId,
   });
 
-  const runningServers = Array.isArray(servers) ? servers.filter((server: VastServer) => 
-    server.isLaunched && server.status === 'running'
-  ) : [];
-
-  // Get models for selected server
+  // Get models for current server
   const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useQuery({
-    queryKey: [`/api/comfy/${selectedServer?.id}/models`],
-    enabled: !!selectedServer,
+    queryKey: [`/api/comfy/${serverId}/models`],
+    enabled: !!serverId,
   });
 
   // Get available models from ComfyUI
   const { data: availableModels, isLoading: availableModelsLoading, error: availableModelsError, refetch: refetchAvailableModels } = useQuery({
-    queryKey: [`/api/comfy/${selectedServer?.id}/available-models`],
-    enabled: !!selectedServer,
+    queryKey: [`/api/comfy/${serverId}/available-models`],
+    enabled: !!serverId,
   });
 
-  // Get workflows
+  // Get workflows for current server
   const { data: workflows, isLoading: workflowsLoading, refetch: refetchWorkflows } = useQuery({
-    queryKey: ["/api/comfy/workflows"],
+    queryKey: [`/api/comfy/workflows?serverId=${serverId}`],
+    enabled: !!serverId,
   });
 
-  // Get generations for selected server
+  // Get generations for current server
   const { data: generations, isLoading: generationsLoading, refetch: refetchGenerations } = useQuery({
-    queryKey: [`/api/comfy/${selectedServer?.id}/generations`],
-    enabled: !!selectedServer,
+    queryKey: [`/api/comfy/${serverId}/generations`],
+    enabled: !!serverId,
   });
 
-  // Get execution progress for selected server
+  // Get execution progress for current server
   const { data: executions, refetch: refetchExecutions } = useQuery({
-    queryKey: [`/api/server-executions/${selectedServer?.id}`],
-    enabled: !!selectedServer,
+    queryKey: [`/api/server-executions/${serverId}`],
+    enabled: !!serverId,
     refetchInterval: 2000, // Poll every 2 seconds for real-time updates
   });
 
-  // Auto-select first running server
-  useEffect(() => {
-    if (runningServers.length > 0 && !selectedServer) {
-      setSelectedServer(runningServers[0]);
-    }
-  }, [runningServers, selectedServer]);
+  // No need for auto-selection since server ID comes from URL
 
   // WebSocket connection for real-time logs
   useEffect(() => {
@@ -186,7 +185,7 @@ export default function ComfyUI() {
   // Mutations
   const addModelMutation = useMutation({
     mutationFn: async (modelData: any) => {
-      const response = await fetch(`/api/comfy/${selectedServer?.id}/models`, {
+      const response = await fetch(`/api/comfy/${serverId}/models`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -210,7 +209,7 @@ export default function ComfyUI() {
 
   const generateMutation = useMutation({
     mutationFn: async (generationData: any) => {
-      const response = await fetch(`/api/comfy/${selectedServer?.id}/generate`, {
+      const response = await fetch(`/api/comfy/${serverId}/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -297,9 +296,9 @@ export default function ComfyUI() {
 
   const autoSetupMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedServer) throw new Error('No server selected');
+      if (!serverId) throw new Error('No server ID provided');
       
-      const response = await fetch(`/api/comfy/${selectedServer.id}/auto-setup`, {
+      const response = await fetch(`/api/comfy/${serverId}/auto-setup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -383,7 +382,7 @@ export default function ComfyUI() {
   });
 
   const handleAddModel = () => {
-    if (!newModelName || !newModelUrl || !selectedServer) return;
+    if (!newModelName || !newModelUrl || !serverId) return;
     
     // Check for duplicates
     if (checkDuplicateModel(newModelName, newModelUrl)) {
@@ -404,7 +403,7 @@ export default function ComfyUI() {
   };
 
   const handleGenerate = () => {
-    if (!selectedServer || !prompt) return;
+    if (!serverId || !prompt) return;
 
     generateMutation.mutate({
       prompt,
@@ -430,7 +429,7 @@ export default function ComfyUI() {
       description: newWorkflowDescription,
       workflowJson: parsedWorkflow,
       category: newWorkflowCategory,
-      serverId: selectedServer?.id,
+      serverId: parseInt(serverId),
       isTemplate: false,
     });
   };
@@ -467,20 +466,24 @@ export default function ComfyUI() {
     );
   };
 
-  if (serversLoading) {
+  if (serverLoading) {
     return <LoadingCard />;
   }
 
-  if (runningServers.length === 0) {
+  if (!currentServer || currentServer.status !== 'running') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
         <div className="container mx-auto px-6 py-4 space-y-6">
           {/* Header */}
           <div className="flex items-center justify-between">
             <nav className="flex items-center space-x-2 text-sm">
-              <span className="text-slate-600 dark:text-slate-400">
+              <button onClick={() => setLocation('/')} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
                 <Home className="h-4 w-4" />
-              </span>
+              </button>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+              <button onClick={() => setLocation('/vast-servers')} className="text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 transition-colors">
+                Vast Servers
+              </button>
               <ChevronRight className="h-4 w-4 text-slate-400" />
               <span className="text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1">
                 <Wand2 className="h-4 w-4" />
@@ -594,35 +597,8 @@ export default function ComfyUI() {
         </div>
 
         {/* Server Selection */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Server Selection</CardTitle>
-            <CardDescription>Choose a running server for ComfyUI operations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Select 
-              value={selectedServer?.id.toString() || ""} 
-              onValueChange={(value) => {
-                const server = runningServers.find(s => s.id.toString() === value);
-                setSelectedServer(server || null);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a server" />
-              </SelectTrigger>
-              <SelectContent>
-                {runningServers.map((server) => (
-                  <SelectItem key={server.id} value={server.id.toString()}>
-                    {server.name} - {server.gpu} ({server.location})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-
         {/* Real-time setup progress display */}
-        {selectedServer && Array.isArray(executions) && executions.length > 0 && (
+        {currentServer && Array.isArray(executions) && executions.length > 0 && (
           <Card className="border-orange-200 dark:border-orange-800">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
@@ -631,7 +607,7 @@ export default function ComfyUI() {
                 <Badge variant="secondary">{executions[0]?.status}</Badge>
               </CardTitle>
               <CardDescription>
-                Automatically installing ComfyUI on server {selectedServer.name}
+                Automatically installing ComfyUI on server {currentServer.name}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -650,7 +626,7 @@ export default function ComfyUI() {
           </Card>
         )}
 
-        {selectedServer && (
+        {currentServer && (
           <Tabs defaultValue="generate" className="space-y-6">
             <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="generate">Generate</TabsTrigger>
@@ -685,7 +661,7 @@ export default function ComfyUI() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {availableModelsError && selectedServer && availableModels?.status !== 'demo-ready' && (
+                    {availableModelsError && currentServer && availableModels?.status !== 'demo-ready' && (
                       <Alert className="mb-4">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>ComfyUI Setup Required</AlertTitle>
@@ -695,7 +671,7 @@ export default function ComfyUI() {
                           <div className="bg-muted p-3 rounded-md space-y-2 text-sm">
                             <p><strong>1. Connect to your server:</strong></p>
                             <code className="bg-background p-1 rounded text-xs block">
-                              {selectedServer.sshConnection}
+                              {currentServer.sshConnection}
                             </code>
                             
                             <p><strong>2. Navigate to ComfyUI:</strong></p>
@@ -710,7 +686,7 @@ export default function ComfyUI() {
                             
                             <p><strong>4. ComfyUI will be accessible at:</strong></p>
                             <code className="bg-background p-1 rounded text-xs block">
-                              http://{selectedServer.serverUrl?.replace('http://', '').split(':')[0]}:8188
+                              http://{currentServer.serverUrl?.replace('http://', '').split(':')[0]}:8188
                             </code>
                           </div>
                           
@@ -1114,8 +1090,8 @@ export default function ComfyUI() {
                                       variant="outline" 
                                       size="sm"
                                       onClick={() => {
-                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/models`] });
-                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/available-models`] });
+                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${serverId}/models`] });
+                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${serverId}/available-models`] });
                                       }}
                                     >
                                       <RefreshCw className="h-4 w-4 mr-2" />
@@ -1528,13 +1504,13 @@ export default function ComfyUI() {
                       )}
                     </Button>
                     
-                    {analysisResult && selectedServer && (
+                    {analysisResult && currentServer && (
                       <Button
                         variant="outline"
                         onClick={() => {
                           setIsDownloading(true);
                           downloadRequirementsMutation.mutate({
-                            serverId: selectedServer.id,
+                            serverId: parseInt(serverId),
                             analysis: analysisResult
                           });
                         }}

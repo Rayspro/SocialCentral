@@ -264,6 +264,29 @@ export type InsertComfyWorkflow = z.infer<typeof insertComfyWorkflowSchema>;
 export type ComfyGeneration = typeof comfyGenerations.$inferSelect;
 export type InsertComfyGeneration = z.infer<typeof insertComfyGenerationSchema>;
 
+// Audit Log table for tracking all system events
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  userId: integer("user_id").references(() => users.id),
+  action: text("action").notNull(), // CREATE, UPDATE, DELETE, LOGIN, LOGOUT, etc.
+  resource: text("resource").notNull(), // server, comfy_generation, user, etc.
+  resourceId: text("resource_id"), // ID of the affected resource
+  details: jsonb("details"), // Additional context and metadata
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  severity: text("severity").notNull().default("info"), // info, warning, error, critical
+  category: text("category").notNull().default("user_action"), // user_action, system_event, security_event
+});
+
+export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type AuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 

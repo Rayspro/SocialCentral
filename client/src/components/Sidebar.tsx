@@ -10,7 +10,8 @@ import {
   Server,
   RotateCw,
   Wand2,
-  BookOpen
+  BookOpen,
+  Shield
 } from "lucide-react";
 
 const navigationItems = [
@@ -23,6 +24,7 @@ const navigationItems = [
   { path: "/vast-servers", label: "Vast.ai Servers", icon: Server },
   { path: "/comfy-ui", label: "ComfyUI", icon: Wand2 },
   { path: "/performance-story", label: "Performance Story", icon: BookOpen },
+  { path: "/audit-log", label: "Audit Log", icon: Shield },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

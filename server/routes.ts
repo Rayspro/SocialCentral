@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { workflowAnalyzer } from "./workflow-analyzer";
+import { auditLogger } from "./audit-logger";
 import { insertAccountSchema, insertContentSchema, insertScheduleSchema, insertSetupScriptSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -1561,6 +1562,47 @@ echo "CUDA environment configured!"`,
   app.post('/api/comfy/:serverId/auto-setup', autoSetupComfyUI);
   app.post('/api/comfy/:serverId/startup', startupComfyUI);
   
+  // Audit Log API endpoints
+  app.get('/api/audit-logs', async (req: Request, res: Response) => {
+    try {
+      const { limit = 100, offset = 0, userId, resource, resourceId } = req.query;
+      
+      let logs;
+      if (userId) {
+        logs = await storage.getAuditLogsByUser(parseInt(userId as string), parseInt(limit as string));
+      } else if (resource) {
+        logs = await storage.getAuditLogsByResource(resource as string, resourceId as string);
+      } else {
+        logs = await storage.getAuditLogs(parseInt(limit as string), parseInt(offset as string));
+      }
+
+      res.json(logs);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      res.status(500).json({ error: 'Failed to fetch audit logs' });
+    }
+  });
+
+  app.get('/api/audit-logs/summary', async (req: Request, res: Response) => {
+    try {
+      const logs = await storage.getAuditLogs(1000, 0);
+      
+      const summary = {
+        totalEvents: logs.length,
+        securityEvents: logs.filter(log => log.category === 'security_event').length,
+        userActions: logs.filter(log => log.category === 'user_action').length,
+        systemEvents: logs.filter(log => log.category === 'system_event').length,
+        errorEvents: logs.filter(log => log.severity === 'error' || log.severity === 'critical').length,
+        recentActivity: logs.slice(0, 10)
+      };
+
+      res.json(summary);
+    } catch (error) {
+      console.error('Error fetching audit summary:', error);
+      res.status(500).json({ error: 'Failed to fetch audit summary' });
+    }
+  });
+
   // Real-time execution progress
   app.get('/api/server-executions/:serverId', async (req: Request, res: Response) => {
     try {

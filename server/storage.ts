@@ -11,6 +11,7 @@ import {
   comfyModels,
   comfyWorkflows,
   comfyGenerations,
+  auditLogs,
   type User,
   type InsertUser,
   type Platform,
@@ -35,6 +36,8 @@ import {
   type InsertComfyWorkflow,
   type ComfyGeneration,
   type InsertComfyGeneration,
+  type AuditLog,
+  type InsertAuditLog,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -126,6 +129,12 @@ export interface IStorage {
   createComfyGeneration(generation: InsertComfyGeneration): Promise<ComfyGeneration>;
   updateComfyGeneration(id: number, generation: Partial<InsertComfyGeneration>): Promise<ComfyGeneration | undefined>;
   deleteComfyGeneration(id: number): Promise<boolean>;
+
+  // Audit Log methods
+  getAuditLogs(limit?: number, offset?: number): Promise<AuditLog[]>;
+  getAuditLogsByUser(userId: number, limit?: number): Promise<AuditLog[]>;
+  getAuditLogsByResource(resource: string, resourceId?: string): Promise<AuditLog[]>;
+  createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
 
   // Stats
   getStats(): Promise<{
@@ -915,6 +924,156 @@ echo "It will start automatically when you connect to the server"`,
 
     this.comfyGenerations.splice(index, 1);
     return true;
+  }
+
+  // Audit Log methods
+  private auditLogs: AuditLog[] = [
+    {
+      id: 1,
+      category: 'user_action',
+      userId: 1,
+      action: 'user_login',
+      resource: 'authentication',
+      resourceId: null,
+      details: { success: true, method: 'password' },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 2,
+      category: 'system_event',
+      userId: 1,
+      action: 'server_create',
+      resource: 'vast_server',
+      resourceId: 'demo_server_1',
+      details: { gpuType: 'RTX 4090', pricePerHour: 1.5, location: 'US-Central' },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 3,
+      category: 'security_event',
+      userId: null,
+      action: 'failed_login_attempt',
+      resource: 'authentication',
+      resourceId: null,
+      details: { email: 'invalid@example.com', reason: 'invalid_credentials' },
+      ipAddress: '192.168.1.101',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+      severity: 'warning'
+    },
+    {
+      id: 4,
+      category: 'user_action',
+      userId: 1,
+      action: 'comfy_generation',
+      resource: 'comfy_ui',
+      resourceId: 'gen_123',
+      details: { prompt: 'A beautiful landscape', model: 'SDXL', steps: 20 },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 5,
+      category: 'system_event',
+      userId: 1,
+      action: 'api_key_update',
+      resource: 'settings',
+      resourceId: 'vast_ai',
+      details: { service: 'vast_ai', action: 'key_updated' },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 6,
+      category: 'system_event',
+      userId: 1,
+      action: 'server_stop',
+      resource: 'vast_server',
+      resourceId: 'demo_server_2',
+      details: { reason: 'user_requested', uptime_hours: 2.5 },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 7,
+      category: 'security_event',
+      userId: 1,
+      action: 'unusual_activity',
+      resource: 'user_behavior',
+      resourceId: null,
+      details: { activity: 'multiple_rapid_requests', count: 50, timeframe: '5_minutes' },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
+      severity: 'warning'
+    },
+    {
+      id: 8,
+      category: 'system_event',
+      userId: null,
+      action: 'system_error',
+      resource: 'vast_api',
+      resourceId: null,
+      details: { error: 'connection_timeout', endpoint: '/instances', retry_count: 3 },
+      ipAddress: null,
+      userAgent: null,
+      timestamp: new Date(Date.now() - 90 * 60 * 1000), // 1.5 hours ago
+      severity: 'error'
+    }
+  ];
+
+  async getAuditLogs(limit: number = 100, offset: number = 0): Promise<AuditLog[]> {
+    return this.auditLogs
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(offset, offset + limit);
+  }
+
+  async getAuditLogsByUser(userId: number, limit: number = 50): Promise<AuditLog[]> {
+    return this.auditLogs
+      .filter(log => log.userId === userId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, limit);
+  }
+
+  async getAuditLogsByResource(resource: string, resourceId?: string): Promise<AuditLog[]> {
+    return this.auditLogs
+      .filter(log => {
+        if (resourceId) {
+          return log.resource === resource && log.resourceId === resourceId;
+        }
+        return log.resource === resource;
+      })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }
+
+  async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
+    const newAuditLog: AuditLog = {
+      id: this.auditLogs.length + 9,
+      category: auditLog.category || 'system_event',
+      userId: auditLog.userId || null,
+      action: auditLog.action,
+      resource: auditLog.resource,
+      resourceId: auditLog.resourceId || null,
+      details: auditLog.details || {},
+      ipAddress: auditLog.ipAddress || null,
+      userAgent: auditLog.userAgent || null,
+      timestamp: new Date(),
+      severity: auditLog.severity || 'info',
+    };
+    this.auditLogs.unshift(newAuditLog); // Add to beginning for chronological order
+    return newAuditLog;
   }
 }
 

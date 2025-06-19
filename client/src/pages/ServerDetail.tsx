@@ -30,10 +30,12 @@ function WorkflowAnalyzer({ serverId }: { serverId: number }) {
   // Analyze workflow mutation
   const analyzeWorkflowMutation = useMutation({
     mutationFn: async (workflowData: any) => {
-      return apiRequest('/api/comfy/analyze-workflow', {
+      const response = await fetch('/api/comfy/analyze-workflow', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workflowJson: workflowData }),
       });
+      return response.json();
     },
     onSuccess: (data) => {
       setAnalysisResult(data);
@@ -56,10 +58,12 @@ function WorkflowAnalyzer({ serverId }: { serverId: number }) {
   // Download requirements mutation
   const downloadRequirementsMutation = useMutation({
     mutationFn: async (analysis: any) => {
-      return apiRequest(`/api/comfy/${serverId}/download-requirements`, {
+      const response = await fetch(`/api/comfy/${serverId}/download-requirements`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ analysis }),
       });
+      return response.json();
     },
     onSuccess: () => {
       setIsDownloading(false);
@@ -1136,23 +1140,10 @@ export default function ServerDetail() {
                       ComfyUI has been successfully installed and is ready to use.
                     </p>
                     <div className="flex gap-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button size="sm" variant="outline">
-                            <Settings className="h-4 w-4 mr-2" />
-                            Manage Models
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-                          <DialogHeader>
-                            <DialogTitle>Model Management</DialogTitle>
-                            <DialogDescription>
-                              Download, manage, and view models for this server
-                            </DialogDescription>
-                          </DialogHeader>
-                          <ModelManagementModal serverId={parseInt(id)} />
-                        </DialogContent>
-                      </Dialog>
+                      <Button size="sm" variant="outline" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Manage Models
+                      </Button>
                       <Button size="sm" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
                         <Bot className="h-4 w-4 mr-2" />
                         Launch ComfyUI
@@ -1272,8 +1263,31 @@ export default function ServerDetail() {
                   AI-powered analysis of ComfyUI workflows to identify required models and custom nodes
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <WorkflowAnalyzer serverId={parseInt(id)} />
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="workflow-json">Paste ComfyUI Workflow JSON</Label>
+                  <Textarea 
+                    id="workflow-json"
+                    placeholder="Paste your ComfyUI workflow JSON here..."
+                    rows={6}
+                    className="font-mono text-sm"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button>
+                    <Brain className="h-4 w-4 mr-2" />
+                    Analyze Workflow
+                  </Button>
+                  <Button variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Auto-Download All
+                  </Button>
+                </div>
+                <div className="bg-muted rounded-lg p-4">
+                  <p className="text-sm text-muted-foreground">
+                    Upload a ComfyUI workflow to automatically detect required models and custom nodes. The AI will analyze the workflow and provide download links for all dependencies.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>

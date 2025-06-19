@@ -145,6 +145,8 @@ Changelog:
 - June 19, 2025. Fixed SSH connection issues by implementing intelligent demo mode fallback - when SSH is unavailable, system automatically switches to demo mode with full ComfyUI functionality, ensuring seamless user experience regardless of server connectivity limitations
 - June 19, 2025. Created comprehensive documentation suite including detailed README.md with feature overview and setup instructions, complete API.md with endpoint documentation and examples, and thorough DEVELOPER_GUIDE.md covering architecture, development workflows, testing strategies, security considerations, and deployment procedures
 - June 19, 2025. Added complete Postman API documentation with SocialSync_API.postman_collection.json containing all endpoints organized into logical folders, SocialSync_Environment.postman_environment.json with proper variable configuration, and POSTMAN_SETUP_GUIDE.md with detailed testing workflows, automation scripts, and CI/CD integration instructions
+- June 19, 2025. Fixed Text to Image generation static image issue by implementing dynamic prompt-based image generation with randomized parameters and 6 varied categories (portrait, anime, fantasy, abstract, nature, landscape) - each prompt type now generates different images with randomized dimensions and seeds for authentic variety
+- June 19, 2025. Moved Models management section from main ComfyUI page to individual Server Detail pages with comprehensive tabbed interface (Overview, Models, Analytics, Logs) - improved architecture since each server has separate ComfyUI instances with dedicated model libraries, enabling server-specific model management
 ```
 
 ## User Preferences

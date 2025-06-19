@@ -7,7 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, Package, Download, Trash2, Eye, HardDrive } from "lucide-react";
 import { format } from "date-fns";
 
 interface Server {
@@ -61,6 +68,14 @@ export default function ServerDetail() {
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [showModelsDialog, setShowModelsDialog] = useState(false);
+  const [showAddModelDialog, setShowAddModelDialog] = useState(false);
+  const [newModelUrl, setNewModelUrl] = useState("");
+  const [newModelFolder, setNewModelFolder] = useState("checkpoints");
+  const [newModelName, setNewModelName] = useState("");
+  const [newModelDescription, setNewModelDescription] = useState("");
+  const { toast } = useToast();
 
   const { data: schedulerInfo, isLoading, refetch } = useQuery<SchedulerInfo>({
     queryKey: ["/api/server-scheduler", serverId],
@@ -70,6 +85,17 @@ export default function ServerDetail() {
   const { data: executions } = useQuery({
     queryKey: ["/api/server-executions", serverId],
     refetchInterval: autoRefresh ? 10000 : false, // Refresh executions every 10 seconds
+  });
+
+  // Models queries
+  const { data: models } = useQuery({
+    queryKey: ["/api/comfy", serverId, "models"],
+    refetchInterval: autoRefresh ? 30000 : false, // Refresh models every 30 seconds
+  });
+
+  const { data: availableModels } = useQuery({
+    queryKey: ["/api/comfy", serverId, "available-models"],
+    refetchInterval: autoRefresh ? 60000 : false, // Refresh available models every minute
   });
 
   const startSchedulerMutation = useMutation({
@@ -93,6 +119,74 @@ export default function ServerDetail() {
       queryClient.invalidateQueries({ queryKey: ["/api/server-scheduler", serverId] });
     },
   });
+
+  // Model management mutations
+  const addModelMutation = useMutation({
+    mutationFn: async (modelData: any) => {
+      return apiRequest(`/api/comfy/models`, {
+        method: "POST",
+        body: JSON.stringify({ ...modelData, serverId: parseInt(serverId!) }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/comfy", serverId, "models"] });
+      setShowAddModelDialog(false);
+      setNewModelUrl("");
+      setNewModelName("");
+      setNewModelDescription("");
+      toast({
+        title: "Model Added",
+        description: "Model download started successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add model",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteModelMutation = useMutation({
+    mutationFn: async (modelId: number) => {
+      return apiRequest(`/api/comfy/models/${modelId}`, {
+        method: "DELETE",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/comfy", serverId, "models"] });
+      toast({
+        title: "Model Deleted",
+        description: "Model removed successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete model",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddModel = () => {
+    if (!newModelUrl || !newModelName) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addModelMutation.mutate({
+      name: newModelName,
+      url: newModelUrl,
+      folder: newModelFolder,
+      description: newModelDescription,
+    });
+  };
 
   if (isLoading) {
     return (
@@ -197,41 +291,50 @@ export default function ServerDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Server Status */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="h-5 w-5" />
-              Server Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(server.status)}`}></div>
-              <span className="font-medium">{server.status}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`w-3 h-3 rounded-full ${getSetupStatusColor(server.setupStatus)}`}></div>
-              <span className="font-medium">Setup: {server.setupStatus}</span>
-            </div>
-            <Separator />
-            <div className="text-sm space-y-1">
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">GPU:</span>
-                <span>{server.gpu}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Price:</span>
-                <span>${server.pricePerHour}/hr</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600 dark:text-gray-400">Location:</span>
-                <span>{server.location}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="models">Models</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Server Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Server Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${getStatusColor(server.status)}`}></div>
+                  <span className="font-medium">{server.status}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${getSetupStatusColor(server.setupStatus)}`}></div>
+                  <span className="font-medium">Setup: {server.setupStatus}</span>
+                </div>
+                <Separator />
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">GPU:</span>
+                    <span>{server.gpu}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Price:</span>
+                    <span>${server.pricePerHour}/hr</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600 dark:text-gray-400">Location:</span>
+                    <span>{server.location}</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
         {/* Scheduler Status */}
         <Card>
@@ -386,56 +489,279 @@ export default function ServerDetail() {
               )}
             </div>
           </CardContent>
-        </Card>
-      </div>
+          </Card>
+          </div>
+        </TabsContent>
 
-      {/* Execution History */}
-      {executions && executions.length > 0 && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle>Execution History</CardTitle>
-            <CardDescription>Recent script executions and setup tasks</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {executions.map((execution: any) => (
-                <div key={execution.id} className="border rounded-lg p-4 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {execution.status === 'completed' ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : execution.status === 'failed' ? (
-                        <AlertCircle className="h-5 w-5 text-red-500" />
-                      ) : (
-                        <Clock className="h-5 w-5 text-yellow-500" />
-                      )}
-                      <span className="font-medium">Script Execution #{execution.id}</span>
+        <TabsContent value="models" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium">ComfyUI Models</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Manage AI models for this server's ComfyUI instance
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <Dialog open={showModelsDialog} onOpenChange={setShowModelsDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Eye className="h-4 w-4 mr-1" />
+                    View All Models
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Available ComfyUI Models</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {availableModels && Object.entries(availableModels.models || {}).map(([category, modelList]) => (
+                      <div key={category}>
+                        <h4 className="font-medium capitalize mb-2">{category}</h4>
+                        <div className="grid grid-cols-2 gap-2">
+                          {(modelList as string[]).map((model) => (
+                            <div key={model} className="p-2 bg-gray-50 dark:bg-gray-800 rounded text-sm">
+                              {model}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </DialogContent>
+              </Dialog>
+              
+              <Dialog open={showAddModelDialog} onOpenChange={setShowAddModelDialog}>
+                <DialogTrigger asChild>
+                  <Button size="sm">
+                    <Download className="h-4 w-4 mr-1" />
+                    Add Model
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Download New Model</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="modelName">Model Name</Label>
+                      <Input
+                        id="modelName"
+                        value={newModelName}
+                        onChange={(e) => setNewModelName(e.target.value)}
+                        placeholder="Enter model name"
+                      />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={execution.status === 'completed' ? 'default' : execution.status === 'failed' ? 'destructive' : 'secondary'}>
-                        {execution.status}
-                      </Badge>
-                      <span className="text-sm text-gray-600 dark:text-gray-400">
-                        {format(new Date(execution.createdAt), 'MM/dd/yyyy HH:mm')}
-                      </span>
+                    <div>
+                      <Label htmlFor="modelUrl">Download URL</Label>
+                      <Input
+                        id="modelUrl"
+                        value={newModelUrl}
+                        onChange={(e) => setNewModelUrl(e.target.value)}
+                        placeholder="https://example.com/model.safetensors"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="modelFolder">Folder</Label>
+                      <Select value={newModelFolder} onValueChange={setNewModelFolder}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="checkpoints">checkpoints</SelectItem>
+                          <SelectItem value="loras">loras</SelectItem>
+                          <SelectItem value="vae">vae</SelectItem>
+                          <SelectItem value="controlnet">controlnet</SelectItem>
+                          <SelectItem value="upscale_models">upscale_models</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="modelDescription">Description (Optional)</Label>
+                      <Textarea
+                        id="modelDescription"
+                        value={newModelDescription}
+                        onChange={(e) => setNewModelDescription(e.target.value)}
+                        placeholder="Model description"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setShowAddModelDialog(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button 
+                        onClick={handleAddModel}
+                        disabled={addModelMutation.isPending}
+                      >
+                        {addModelMutation.isPending ? "Adding..." : "Add Model"}
+                      </Button>
                     </div>
                   </div>
-                  {execution.output && (
-                    <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-sm font-mono">
-                      <pre className="whitespace-pre-wrap">{execution.output}</pre>
-                    </div>
-                  )}
-                  {execution.errorLog && (
-                    <div className="bg-red-50 dark:bg-red-900/20 rounded p-3 text-sm text-red-600 dark:text-red-400">
-                      {execution.errorLog}
-                    </div>
-                  )}
-                </div>
-              ))}
+                </DialogContent>
+              </Dialog>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+
+          {/* Installed Models */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Installed Models
+              </CardTitle>
+              <CardDescription>
+                Models currently available on this server
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {models && models.length > 0 ? (
+                <div className="space-y-4">
+                  {models.map((model: any) => (
+                    <div key={model.id} className="border rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-medium">{model.name}</h4>
+                            <Badge variant="outline" className="text-xs">
+                              {model.folder}
+                            </Badge>
+                            <Badge 
+                              variant={model.status === 'completed' ? 'default' : 
+                                     model.status === 'failed' ? 'destructive' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {model.status}
+                            </Badge>
+                          </div>
+                          {model.description && (
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              {model.description}
+                            </p>
+                          )}
+                          <div className="flex items-center gap-4 text-xs text-gray-500 mt-2">
+                            {model.fileSize && (
+                              <span>
+                                <HardDrive className="h-3 w-3 inline mr-1" />
+                                {(model.fileSize / (1024 * 1024 * 1024)).toFixed(2)} GB
+                              </span>
+                            )}
+                            <span>Added {format(new Date(model.createdAt), 'MM/dd/yyyy')}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {model.downloadProgress !== null && model.downloadProgress < 100 && (
+                            <div className="flex items-center gap-2">
+                              <Progress value={model.downloadProgress} className="w-24" />
+                              <span className="text-sm">{model.downloadProgress}%</span>
+                            </div>
+                          )}
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => deleteModelMutation.mutate(model.id)}
+                            disabled={deleteModelMutation.isPending}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      {model.errorMessage && (
+                        <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded text-sm text-red-600 dark:text-red-400">
+                          {model.errorMessage}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600 dark:text-gray-400">No models installed</p>
+                  <p className="text-sm text-gray-500 mt-1">Add models to get started with ComfyUI</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Server Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 dark:text-gray-400">Analytics coming soon...</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="logs" className="space-y-6">
+          {/* Execution History */}
+          {executions && executions.length > 0 ? (
+            <Card>
+              <CardHeader>
+                <CardTitle>Execution History</CardTitle>
+                <CardDescription>Recent script executions and setup tasks</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {executions.map((execution: any) => (
+                    <div key={execution.id} className="border rounded-lg p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {execution.status === 'completed' ? (
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          ) : execution.status === 'failed' ? (
+                            <AlertCircle className="h-5 w-5 text-red-500" />
+                          ) : (
+                            <Clock className="h-5 w-5 text-yellow-500" />
+                          )}
+                          <span className="font-medium">Script Execution #{execution.id}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant={execution.status === 'completed' ? 'default' : execution.status === 'failed' ? 'destructive' : 'secondary'}>
+                            {execution.status}
+                          </Badge>
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            {format(new Date(execution.createdAt), 'MM/dd/yyyy HH:mm')}
+                          </span>
+                        </div>
+                      </div>
+                      {execution.output && (
+                        <div className="bg-gray-50 dark:bg-gray-900 rounded p-3 text-sm font-mono">
+                          <pre className="whitespace-pre-wrap">{execution.output}</pre>
+                        </div>
+                      )}
+                      {execution.errorLog && (
+                        <div className="bg-red-50 dark:bg-red-900/20 rounded p-3 text-sm text-red-600 dark:text-red-400">
+                          {execution.errorLog}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Execution History</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Clock className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600 dark:text-gray-400">No execution history</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

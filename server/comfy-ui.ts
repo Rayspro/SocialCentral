@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { storage } from './storage';
 import type { InsertComfyModel, InsertComfyWorkflow, InsertComfyGeneration } from '@shared/schema';
+import { sshTunnelManager } from './ssh-tunnel';
 
 // ComfyUI API client class
 class ComfyUIClient {
@@ -12,10 +13,32 @@ class ComfyUIClient {
 
   async checkStatus(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/system_stats`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(`${this.baseUrl}/system_stats`, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: { 'Accept': 'application/json' }
+      });
+      clearTimeout(timeoutId);
       return response.ok;
     } catch (error) {
-      return false;
+      // Try alternative ComfyUI endpoint
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const altResponse = await fetch(`${this.baseUrl}/api/v1/object_info`, {
+          method: 'GET',
+          signal: controller.signal,
+          headers: { 'Accept': 'application/json' }
+        });
+        clearTimeout(timeoutId);
+        return altResponse.ok;
+      } catch (altError) {
+        return false;
+      }
     }
   }
 
@@ -287,16 +310,49 @@ export async function getAvailableModels(req: Request, res: Response) {
       return res.status(404).json({ error: 'Server not found or not running' });
     }
 
-    const comfyUrl = `http://${server.serverUrl}:8188`;
-    const client = new ComfyUIClient(comfyUrl);
+    // Try multiple connection methods for ComfyUI
+    const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+    const possibleUrls = [
+      `http://${serverHost}:8188`,
+      `https://${serverHost}:8188`,
+      `http://${serverHost}:${server.metadata?.vastData?.direct_port_start || 65535}`,
+      server.serverUrl + ':8188'
+    ];
 
-    const isOnline = await client.checkStatus();
-    if (!isOnline) {
-      return res.status(503).json({ error: 'ComfyUI server is not accessible' });
+    let client = null;
+    let workingUrl = null;
+
+    for (const url of possibleUrls) {
+      try {
+        const testClient = new ComfyUIClient(url);
+        const isOnline = await testClient.checkStatus();
+        if (isOnline) {
+          client = testClient;
+          workingUrl = url;
+          break;
+        }
+      } catch (error) {
+        console.log(`Failed to connect to ComfyUI at ${url}:`, error.message);
+        continue;
+      }
+    }
+
+    if (!client) {
+      return res.status(503).json({
+        error: 'ComfyUI server is not accessible',
+        details: 'Tried multiple connection methods but ComfyUI is not responding',
+        troubleshooting: [
+          'Verify ComfyUI is running on your server',
+          'Check if port 8188 is open',
+          'Ensure ComfyUI started after the setup completed',
+          'Try accessing ComfyUI directly in your browser'
+        ],
+        testedUrls: possibleUrls
+      });
     }
 
     const models = await client.getModels();
-    res.json(models);
+    res.json({ models, connectedUrl: workingUrl });
   } catch (error) {
     console.error('Error fetching available models:', error);
     res.status(500).json({ error: 'Failed to fetch available models' });
@@ -347,7 +403,9 @@ export async function generateImage(req: Request, res: Response) {
       return res.status(404).json({ error: 'Server not found or not running' });
     }
 
-    const comfyUrl = `http://${server.serverUrl}:8188`;
+    // Extract hostname from server URL and use port 8188 for ComfyUI
+    const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+    const comfyUrl = `http://${serverHost}:8188`;
     const client = new ComfyUIClient(comfyUrl);
 
     // Check if ComfyUI is accessible
@@ -613,36 +671,6 @@ async function setupComfyUIWithProgress(executionId: number, serverId: number, s
   }
 }
 
-  let totalOutput = '';
-  let currentStep = 0;
-
-  for (const step of steps) {
-    currentStep++;
-    const stepProgress = `[STEP ${currentStep}/${steps.length}] ${step.name}\n${step.output}\n\n`;
-    totalOutput += stepProgress;
-
-    try {
-      await storage.updateServerExecution(executionId, {
-        status: currentStep === steps.length ? 'completed' : 'running',
-        output: totalOutput,
-        completedAt: currentStep === steps.length ? new Date() : undefined,
-      });
-
-      // Update server status when completed
-      if (currentStep === steps.length) {
-        await storage.updateVastServer(serverId, {
-          setupStatus: 'ready'
-        });
-      }
-    } catch (error) {
-      console.error('Error updating execution:', error);
-    }
-
-    // Wait for step duration
-    await new Promise(resolve => setTimeout(resolve, step.duration));
-  }
-}
-
 // Background functions
 
 async function downloadModelInBackground(modelId: number, serverId: number, url: string, folder: string, fileName: string) {
@@ -659,7 +687,9 @@ async function downloadModelInBackground(modelId: number, serverId: number, url:
       return;
     }
 
-    const comfyUrl = `http://${server.serverUrl}:8188`;
+    // Extract hostname from server URL and use port 8188 for ComfyUI
+    const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+    const comfyUrl = `http://${serverHost}:8188`;
     const client = new ComfyUIClient(comfyUrl);
 
     const success = await client.downloadModel(url, folder, fileName);
@@ -695,7 +725,9 @@ async function monitorGeneration(generationId: number, serverId: number, queueId
       return;
     }
 
-    const comfyUrl = `http://${server.serverUrl}:8188`;
+    // Extract hostname from server URL and use port 8188 for ComfyUI
+    const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
+    const comfyUrl = `http://${serverHost}:8188`;
     const client = new ComfyUIClient(comfyUrl);
 
     // Update status to running

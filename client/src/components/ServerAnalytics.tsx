@@ -1,7 +1,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Area, AreaChart } from "recharts";
-import { Server, Clock, DollarSign, Activity, Zap, TrendingUp } from "lucide-react";
+import { Server, Clock, DollarSign, Activity, Zap, TrendingUp, Calendar, Eye, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 interface ServerMetrics {
   dailyUsage: Array<{ date: string; servers: number; cost: number; uptime: number }>;
@@ -10,57 +13,64 @@ interface ServerMetrics {
   uptimeStats: { totalUptime: number; averageUptime: number; totalCost: number; activeServers: number };
 }
 
+interface TodayServer {
+  id: number;
+  name: string;
+  gpu: string;
+  status: string;
+  hoursRunning: number;
+  costPerHour: number;
+  todayCost: number;
+  region: string;
+  createdAt: string;
+}
+
+interface TodayAnalytics {
+  date: string;
+  servers: TodayServer[];
+  totalCost: number;
+  activeServers: number;
+}
+
 export function ServerAnalytics() {
-  const { data: metrics, isLoading } = useQuery<ServerMetrics>({
-    queryKey: ["/api/server-analytics"],
-    queryFn: async () => {
-      // Generate mock analytics data for demonstration
-      const today = new Date();
-      const dailyData = [];
-      const monthlyData = [];
-      
-      // Generate last 7 days data
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        dailyData.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          servers: Math.floor(Math.random() * 5) + 1,
-          cost: Math.floor(Math.random() * 50) + 10,
-          uptime: Math.floor(Math.random() * 20) + 80
-        });
-      }
-
-      // Generate last 6 months data
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date(today);
-        date.setMonth(date.getMonth() - i);
-        monthlyData.push({
-          month: date.toLocaleDateString('en-US', { month: 'short' }),
-          servers: Math.floor(Math.random() * 20) + 5,
-          cost: Math.floor(Math.random() * 800) + 200,
-          uptime: Math.floor(Math.random() * 15) + 85
-        });
-      }
-
-      return {
-        dailyUsage: dailyData,
-        monthlyUsage: monthlyData,
-        serverTypes: [
-          { name: "RTX 4090", count: 12, cost: 450 },
-          { name: "RTX 3080", count: 8, cost: 280 },
-          { name: "RTX 4080", count: 5, cost: 320 },
-          { name: "A100", count: 3, cost: 890 }
-        ],
-        uptimeStats: {
-          totalUptime: 2847,
-          averageUptime: 94.2,
-          totalCost: 1247.50,
-          activeServers: 7
-        }
-      };
-    }
+  const [viewMode, setViewMode] = useState<'overview' | 'today'>('overview');
+  
+  const { data: metrics, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery<ServerMetrics>({
+    queryKey: ["/api/server-analytics"]
   });
+
+  const { data: todayData, isLoading: todayLoading, refetch: refetchToday } = useQuery<TodayAnalytics>({
+    queryKey: ["/api/server-analytics/today"],
+    enabled: viewMode === 'today'
+  });
+
+  const isLoading = metricsLoading || (viewMode === 'today' && todayLoading);
+
+  const handleRefresh = () => {
+    if (viewMode === 'overview') {
+      refetchMetrics();
+    } else {
+      refetchToday();
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'running': return 'bg-green-500';
+      case 'stopped': return 'bg-red-500';
+      case 'loading': return 'bg-yellow-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'running': return 'default';
+      case 'stopped': return 'destructive';
+      case 'loading': return 'outline';
+      default: return 'secondary';
+    }
+  };
 
   if (isLoading) {
     return (
@@ -80,10 +90,186 @@ export function ServerAnalytics() {
     );
   }
 
+  if (viewMode === 'today' && todayData) {
+    return (
+      <div className="space-y-6">
+        {/* Header */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-purple-600" />
+                <CardTitle className="text-lg">Today's Server Costs</CardTitle>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRefresh}
+                  className="gap-2"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                  Refresh
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewMode('overview')}
+                  className="gap-2"
+                >
+                  <Eye className="h-4 w-4" />
+                  Overview
+                </Button>
+              </div>
+            </div>
+            <CardDescription>
+              Individual server costs for {new Date(todayData.date).toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+              })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Total Cost</p>
+                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">${todayData.totalCost}</p>
+                  </div>
+                  <DollarSign className="h-8 w-8 text-purple-600" />
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-700 dark:text-green-300">Active Servers</p>
+                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">{todayData.activeServers}</p>
+                  </div>
+                  <Server className="h-8 w-8 text-green-600" />
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Servers</p>
+                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{todayData.servers.length}</p>
+                  </div>
+                  <Activity className="h-8 w-8 text-blue-600" />
+                </div>
+              </div>
+              <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-700 dark:text-orange-300">Avg Cost/Hour</p>
+                    <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                      ${todayData.servers.length > 0 ? 
+                        (todayData.servers.reduce((sum, s) => sum + s.costPerHour, 0) / todayData.servers.length).toFixed(2) : 
+                        '0.00'
+                      }
+                    </p>
+                  </div>
+                  <Clock className="h-8 w-8 text-orange-600" />
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Server List */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Server Breakdown</CardTitle>
+            <CardDescription>Individual server costs and runtime details</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-2">
+            <div className="space-y-3">
+              {todayData.servers.map((server) => (
+                <div 
+                  key={server.id}
+                  className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-3 h-3 rounded-full ${getStatusColor(server.status)}`}></div>
+                      <div>
+                        <h4 className="font-semibold text-slate-900 dark:text-slate-100">{server.name}</h4>
+                        <p className="text-sm text-slate-600 dark:text-slate-400">{server.gpu} • {server.region}</p>
+                      </div>
+                    </div>
+                    <Badge variant={getStatusVariant(server.status)} className="capitalize">
+                      {server.status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-6 text-right">
+                    <div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Runtime</p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">{server.hoursRunning}h</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Rate</p>
+                      <p className="font-semibold text-slate-900 dark:text-slate-100">${server.costPerHour}/h</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-slate-600 dark:text-slate-400">Today's Cost</p>
+                      <p className="font-bold text-lg text-slate-900 dark:text-slate-100">${server.todayCost}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {todayData.servers.length === 0 && (
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                  No servers running today
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
 
   return (
     <div className="space-y-6">
+      {/* Header */}
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Activity className="h-5 w-5 text-purple-600" />
+              <CardTitle className="text-lg">Server Analytics Overview</CardTitle>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                className="gap-2"
+              >
+                <RefreshCw className="h-4 w-4" />
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setViewMode('today')}
+                className="gap-2"
+              >
+                <Calendar className="h-4 w-4" />
+                Today's Costs
+              </Button>
+            </div>
+          </div>
+          <CardDescription>
+            Comprehensive server usage, costs, and performance metrics
+          </CardDescription>
+        </CardHeader>
+      </Card>
+
       {/* Key Metrics */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">

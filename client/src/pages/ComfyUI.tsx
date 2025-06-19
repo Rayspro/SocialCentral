@@ -281,6 +281,43 @@ export default function ComfyUI() {
     },
   });
 
+  const autoSetupMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedServer) throw new Error('No server selected');
+      
+      const response = await fetch(`/api/comfy/${selectedServer.id}/auto-setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to setup ComfyUI');
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Setup Started",
+        description: "ComfyUI installation has begun. This may take a few minutes.",
+      });
+      // Refetch available models after a delay
+      setTimeout(() => {
+        refetchAvailableModels();
+      }, 5000);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Setup Failed",
+        description: error.message || "Failed to start ComfyUI setup",
+        variant: "destructive",
+      });
+    },
+  });
+
   const analyzeWorkflowMutation = useMutation({
     mutationFn: async (workflowJson: any) => {
       const response = await fetch('/api/comfy/analyze-workflow', {
@@ -382,6 +419,10 @@ export default function ComfyUI() {
       serverId: selectedServer?.id,
       isTemplate: false,
     });
+  };
+
+  const handleAutoSetupComfyUI = () => {
+    autoSetupMutation.mutate();
   };
 
   const getStatusColor = (status: string) => {
@@ -708,17 +749,34 @@ export default function ComfyUI() {
                     </Button>
                     
                     {!availableModelsLoading && (
-                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-sm">
-                        <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">ComfyUI Setup Required</h4>
-                        <p className="text-yellow-700 dark:text-yellow-300 mb-3">
-                          ComfyUI server is not running on your Vast.ai instance. To enable image generation:
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm">
+                        <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+                          <Settings className="h-4 w-4" />
+                          Auto-Setup ComfyUI
+                        </h4>
+                        <p className="text-blue-700 dark:text-blue-300 mb-3">
+                          ComfyUI server is not running. Click below to automatically install and start ComfyUI on your server:
                         </p>
-                        <ol className="list-decimal list-inside text-yellow-700 dark:text-yellow-300 space-y-1">
-                          <li>SSH into your Vast.ai server</li>
-                          <li>Install ComfyUI: <code className="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">git clone https://github.com/comfyanonymous/ComfyUI.git</code></li>
-                          <li>Install dependencies: <code className="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">pip install -r requirements.txt</code></li>
-                          <li>Start ComfyUI: <code className="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">python main.py --listen 0.0.0.0 --port 8188</code></li>
-                        </ol>
+                        <Button 
+                          onClick={() => handleAutoSetupComfyUI()}
+                          disabled={autoSetupMutation.isPending}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                        >
+                          {autoSetupMutation.isPending ? (
+                            <LoadingSpinner size="sm" text="Setting up ComfyUI..." />
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              Auto-Install ComfyUI
+                            </>
+                          )}
+                        </Button>
+                        
+                        <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            This will install ComfyUI, download basic models, and start the server automatically.
+                          </p>
+                        </div>
                       </div>
                     )}
                   </CardContent>

@@ -24,6 +24,7 @@ import {
   generateImage,
   getGenerationStatus,
   getGenerations,
+  autoSetupComfyUI,
 } from "./comfy-ui";
 import { workflowAnalyzer } from "./workflow-analyzer";
 
@@ -1522,6 +1523,9 @@ echo "CUDA environment configured!"`,
   app.post('/api/comfy/:serverId/generate', generateImage);
   app.get('/api/comfy/generation/:generationId', getGenerationStatus);
   app.get('/api/comfy/:serverId/generations', getGenerations);
+  
+  // Auto-setup ComfyUI
+  app.post('/api/comfy/:serverId/auto-setup', autoSetupComfyUI);
 
   // Workflow analysis routes
   app.post('/api/comfy/analyze-workflow', async (req: Request, res: Response) => {

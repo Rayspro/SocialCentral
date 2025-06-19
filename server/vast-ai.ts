@@ -279,7 +279,7 @@ class VastAIService {
 // Route handlers
 export async function getVastServers(req: Request, res: Response) {
   try {
-    const { storage } = req.app.locals;
+    const { storage } = await import('./storage');
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     
@@ -314,7 +314,7 @@ export async function getVastServers(req: Request, res: Response) {
 
 export async function getAvailableServers(req: Request, res: Response) {
   try {
-    const { storage } = req.app.locals;
+    const { storage } = await import('./storage');
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const filters = {
@@ -357,7 +357,7 @@ export async function getAvailableServers(req: Request, res: Response) {
 
 export async function createVastServer(req: Request, res: Response) {
   try {
-    const { storage } = req.app.locals;
+    const { storage } = await import('./storage');
     const { offerId, image, setupScript } = req.body;
     
     if (!offerId) {
@@ -398,20 +398,22 @@ export async function createVastServer(req: Request, res: Response) {
 
 export async function destroyVastServer(req: Request, res: Response) {
   try {
+    const { storage } = await import('./storage');
     const instanceId = parseInt(req.params.id);
     
     if (!instanceId) {
       return res.status(400).json({ error: "Invalid instance ID" });
     }
 
-    const vastApiKey = process.env.VAST_API_KEY;
-    if (!vastApiKey) {
+    // Get Vast.ai API key from database
+    const vastApiKey = await storage.getApiKeyByService('vast');
+    if (!vastApiKey || !vastApiKey.keyValue) {
       return res.status(400).json({ 
-        error: "Vast.ai API key not configured. Please add your API key in environment variables." 
+        error: "Vast.ai API key not configured. Please add your API key in Settings." 
       });
     }
 
-    const vastService = new VastAIService(vastApiKey);
+    const vastService = new VastAIService(vastApiKey.keyValue);
     const success = await vastService.destroyInstance(instanceId);
     
     if (!success) {
@@ -432,20 +434,22 @@ export async function destroyVastServer(req: Request, res: Response) {
 
 export async function restartVastServer(req: Request, res: Response) {
   try {
+    const { storage } = await import('./storage');
     const instanceId = parseInt(req.params.id);
     
     if (!instanceId) {
       return res.status(400).json({ error: "Invalid instance ID" });
     }
 
-    const vastApiKey = process.env.VAST_API_KEY;
-    if (!vastApiKey) {
+    // Get Vast.ai API key from database
+    const vastApiKey = await storage.getApiKeyByService('vast');
+    if (!vastApiKey || !vastApiKey.keyValue) {
       return res.status(400).json({ 
-        error: "Vast.ai API key not configured. Please add your API key in environment variables." 
+        error: "Vast.ai API key not configured. Please add your API key in Settings." 
       });
     }
 
-    const vastService = new VastAIService(vastApiKey);
+    const vastService = new VastAIService(vastApiKey.keyValue);
     const success = await vastService.restartInstance(instanceId);
     
     if (!success) {

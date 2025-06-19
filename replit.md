@@ -110,6 +110,7 @@ Changelog:
 - June 19, 2025. Fixed server startup crashes by implementing complete MemStorage interface with all required Vast.ai and setup script methods
 - June 19, 2025. Resolved VastServers page crashes with proper array validation and API error handling
 - June 19, 2025. Fixed API key management system - keys now save and display correctly in settings page
+- June 19, 2025. Fixed Vast.ai API integration to use database-stored API keys instead of environment variables, enabling real server launches on Vast.ai platform
 ```
 
 ## User Preferences

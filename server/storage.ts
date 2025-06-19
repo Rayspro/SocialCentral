@@ -6,6 +6,8 @@ import {
   schedules,
   apiKeys,
   vastServers,
+  setupScripts,
+  serverExecutions,
   type User,
   type InsertUser,
   type Platform,
@@ -19,7 +21,11 @@ import {
   type ApiKey,
   type InsertApiKey,
   type VastServer,
-  type InsertVastServer
+  type InsertVastServer,
+  type SetupScript,
+  type InsertSetupScript,
+  type ServerExecution,
+  type InsertServerExecution
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -74,6 +80,19 @@ export interface IStorage {
   deleteVastServer(id: number): Promise<boolean>;
   launchVastServer(id: number): Promise<VastServer | undefined>;
   stopVastServer(id: number): Promise<VastServer | undefined>;
+
+  // Setup Script methods
+  getSetupScripts(): Promise<SetupScript[]>;
+  getSetupScript(id: number): Promise<SetupScript | undefined>;
+  getSetupScriptsByCategory(category: string): Promise<SetupScript[]>;
+  createSetupScript(script: InsertSetupScript): Promise<SetupScript>;
+  updateSetupScript(id: number, script: Partial<InsertSetupScript>): Promise<SetupScript | undefined>;
+  deleteSetupScript(id: number): Promise<boolean>;
+
+  // Server Execution methods
+  getServerExecutions(serverId: number): Promise<ServerExecution[]>;
+  createServerExecution(execution: InsertServerExecution): Promise<ServerExecution>;
+  updateServerExecution(id: number, execution: Partial<InsertServerExecution>): Promise<ServerExecution | undefined>;
 
   // Stats
   getStats(): Promise<{
@@ -312,6 +331,58 @@ export class DatabaseStorage implements IStorage {
         serverUrl: null,
       })
       .where(eq(vastServers.id, id))
+      .returning();
+    return results[0];
+  }
+
+  // Setup Script methods
+  async getSetupScripts(): Promise<SetupScript[]> {
+    return await db.select().from(setupScripts);
+  }
+
+  async getSetupScript(id: number): Promise<SetupScript | undefined> {
+    const results = await db.select().from(setupScripts).where(eq(setupScripts.id, id));
+    return results[0];
+  }
+
+  async getSetupScriptsByCategory(category: string): Promise<SetupScript[]> {
+    return await db.select().from(setupScripts).where(eq(setupScripts.category, category));
+  }
+
+  async createSetupScript(script: InsertSetupScript): Promise<SetupScript> {
+    const results = await db.insert(setupScripts).values(script).returning();
+    return results[0];
+  }
+
+  async updateSetupScript(id: number, script: Partial<InsertSetupScript>): Promise<SetupScript | undefined> {
+    const results = await db
+      .update(setupScripts)
+      .set(script)
+      .where(eq(setupScripts.id, id))
+      .returning();
+    return results[0];
+  }
+
+  async deleteSetupScript(id: number): Promise<boolean> {
+    const results = await db.delete(setupScripts).where(eq(setupScripts.id, id)).returning();
+    return results.length > 0;
+  }
+
+  // Server Execution methods
+  async getServerExecutions(serverId: number): Promise<ServerExecution[]> {
+    return await db.select().from(serverExecutions).where(eq(serverExecutions.serverId, serverId));
+  }
+
+  async createServerExecution(execution: InsertServerExecution): Promise<ServerExecution> {
+    const results = await db.insert(serverExecutions).values(execution).returning();
+    return results[0];
+  }
+
+  async updateServerExecution(id: number, execution: Partial<InsertServerExecution>): Promise<ServerExecution | undefined> {
+    const results = await db
+      .update(serverExecutions)
+      .set(execution)
+      .where(eq(serverExecutions.id, id))
       .returning();
     return results[0];
   }

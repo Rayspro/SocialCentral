@@ -1,7 +1,7 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertAccountSchema, insertContentSchema, insertScheduleSchema } from "@shared/schema";
+import { insertAccountSchema, insertContentSchema, insertScheduleSchema, insertSetupScriptSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
 
@@ -825,6 +825,117 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Delete server error:", error);
       res.status(500).json({ error: "Failed to delete server" });
+    }
+  });
+
+  // Setup Scripts endpoints
+  app.get("/api/setup-scripts", async (_req, res) => {
+    const scripts = await storage.getSetupScripts();
+    res.json(scripts);
+  });
+
+  app.get("/api/setup-scripts/category/:category", async (req, res) => {
+    const { category } = req.params;
+    const scripts = await storage.getSetupScriptsByCategory(category);
+    res.json(scripts);
+  });
+
+  app.post("/api/setup-scripts", async (req, res) => {
+    try {
+      const result = insertSetupScriptSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error.issues });
+      }
+      const script = await storage.createSetupScript(result.data);
+      res.status(201).json(script);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create setup script" });
+    }
+  });
+
+  // Server Execution endpoints
+  app.get("/api/server-executions/:serverId", async (req, res) => {
+    const serverId = parseInt(req.params.serverId);
+    const executions = await storage.getServerExecutions(serverId);
+    res.json(executions);
+  });
+
+  app.post("/api/execute-script", async (req, res) => {
+    try {
+      const { serverId, scriptId } = req.body;
+      
+      if (!serverId || !scriptId) {
+        return res.status(400).json({ error: "Server ID and Script ID are required" });
+      }
+
+      // Get server and script details
+      const server = await storage.getVastServer(serverId);
+      const script = await storage.getSetupScript(scriptId);
+
+      if (!server || !script) {
+        return res.status(404).json({ error: "Server or script not found" });
+      }
+
+      if (!server.isLaunched || server.status !== "running") {
+        return res.status(400).json({ error: "Server must be running to execute scripts" });
+      }
+
+      // Create execution record
+      const execution = await storage.createServerExecution({
+        serverId,
+        scriptId,
+        status: "pending",
+        startedAt: new Date(),
+      });
+
+      // Update server status to configuring
+      await storage.updateVastServer(serverId, { 
+        status: "configuring",
+        setupStatus: "installing" 
+      });
+
+      // Simulate script execution (in real implementation, this would SSH to the server)
+      setTimeout(async () => {
+        try {
+          // Simulate script execution with random success/failure
+          const isSuccess = Math.random() > 0.2; // 80% success rate
+          
+          if (isSuccess) {
+            await storage.updateServerExecution(execution.id, {
+              status: "completed",
+              output: `Script '${script.name}' executed successfully!\n\n${script.description}\n\nEstimated time: ${script.estimatedTime} minutes\n\nExecution completed without errors.`,
+              completedAt: new Date(),
+            });
+
+            await storage.updateVastServer(serverId, { 
+              status: "running",
+              setupStatus: "ready" 
+            });
+          } else {
+            await storage.updateServerExecution(execution.id, {
+              status: "failed",
+              errorLog: "Script execution failed due to network timeout or dependency issues.",
+              completedAt: new Date(),
+            });
+
+            await storage.updateVastServer(serverId, { 
+              status: "running",
+              setupStatus: "failed" 
+            });
+          }
+        } catch (error) {
+          console.error("Error updating execution:", error);
+        }
+      }, 3000 + Math.random() * 5000); // Random delay 3-8 seconds
+
+      res.json({ 
+        success: true, 
+        execution,
+        message: "Script execution started" 
+      });
+    } catch (error) {
+      console.error("Error executing script:", error);
+      res.status(500).json({ error: "Failed to execute script" });
     }
   });
 

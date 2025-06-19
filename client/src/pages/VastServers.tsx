@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown } from "lucide-react";
+import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { VastServer } from "@shared/schema";
 
@@ -27,11 +27,33 @@ interface AvailableServer {
   metadata?: any;
 }
 
+interface SetupScript {
+  id: number;
+  name: string;
+  description: string;
+  category: string;
+  estimatedTime: number;
+  requirements: any;
+}
+
+interface ServerExecution {
+  id: number;
+  serverId: number;
+  scriptId: number;
+  status: string;
+  output?: string;
+  errorLog?: string;
+  startedAt?: string;
+  completedAt?: string;
+}
+
 export default function VastServers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedServer, setSelectedServer] = useState<AvailableServer | null>(null);
   const [showLaunchDialog, setShowLaunchDialog] = useState(false);
+  const [showSetupDialog, setShowSetupDialog] = useState(false);
+  const [selectedLaunchedServer, setSelectedLaunchedServer] = useState<VastServer | null>(null);
   
   // Filter and sort states
   const [searchTerm, setSearchTerm] = useState("");
@@ -51,6 +73,21 @@ export default function VastServers() {
   const { data: availableServers, isLoading: isLoadingAvailable } = useQuery<AvailableServer[]>({
     queryKey: ['/api/vast-servers/available'],
     queryFn: () => fetch('/api/vast-servers/available').then(res => res.json()),
+  });
+
+  // Fetch setup scripts
+  const { data: setupScripts } = useQuery<SetupScript[]>({
+    queryKey: ['/api/setup-scripts'],
+    queryFn: () => fetch('/api/setup-scripts').then(res => res.json()),
+  });
+
+  // Fetch server executions for selected server
+  const { data: serverExecutions } = useQuery<ServerExecution[]>({
+    queryKey: ['/api/server-executions', selectedLaunchedServer?.id],
+    queryFn: () => selectedLaunchedServer 
+      ? fetch(`/api/server-executions/${selectedLaunchedServer.id}`).then(res => res.json())
+      : Promise.resolve([]),
+    enabled: !!selectedLaunchedServer,
   });
 
   // Launch server mutation
@@ -131,9 +168,42 @@ export default function VastServers() {
     },
   });
 
+  // Execute script mutation
+  const executeScriptMutation = useMutation({
+    mutationFn: async ({ serverId, scriptId }: { serverId: number; scriptId: number }) => {
+      const response = await fetch('/api/execute-script', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serverId, scriptId }),
+      });
+      if (!response.ok) throw new Error('Failed to execute script');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/server-executions'], refetchType: 'all' });
+      toast({
+        title: "Script Execution Started",
+        description: "The setup script is now running on your server.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Execution Failed",
+        description: error.message || "Failed to execute script",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleLaunchServer = (server: AvailableServer) => {
     setSelectedServer(server);
     setShowLaunchDialog(true);
+  };
+
+  const handleSetupServer = (server: VastServer) => {
+    setSelectedLaunchedServer(server);
+    setShowSetupDialog(true);
   };
 
   const confirmLaunch = () => {
@@ -306,17 +376,50 @@ export default function VastServers() {
                         </div>
                       )}
                     </div>
+                    {server.setupStatus && (
+                      <div className="flex items-center gap-2 mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                        {server.setupStatus === 'installing' && (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                            <span className="text-sm">Setting up ComfyUI...</span>
+                          </>
+                        )}
+                        {server.setupStatus === 'ready' && (
+                          <>
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            <span className="text-sm">ComfyUI Ready</span>
+                          </>
+                        )}
+                        {server.setupStatus === 'failed' && (
+                          <>
+                            <XCircle className="h-4 w-4 text-red-500" />
+                            <span className="text-sm">Setup Failed</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                     <div className="flex gap-2 mt-4">
                       {server.status === 'running' && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => stopMutation.mutate(server.id)}
-                          disabled={stopMutation.isPending}
-                        >
-                          <Square className="h-4 w-4 mr-1" />
-                          Stop
-                        </Button>
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleSetupServer(server)}
+                            disabled={server.status === 'configuring'}
+                          >
+                            <Settings className="h-4 w-4 mr-1" />
+                            Setup
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => stopMutation.mutate(server.id)}
+                            disabled={stopMutation.isPending}
+                          >
+                            <Square className="h-4 w-4 mr-1" />
+                            Stop
+                          </Button>
+                        </>
                       )}
                       <Button
                         variant="outline"
@@ -598,6 +701,144 @@ export default function VastServers() {
                     <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                   )}
                   Confirm Launch
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* ComfyUI Setup Dialog */}
+      <Dialog open={showSetupDialog} onOpenChange={setShowSetupDialog}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Setup ComfyUI on {selectedLaunchedServer?.name}</DialogTitle>
+            <DialogDescription>
+              Choose setup scripts to configure your server with ComfyUI and download models
+            </DialogDescription>
+          </DialogHeader>
+          
+          {selectedLaunchedServer && (
+            <div className="space-y-6">
+              {/* Server Info */}
+              <div className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="font-medium text-gray-600 dark:text-gray-400">GPU</div>
+                    <div>{selectedLaunchedServer.gpu} × {selectedLaunchedServer.gpuCount}</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-600 dark:text-gray-400">RAM</div>
+                    <div>{selectedLaunchedServer.ram} GB</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-600 dark:text-gray-400">Storage</div>
+                    <div>{selectedLaunchedServer.disk} GB</div>
+                  </div>
+                  <div>
+                    <div className="font-medium text-gray-600 dark:text-gray-400">Status</div>
+                    <Badge className={getStatusColor(selectedLaunchedServer.status)}>
+                      {selectedLaunchedServer.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Available Scripts */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Available Setup Scripts</h3>
+                <div className="grid gap-4">
+                  {setupScripts?.filter(script => script.category === 'comfyui').map((script) => (
+                    <Card key={script.id} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <CardTitle className="text-base">{script.name}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline">
+                              <Clock className="h-3 w-3 mr-1" />
+                              {script.estimatedTime}m
+                            </Badge>
+                            <Button
+                              size="sm"
+                              onClick={() => executeScriptMutation.mutate({
+                                serverId: selectedLaunchedServer.id,
+                                scriptId: script.id
+                              })}
+                              disabled={executeScriptMutation.isPending || selectedLaunchedServer.status === 'configuring'}
+                            >
+                              {executeScriptMutation.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Terminal className="h-4 w-4" />
+                              )}
+                              Execute
+                            </Button>
+                          </div>
+                        </div>
+                        <CardDescription>{script.description}</CardDescription>
+                      </CardHeader>
+                      {script.requirements && (
+                        <CardContent className="pt-0">
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            Requirements: {script.requirements.minRam && `${script.requirements.minRam}GB RAM, `}
+                            {script.requirements.minDisk && `${script.requirements.minDisk}GB Storage, `}
+                            {script.requirements.gpu && 'GPU Required, '}
+                            {script.requirements.bandwidth && `${script.requirements.bandwidth} bandwidth`}
+                          </div>
+                        </CardContent>
+                      )}
+                    </Card>
+                  ))}
+                </div>
+              </div>
+
+              {/* Execution History */}
+              {serverExecutions && serverExecutions.length > 0 && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Execution History</h3>
+                  <div className="space-y-2">
+                    {serverExecutions.slice(-5).reverse().map((execution) => {
+                      const script = setupScripts?.find(s => s.id === execution.scriptId);
+                      return (
+                        <Card key={execution.id}>
+                          <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                {execution.status === 'pending' && <Clock className="h-4 w-4 text-yellow-500" />}
+                                {execution.status === 'running' && <Loader2 className="h-4 w-4 animate-spin text-blue-500" />}
+                                {execution.status === 'completed' && <CheckCircle className="h-4 w-4 text-green-500" />}
+                                {execution.status === 'failed' && <XCircle className="h-4 w-4 text-red-500" />}
+                                <span className="font-medium">{script?.name || 'Unknown Script'}</span>
+                              </div>
+                              <Badge variant="outline">{execution.status}</Badge>
+                            </div>
+                            {execution.output && (
+                              <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">
+                                <pre className="whitespace-pre-wrap">{execution.output}</pre>
+                              </div>
+                            )}
+                            {execution.errorLog && (
+                              <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/20 rounded text-xs font-mono text-red-700 dark:text-red-300">
+                                <pre className="whitespace-pre-wrap">{execution.errorLog}</pre>
+                              </div>
+                            )}
+                            {execution.startedAt && (
+                              <div className="mt-2 text-xs text-gray-500">
+                                Started: {new Date(execution.startedAt).toLocaleString()}
+                                {execution.completedAt && ` • Completed: ${new Date(execution.completedAt).toLocaleString()}`}
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-end pt-4 border-t">
+                <Button variant="outline" onClick={() => setShowSetupDialog(false)}>
+                  Close
                 </Button>
               </div>
             </div>

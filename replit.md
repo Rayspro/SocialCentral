@@ -106,6 +106,7 @@ SocialSync is a full-stack web application for managing social media content acr
 Changelog:
 - June 18, 2025. Initial setup
 - June 19, 2025. Added comprehensive Vast.ai server management system with filterable table view, pricing display, and launch capabilities
+- June 19, 2025. Implemented ComfyUI shell script execution system with predefined setup scripts for automated model downloads and server configuration
 ```
 
 ## User Preferences

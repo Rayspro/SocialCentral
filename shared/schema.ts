@@ -82,10 +82,38 @@ export const vastServers = pgTable("vast_servers", {
   isLaunched: boolean("is_launched").notNull().default(false),
   launchedAt: timestamp("launched_at"),
   serverUrl: text("server_url"),
-  status: text("status").notNull().default("available"), // available, launching, running, stopping, stopped
+  sshConnection: text("ssh_connection"), // SSH connection string
+  status: text("status").notNull().default("available"), // available, launching, running, stopping, stopped, configuring
+  setupStatus: text("setup_status").default("pending"), // pending, installing, ready, failed
+  comfyuiPort: integer("comfyui_port").default(8188),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const setupScripts = pgTable("setup_scripts", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description").notNull(),
+  category: text("category").notNull(), // comfyui, stable-diffusion, general
+  script: text("script").notNull(), // bash script content
+  isActive: boolean("is_active").notNull().default(true),
+  estimatedTime: integer("estimated_time_minutes").default(10), // estimated execution time
+  requirements: jsonb("requirements"), // system requirements
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const serverExecutions = pgTable("server_executions", {
+  id: serial("id").primaryKey(),
+  serverId: integer("server_id").notNull().references(() => vastServers.id),
+  scriptId: integer("script_id").notNull().references(() => setupScripts.id),
+  status: text("status").notNull().default("pending"), // pending, running, completed, failed
+  output: text("output"), // script execution output
+  errorLog: text("error_log"), // error messages
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
 // Insert schemas
@@ -122,6 +150,17 @@ export const insertVastServerSchema = createInsertSchema(vastServers).omit({
   updatedAt: true,
 });
 
+export const insertSetupScriptSchema = createInsertSchema(setupScripts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServerExecutionSchema = createInsertSchema(serverExecutions).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type Platform = typeof platforms.$inferSelect;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -140,6 +179,12 @@ export type InsertApiKey = z.infer<typeof insertApiKeySchema>;
 
 export type VastServer = typeof vastServers.$inferSelect;
 export type InsertVastServer = z.infer<typeof insertVastServerSchema>;
+
+export type SetupScript = typeof setupScripts.$inferSelect;
+export type InsertSetupScript = z.infer<typeof insertSetupScriptSchema>;
+
+export type ServerExecution = typeof serverExecutions.$inferSelect;
+export type InsertServerExecution = z.infer<typeof insertServerExecutionSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

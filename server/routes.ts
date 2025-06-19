@@ -712,7 +712,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get stored servers
       const storedServers = await storage.getVastServers();
       
-      // Try to sync with Vast.ai if we have API key
+      // Always try to sync with Vast.ai if we have API key
       const vastApiKey = await storage.getApiKeyByService("vast");
       if (vastApiKey?.keyValue) {
         try {
@@ -727,18 +727,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const data = await response.json();
             const instances = data.instances || [];
             
-            // Update each stored server with real Vast.ai data
+            // Sync existing servers with Vast.ai data
             for (const storedServer of storedServers) {
               if (storedServer.vastId) {
                 const vastInstance = instances.find((instance: any) => instance.id.toString() === storedServer.vastId);
                 if (vastInstance) {
-                  // Update server with real data from Vast.ai
                   await storage.updateVastServer(storedServer.id, {
                     status: vastInstance.actual_status === 'running' ? 'running' : 'stopped',
                     serverUrl: vastInstance.ssh_host ? `http://${vastInstance.ssh_host}:${vastInstance.direct_port_start || 8188}` : storedServer.serverUrl,
                     sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
                       ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
                       : storedServer.sshConnection,
+                    isLaunched: vastInstance.actual_status === 'running',
+                    setupStatus: vastInstance.actual_status === 'running' ? 'ready' : 'pending',
                     metadata: {
                       ...storedServer.metadata as any,
                       vastData: {
@@ -754,6 +755,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
                     }
                   });
                 }
+              }
+            }
+            
+            // Check for instances on Vast.ai that aren't in our database
+            for (const vastInstance of instances) {
+              const existingServer = storedServers.find(server => server.vastId === vastInstance.id.toString());
+              if (!existingServer) {
+                // Create new server record for existing Vast.ai instance
+                await storage.createVastServer({
+                  vastId: vastInstance.id.toString(),
+                  name: vastInstance.label || `Server ${vastInstance.id}`,
+                  gpu: vastInstance.gpu_name || 'Unknown GPU',
+                  gpuCount: vastInstance.num_gpus || 1,
+                  cpuCores: vastInstance.num_cpus || 1,
+                  ram: Math.round(vastInstance.cpu_ram / 1024) || 1,
+                  disk: Math.round(vastInstance.disk_space) || 100,
+                  pricePerHour: (vastInstance.dph_total || 0).toString(),
+                  location: vastInstance.geolocation || 'Unknown',
+                  isAvailable: true,
+                  isLaunched: vastInstance.actual_status === 'running',
+                  status: vastInstance.actual_status === 'running' ? 'running' : 'stopped',
+                  setupStatus: vastInstance.actual_status === 'running' ? 'ready' : 'pending',
+                  serverUrl: vastInstance.ssh_host ? `http://${vastInstance.ssh_host}:${vastInstance.direct_port_start || 8188}` : undefined,
+                  sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
+                    ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
+                    : undefined,
+                  metadata: {
+                    vastData: {
+                      machine_id: vastInstance.machine_id,
+                      hostname: vastInstance.hostname,
+                      created_on: vastInstance.start_date,
+                      ssh_host: vastInstance.ssh_host,
+                      ssh_port: vastInstance.ssh_port,
+                      direct_port_start: vastInstance.direct_port_start,
+                      direct_port_end: vastInstance.direct_port_end,
+                      imported_from_vast: true,
+                      last_synced: new Date().toISOString()
+                    }
+                  }
+                });
+                console.log(`Imported existing Vast.ai instance: ${vastInstance.id}`);
               }
             }
             
@@ -1312,7 +1354,6 @@ echo "CUDA environment configured!"`,
   // Server Analytics routes  
   app.get("/api/server-analytics", async (req, res) => {
     try {
-      // Get synced servers for analytics
       const servers = await storage.getVastServers();
       const today = new Date();
       const last7Days = [];

@@ -80,31 +80,7 @@ export default function VastServers() {
     queryFn: () => fetch('/api/vast-servers').then(res => res.json()),
   });
 
-  // Sync servers mutation
-  const syncMutation = useMutation({
-    mutationFn: async () => {
-      const response = await fetch("/api/vast-servers/sync", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" }
-      });
-      if (!response.ok) throw new Error("Failed to sync servers");
-      return response.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] });
-      toast({
-        title: "Sync Complete",
-        description: "Successfully synced servers with Vast.ai",
-      });
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Sync Failed", 
-        description: error.message || "Failed to sync with Vast.ai",
-        variant: "destructive",
-      });
-    },
-  });
+
 
   // Fetch available servers
   const { data: availableServers, isLoading: isLoadingAvailable } = useQuery<AvailableServer[]>({
@@ -465,26 +441,15 @@ export default function VastServers() {
         <TabsContent value="launched" className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-semibold">Launched Servers</h2>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => refetchServers()}
-                disabled={isLoadingLaunched}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${isLoadingLaunched ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => syncMutation.mutate()}
-                disabled={syncMutation.isPending}
-              >
-                <RefreshCw className={`h-4 w-4 mr-1 ${syncMutation.isPending ? 'animate-spin' : ''}`} />
-                Sync with Vast.ai
-              </Button>
-            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetchServers()}
+              disabled={isLoadingLaunched}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${isLoadingLaunched ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
           </div>
           {isLoadingLaunched ? (
             <div className="flex items-center justify-center h-32">

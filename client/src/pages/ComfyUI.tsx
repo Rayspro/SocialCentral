@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
 import { LoadingSpinner, LoadingCard } from "@/components/ui/loading-spinner";
+import { LoadingMascot, MascotPresets } from "@/components/ui/loading-mascot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { 
   Download, 
@@ -818,7 +819,10 @@ export default function ComfyUI() {
                       className="w-full"
                     >
                       {generateMutation.isPending ? (
-                        <LoadingSpinner size="sm" text="Generating..." />
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
                       ) : (
                         <>
                           <Play className="h-4 w-4 mr-2" />
@@ -842,7 +846,10 @@ export default function ComfyUI() {
                           className="w-full bg-blue-600 hover:bg-blue-700"
                         >
                           {autoSetupMutation.isPending ? (
-                            <LoadingSpinner size="sm" text="Setting up ComfyUI..." />
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Setting up ComfyUI...
+                            </>
                           ) : (
                             <>
                               <Download className="h-4 w-4 mr-2" />
@@ -856,6 +863,17 @@ export default function ComfyUI() {
                             This will install ComfyUI, download basic models, and start the server automatically.
                           </p>
                         </div>
+                        
+                        {/* Show mascot during ComfyUI setup */}
+                        {autoSetupMutation.isPending && (
+                          <div className="mt-4">
+                            <MascotPresets.ComfySetup 
+                              status="loading"
+                              size="md"
+                              className="w-full"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </CardContent>

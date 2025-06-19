@@ -1,508 +1,442 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useQuery } from "@tanstack/react-query";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Area, AreaChart } from "recharts";
-import { Server, Clock, DollarSign, Activity, Zap, TrendingUp, Calendar, Eye, RefreshCw } from "lucide-react";
-import { useState } from "react";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LoadingMascot } from "@/components/ui/loading-mascot";
+import { 
+  Settings, 
+  Activity, 
+  Server, 
+  Clock, 
+  HardDrive, 
+  Cpu, 
+  MemoryStick,
+  Loader2,
+  Play,
+  AlertCircle,
+  CheckCircle
+} from "lucide-react";
+import { apiRequest } from "@/lib/queryClient";
 
-interface ServerMetrics {
-  dailyUsage: Array<{ date: string; servers: number; cost: number; uptime: number }>;
-  monthlyUsage: Array<{ month: string; servers: number; cost: number; uptime: number }>;
-  serverTypes: Array<{ name: string; count: number; cost: number }>;
-  uptimeStats: { totalUptime: number; averageUptime: number; totalCost: number; activeServers: number };
+interface ServerAnalyticsProps {
+  serverId: number;
+  onClose: () => void;
 }
 
-interface TodayServer {
-  id: number;
-  name: string;
-  gpu: string;
-  status: string;
-  hoursRunning: number;
-  costPerHour: number;
-  todayCost: number;
-  region: string;
-  createdAt: string;
-}
+export function ServerAnalytics({ serverId, onClose }: ServerAnalyticsProps) {
+  const queryClient = useQueryClient();
+  const [setupProgress, setSetupProgress] = useState(0);
+  const [setupLogs, setSetupLogs] = useState<string[]>([]);
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
 
-interface TodayAnalytics {
-  date: string;
-  servers: TodayServer[];
-  totalCost: number;
-  activeServers: number;
-}
-
-export function ServerAnalytics() {
-  const [viewMode, setViewMode] = useState<'overview' | 'today'>('overview');
-  
-  const { data: metrics, isLoading: metricsLoading, refetch: refetchMetrics } = useQuery<ServerMetrics>({
-    queryKey: ["/api/server-analytics"]
+  // Fetch server details
+  const { data: server, isLoading: isLoadingServer } = useQuery({
+    queryKey: [`/api/vast-servers/${serverId}`],
+    refetchInterval: 5000,
   });
 
-  const { data: todayData, isLoading: todayLoading, refetch: refetchToday } = useQuery<TodayAnalytics>({
-    queryKey: ["/api/server-analytics/today"],
-    enabled: viewMode === 'today'
+  // Fetch server executions
+  const { data: executions, isLoading: isLoadingExecutions } = useQuery({
+    queryKey: [`/api/server-executions/${serverId}`],
   });
 
-  const isLoading = metricsLoading || (viewMode === 'today' && todayLoading);
+  // Fetch scheduler info
+  const { data: schedulerInfo } = useQuery({
+    queryKey: [`/api/server-scheduler/${serverId}`],
+    refetchInterval: 2000,
+  });
 
-  const handleRefresh = () => {
-    if (viewMode === 'overview') {
-      refetchMetrics();
-    } else {
-      refetchToday();
+  // Setup ComfyUI mutation
+  const setupMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/vast-servers/${serverId}/setup`, {
+        method: "POST",
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/vast-servers/${serverId}`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/server-scheduler/${serverId}`] });
+    },
+  });
+
+  // WebSocket connection for real-time logs
+  useEffect(() => {
+    if (server?.setupStatus === 'installing' || schedulerInfo?.isActive) {
+      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+      const wsUrl = `${protocol}//${window.location.host}/ws`;
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("WebSocket connected for server analytics");
+        setWsConnection(ws);
+      };
+
+      ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'setup_progress' && data.serverId === serverId) {
+          setSetupProgress(data.progress);
+          if (data.log) {
+            setSetupLogs(prev => [...prev, data.log]);
+          }
+        }
+      };
+
+      ws.onclose = () => {
+        console.log("WebSocket connection closed");
+        setWsConnection(null);
+      };
+
+      return () => {
+        ws.close();
+      };
     }
-  };
+  }, [server?.setupStatus, schedulerInfo?.isActive, serverId]);
+
+  if (isLoadingServer) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <LoadingMascot message="Loading server details..." />
+      </div>
+    );
+  }
+
+  if (!server) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">Server not found</p>
+        </div>
+      </div>
+    );
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'running': return 'bg-green-500';
-      case 'stopped': return 'bg-red-500';
-      case 'loading': return 'bg-yellow-500';
-      default: return 'bg-gray-500';
+      case 'running': return 'text-green-600 bg-green-100 dark:bg-green-900/20';
+      case 'installing': return 'text-blue-600 bg-blue-100 dark:bg-blue-900/20';
+      case 'completed': return 'text-green-600 bg-green-100 dark:bg-green-900/20';
+      case 'failed': return 'text-red-600 bg-red-100 dark:bg-red-900/20';
+      default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900/20';
     }
   };
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'running': return 'default';
-      case 'stopped': return 'destructive';
-      case 'loading': return 'outline';
-      default: return 'secondary';
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <Activity className="h-5 w-5 text-purple-600" />
-            Server Analytics
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="animate-pulse space-y-4">
-            <div className="h-64 bg-slate-200 dark:bg-slate-700 rounded"></div>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  if (viewMode === 'today' && todayData) {
-    return (
-      <div className="space-y-6">
-        {/* Header */}
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-purple-600" />
-                <CardTitle className="text-lg">Today's Server Costs</CardTitle>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleRefresh}
-                  className="gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setViewMode('overview')}
-                  className="gap-2"
-                >
-                  <Eye className="h-4 w-4" />
-                  Overview
-                </Button>
-              </div>
-            </div>
-            <CardDescription>
-              Individual server costs for {new Date(todayData.date).toLocaleDateString('en-US', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-              })}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border border-purple-200 dark:border-purple-800 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Total Cost</p>
-                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">${todayData.totalCost}</p>
-                  </div>
-                  <DollarSign className="h-8 w-8 text-purple-600" />
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-green-700 dark:text-green-300">Active Servers</p>
-                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">{todayData.activeServers}</p>
-                  </div>
-                  <Server className="h-8 w-8 text-green-600" />
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-blue-700 dark:text-blue-300">Total Servers</p>
-                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{todayData.servers.length}</p>
-                  </div>
-                  <Activity className="h-8 w-8 text-blue-600" />
-                </div>
-              </div>
-              <div className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-orange-700 dark:text-orange-300">Avg Cost/Hour</p>
-                    <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
-                      ${todayData.servers.length > 0 ? 
-                        (todayData.servers.reduce((sum, s) => sum + s.costPerHour, 0) / todayData.servers.length).toFixed(2) : 
-                        '0.00'
-                      }
-                    </p>
-                  </div>
-                  <Clock className="h-8 w-8 text-orange-600" />
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Server List */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg">Server Breakdown</CardTitle>
-            <CardDescription>Individual server costs and runtime details</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <div className="space-y-3">
-              {todayData.servers.map((server) => (
-                <div 
-                  key={server.id}
-                  className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${getStatusColor(server.status)}`}></div>
-                      <div>
-                        <h4 className="font-semibold text-slate-900 dark:text-slate-100">{server.name}</h4>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">{server.gpu} • {server.region}</p>
-                      </div>
-                    </div>
-                    <Badge variant={getStatusVariant(server.status)} className="capitalize">
-                      {server.status}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-6 text-right">
-                    <div>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Runtime</p>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">{server.hoursRunning}h</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Rate</p>
-                      <p className="font-semibold text-slate-900 dark:text-slate-100">${server.costPerHour}/h</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-slate-600 dark:text-slate-400">Today's Cost</p>
-                      <p className="font-bold text-lg text-slate-900 dark:text-slate-100">${server.todayCost}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {todayData.servers.length === 0 && (
-                <div className="text-center py-8 text-slate-500 dark:text-slate-400">
-                  No servers running today
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b'];
+  const needsSetup = server.status === 'running' && (!server.setupStatus || server.setupStatus === 'pending');
+  const setupInProgress = server.setupStatus === 'installing' || schedulerInfo?.isActive;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity className="h-5 w-5 text-purple-600" />
-              <CardTitle className="text-lg">Server Analytics Overview</CardTitle>
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-semibold">{server.name}</h2>
+              <p className="text-sm text-muted-foreground">Server Analytics & Setup</p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                className="gap-2"
-              >
-                <RefreshCw className="h-4 w-4" />
-                Refresh
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setViewMode('today')}
-                className="gap-2"
-              >
-                <Calendar className="h-4 w-4" />
-                Today's Costs
-              </Button>
-            </div>
+            <Button variant="outline" onClick={onClose}>
+              Close
+            </Button>
           </div>
-          <CardDescription>
-            Comprehensive server usage, costs, and performance metrics
-          </CardDescription>
-        </CardHeader>
-      </Card>
 
-      {/* Key Metrics */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900 border-purple-200 dark:border-purple-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-purple-700 dark:text-purple-300">Active Servers</p>
-                <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{metrics?.uptimeStats.activeServers}</p>
+          <Tabs defaultValue="overview" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="setup">ComfyUI Setup</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+              <TabsTrigger value="logs">Logs</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="overview" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Server className="h-4 w-4" />
+                      Server Status
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span>Status:</span>
+                        <Badge className={getStatusColor(server.status)}>
+                          {server.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Setup Status:</span>
+                        <Badge className={getStatusColor(server.setupStatus || 'pending')}>
+                          {server.setupStatus || 'pending'}
+                        </Badge>
+                      </div>
+                      {server.launchedAt && (
+                        <div className="flex items-center justify-between">
+                          <span>Launched:</span>
+                          <span className="text-sm">{new Date(server.launchedAt).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Cpu className="h-4 w-4" />
+                      Specifications
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span>GPU:</span>
+                        <span>{server.gpu} × {server.gpuCount}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>CPU Cores:</span>
+                        <span>{server.cpuCores}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>RAM:</span>
+                        <span>{server.ram} GB</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Storage:</span>
+                        <span>{server.disk} GB</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Cost:</span>
+                        <span className="font-semibold">${server.pricePerHour}/hr</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <Server className="h-8 w-8 text-purple-600" />
-            </div>
-          </CardContent>
-        </Card>
+            </TabsContent>
 
-        <Card className="bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-950 dark:to-cyan-900 border-cyan-200 dark:border-cyan-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-cyan-700 dark:text-cyan-300">Avg Uptime</p>
-                <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{metrics?.uptimeStats.averageUptime}%</p>
+            <TabsContent value="setup" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Settings className="h-4 w-4" />
+                    ComfyUI Setup
+                  </CardTitle>
+                  <CardDescription>
+                    Install and configure ComfyUI on your server
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {needsSetup && (
+                    <div className="space-y-4">
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-sm text-blue-600 dark:text-blue-400">
+                          Your server is ready for ComfyUI installation. Click the button below to start the automated setup process.
+                        </p>
+                      </div>
+                      <Button 
+                        onClick={() => setupMutation.mutate()}
+                        disabled={setupMutation.isPending}
+                        className="w-full"
+                      >
+                        {setupMutation.isPending ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Starting Setup...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4 mr-2" />
+                            Start ComfyUI Setup
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  {setupInProgress && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                        <span className="text-sm text-blue-600 dark:text-blue-400">
+                          ComfyUI setup is in progress...
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span>Progress</span>
+                          <span>{setupProgress}%</span>
+                        </div>
+                        <Progress value={setupProgress} className="w-full" />
+                      </div>
+
+                      {setupLogs.length > 0 && (
+                        <div className="space-y-2">
+                          <h4 className="text-sm font-medium">Real-time Logs</h4>
+                          <div className="bg-black text-green-400 p-3 rounded-lg text-xs font-mono max-h-40 overflow-y-auto">
+                            {setupLogs.map((log, index) => (
+                              <div key={index}>{log}</div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {server.setupStatus === 'completed' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                        <span className="text-sm text-green-600 dark:text-green-400">
+                          ComfyUI setup completed successfully!
+                        </span>
+                      </div>
+                      
+                      {server.serverUrl && (
+                        <div className="p-4 bg-gray-50 dark:bg-gray-900/20 rounded-lg">
+                          <h4 className="text-sm font-medium mb-2">Connection Details</h4>
+                          <code className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                            {server.serverUrl}:8188
+                          </code>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {server.setupStatus === 'failed' && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-sm text-red-600 dark:text-red-400">
+                          ComfyUI setup failed. Please try again.
+                        </span>
+                      </div>
+                      
+                      <Button 
+                        onClick={() => setupMutation.mutate()}
+                        disabled={setupMutation.isPending}
+                        variant="outline"
+                        className="w-full"
+                      >
+                        <Play className="h-4 w-4 mr-2" />
+                        Retry Setup
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Activity className="h-4 w-4" />
+                      Server Activity
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span>Uptime:</span>
+                        <span>{server.launchedAt ? 
+                          Math.floor((Date.now() - new Date(server.launchedAt).getTime()) / (1000 * 60 * 60)) + 'h' : 
+                          'N/A'}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Total Cost:</span>
+                        <span className="font-semibold">
+                          ${server.launchedAt ? 
+                            (((Date.now() - new Date(server.launchedAt).getTime()) / (1000 * 60 * 60)) * parseFloat(server.pricePerHour)).toFixed(2) : 
+                            '0.00'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span>Location:</span>
+                        <span>{server.location}</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Clock className="h-4 w-4" />
+                      Scheduler Info
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {schedulerInfo ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span>Status:</span>
+                          <Badge variant={schedulerInfo.isActive ? "default" : "secondary"}>
+                            {schedulerInfo.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Checks:</span>
+                          <span>{schedulerInfo.checkCount}/40</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span>Last Status:</span>
+                          <span>{schedulerInfo.lastStatus}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No scheduler information available</p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
-              <Clock className="h-8 w-8 text-cyan-600" />
-            </div>
-          </CardContent>
-        </Card>
+            </TabsContent>
 
-        <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-950 dark:to-emerald-900 border-emerald-200 dark:border-emerald-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">Total Hours</p>
-                <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-100">{metrics?.uptimeStats.totalUptime}</p>
-              </div>
-              <Zap className="h-8 w-8 text-emerald-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-950 dark:to-amber-900 border-amber-200 dark:border-amber-800">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Total Cost</p>
-                <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">${metrics?.uptimeStats.totalCost}</p>
-              </div>
-              <DollarSign className="h-8 w-8 text-amber-600" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Daily Usage Trend */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-purple-600" />
-              Daily Server Usage
-            </CardTitle>
-            <CardDescription>Server count and costs over the last 7 days</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={metrics?.dailyUsage}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis 
-                  tick={{ fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="servers" 
-                  stackId="1"
-                  stroke="#8b5cf6" 
-                  fill="#8b5cf6"
-                  fillOpacity={0.6}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Server Types Distribution */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Server className="h-5 w-5 text-purple-600" />
-              Server Types
-            </CardTitle>
-            <CardDescription>Distribution of GPU server types used</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={metrics?.serverTypes}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={40}
-                  outerRadius={80}
-                  paddingAngle={5}
-                  dataKey="count"
-                >
-                  {metrics?.serverTypes.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex flex-wrap gap-3 mt-4">
-              {metrics?.serverTypes.map((entry, index) => (
-                <div key={entry.name} className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
-                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
-                  ></div>
-                  <span className="text-sm text-slate-600 dark:text-slate-400">{entry.name}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Monthly Cost Trend */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-purple-600" />
-              Monthly Costs
-            </CardTitle>
-            <CardDescription>Server costs over the last 6 months</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={metrics?.monthlyUsage}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis 
-                  dataKey="month" 
-                  tick={{ fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis 
-                  tick={{ fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Bar 
-                  dataKey="cost" 
-                  fill="#06b6d4"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        {/* Uptime Trend */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Activity className="h-5 w-5 text-purple-600" />
-              Uptime Performance
-            </CardTitle>
-            <CardDescription>Server uptime percentage over time</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-2">
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart data={metrics?.monthlyUsage}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis 
-                  dataKey="month" 
-                  tick={{ fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis 
-                  domain={[80, 100]}
-                  tick={{ fontSize: 12 }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: 'var(--background)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '8px',
-                    fontSize: '12px'
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="uptime" 
-                  stroke="#10b981"
-                  strokeWidth={3}
-                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+            <TabsContent value="logs" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Activity className="h-4 w-4" />
+                    Execution History
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoadingExecutions ? (
+                    <div className="flex items-center justify-center h-32">
+                      <LoadingMascot message="Loading logs..." />
+                    </div>
+                  ) : executions && executions.length > 0 ? (
+                    <div className="space-y-3 max-h-64 overflow-y-auto">
+                      {executions.map((execution: any) => (
+                        <div key={execution.id} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <Badge className={getStatusColor(execution.status)}>
+                              {execution.status}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(execution.startedAt).toLocaleString()}
+                            </span>
+                          </div>
+                          {execution.output && (
+                            <div className="bg-gray-50 dark:bg-gray-900 p-2 rounded text-xs font-mono">
+                              {execution.output.slice(0, 200)}...
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No execution logs available</p>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );

@@ -18,6 +18,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { LoadingMascot, MascotPresets } from "@/components/ui/loading-mascot";
+import { ServerAnalytics } from "@/components/ServerAnalytics";
 import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3, Home, ChevronRight, User, LogOut, Bell, Timer } from "lucide-react";
 import { LoadingSpinner, LoadingCard, LoadingPage } from "@/components/ui/loading-spinner";
 import { useLocation } from "wouter";
@@ -66,6 +68,8 @@ export default function VastServers() {
   const [showLaunchDialog, setShowLaunchDialog] = useState(false);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
   const [selectedLaunchedServer, setSelectedLaunchedServer] = useState<VastServer | null>(null);
+  const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+  const [analyticsServerId, setAnalyticsServerId] = useState<number | null>(null);
   
   // Filter and sort states
   const [searchTerm, setSearchTerm] = useState("");
@@ -469,7 +473,14 @@ export default function VastServers() {
           ) : launchedServers && launchedServers.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {launchedServers.map((server) => (
-                <Card key={server.id}>
+                <Card 
+                  key={server.id} 
+                  className="cursor-pointer hover:shadow-lg transition-shadow duration-200"
+                  onClick={() => {
+                    setAnalyticsServerId(server.id);
+                    setShowAnalyticsModal(true);
+                  }}
+                >
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">{server.name}</CardTitle>
@@ -570,35 +581,32 @@ export default function VastServers() {
                     <div className="flex flex-col gap-2 mt-4">
                       {/* Primary actions row */}
                       <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `/vast-servers/${server.id}`}
-                          className="flex-1"
-                        >
-                          <BarChart3 className="h-4 w-4 mr-1" />
-                          Analytics
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.location.href = `/server-detail/${server.id}`}
-                          className="flex-1"
-                        >
-                          <Timer className="h-4 w-4 mr-1" />
-                          Monitor
-                        </Button>
                         {server.status === 'running' && (
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => handleSetupServer(server)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              queryClient.invalidateQueries({ queryKey: [`/api/vast-servers/${server.id}`] });
+                            }}
                             className="flex-1"
                           >
-                            <Settings className="h-4 w-4 mr-1" />
-                            Setup
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Refresh
                           </Button>
                         )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `/server-detail/${server.id}`;
+                          }}
+                          className="flex-1"
+                        >
+                          <Timer className="h-4 w-4 mr-1" />
+                          Monitor
+                          </Button>
                       </div>
                       
                       {/* Secondary actions row */}
@@ -929,6 +937,17 @@ export default function VastServers() {
                   Confirm Launch
                 </Button>
               </div>
+              
+              {/* Show cute mascot during launch */}
+              {launchMutation.isPending && (
+                <div className="mt-4">
+                  <MascotPresets.ServerLaunch 
+                    status="loading"
+                    size="md"
+                    className="w-full"
+                  />
+                </div>
+              )}
             </div>
           )}
         </DialogContent>
@@ -1038,6 +1057,17 @@ export default function VastServers() {
                               </div>
                               <Badge variant="outline">{execution.status}</Badge>
                             </div>
+                            
+                            {/* Show mascot for running ComfyUI setup */}
+                            {execution.status === 'running' && script?.name.includes('ComfyUI') && (
+                              <div className="mt-4">
+                                <MascotPresets.ComfySetup 
+                                  status="loading"
+                                  size="sm"
+                                  className="w-full"
+                                />
+                              </div>
+                            )}
                             {execution.output && (
                               <div className="mt-2 p-2 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">
                                 <pre className="whitespace-pre-wrap">{execution.output}</pre>
@@ -1071,7 +1101,18 @@ export default function VastServers() {
           )}
         </DialogContent>
       </Dialog>
-      </div>
+      
+      {/* Server Analytics Modal */}
+      {showAnalyticsModal && analyticsServerId && (
+        <ServerAnalytics
+          serverId={analyticsServerId}
+          onClose={() => {
+            setShowAnalyticsModal(false);
+            setAnalyticsServerId(null);
+          }}
+        />
+      )}
+    </div>
     </div>
   );
 }

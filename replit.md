@@ -145,8 +145,6 @@ Changelog:
 - June 19, 2025. Fixed SSH connection issues by implementing intelligent demo mode fallback - when SSH is unavailable, system automatically switches to demo mode with full ComfyUI functionality, ensuring seamless user experience regardless of server connectivity limitations
 - June 19, 2025. Restructured application architecture - moved ComfyUI section from standalone navigation to server-specific feature accessible via individual server details pages (/server/:id/comfy-ui), since ComfyUI functionality depends on specific servers. Removed ComfyUI from main sidebar navigation and added ComfyUI button to server details pages for direct access to server-specific AI image generation capabilities
 - June 19, 2025. Completed ComfyUI architectural restructuring - systematically replaced all selectedServer references with URL-based server ID parameters throughout ComfyUI component. ComfyUI now operates exclusively as server-specific feature with no server selection UI, using serverId from route parameters for all operations including model management, image generation, and workflow analysis
-- June 19, 2025. Restored missing Analytics tab to server details page with comprehensive tabbed interface (Overview, Analytics, ComfyUI Setup, Logs) - added performance metrics, cost analysis, CPU/GPU usage monitoring, and network I/O tracking for complete server management
-- June 19, 2025. Enhanced ComfyUI Setup tab with restored "Manage Models" functionality and "Real-time Progress" monitoring - added dedicated cards for setup status tracking, live scheduler progress with progress bars, recent activity summaries, and quick access buttons for model management and ComfyUI access
 ```
 
 ## User Preferences

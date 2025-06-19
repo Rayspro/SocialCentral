@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { workflowAnalyzer } from "./workflow-analyzer";
 import { auditLogger } from "./audit-logger";
+import { serverScheduler } from "./server-scheduler";
 import { insertAccountSchema, insertContentSchema, insertScheduleSchema, insertSetupScriptSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -1043,6 +1044,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         });
 
+        // Start scheduler to monitor server status and auto-setup ComfyUI
+        console.log(`Starting scheduler for launched server ${server.id}: ${server.name}`);
+        await serverScheduler.scheduleServerMonitoring(server.id);
+
         res.json(launchedServer);
 
       } catch (error) {
@@ -1413,27 +1418,8 @@ echo "CUDA environment configured!"`,
             
             // Auto-trigger ComfyUI setup when server becomes ready
             if (wasNotRunning && isNowRunning && server.setupStatus !== 'ready') {
-              console.log(`Server ${server.id} became ready, auto-triggering ComfyUI setup`);
-              setTimeout(async () => {
-                try {
-                  const { autoSetupComfyUI } = await import('./comfy-ui');
-                  
-                  const mockReq = {
-                    params: { serverId: server.id.toString() }
-                  } as any;
-                  
-                  const mockRes = {
-                    json: (data: any) => console.log(`Auto-setup initiated for server ${server.id}:`, data),
-                    status: (code: number) => ({
-                      json: (data: any) => console.error(`Auto-setup error for server ${server.id} (${code}):`, data)
-                    })
-                  } as any;
-                  
-                  await autoSetupComfyUI(mockReq, mockRes);
-                } catch (error) {
-                  console.error(`Failed to auto-setup ComfyUI for server ${server.id}:`, error);
-                }
-              }, 5000); // Wait 5 seconds after server becomes ready
+              console.log(`Server ${server.id} became ready, starting scheduler for ComfyUI setup`);
+              await serverScheduler.scheduleServerMonitoring(server.id);
             }
             
             syncedCount++;
@@ -1652,6 +1638,76 @@ echo "CUDA environment configured!"`,
     } catch (error) {
       console.error('Error fetching executions:', error);
       res.status(500).json({ error: 'Failed to fetch executions' });
+    }
+  });
+
+  // Get scheduler information for a server
+  app.get('/api/server-scheduler/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const server = await storage.getVastServer(serverId);
+      
+      if (!server) {
+        return res.status(404).json({ error: 'Server not found' });
+      }
+
+      const schedulerInfo = serverScheduler.getSchedulerInfo(serverId);
+      const allSchedulers = serverScheduler.getAllScheduledServers();
+
+      res.json({
+        server: {
+          id: server.id,
+          name: server.name,
+          status: server.status,
+          setupStatus: server.setupStatus,
+          schedulerActive: server.schedulerActive || false,
+          schedulerChecks: server.schedulerChecks || 0,
+          schedulerStarted: server.schedulerStarted,
+          schedulerLastCheck: server.schedulerLastCheck
+        },
+        activeScheduler: schedulerInfo ? {
+          checkCount: schedulerInfo.checkCount,
+          lastStatus: schedulerInfo.lastStatus,
+          createdAt: schedulerInfo.createdAt,
+          lastCheckedAt: schedulerInfo.lastCheckedAt
+        } : null,
+        totalActiveSchedulers: allSchedulers.length
+      });
+    } catch (error) {
+      console.error('Error fetching scheduler info:', error);
+      res.status(500).json({ error: 'Failed to fetch scheduler information' });
+    }
+  });
+
+  // Start scheduler for a server
+  app.post('/api/server-scheduler/:serverId/start', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      await serverScheduler.scheduleServerMonitoring(serverId);
+      
+      res.json({ 
+        message: `Scheduler started for server ${serverId}`,
+        serverId
+      });
+    } catch (error) {
+      console.error('Error starting scheduler:', error);
+      res.status(500).json({ error: 'Failed to start scheduler' });
+    }
+  });
+
+  // Stop scheduler for a server
+  app.post('/api/server-scheduler/:serverId/stop', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      serverScheduler.removeScheduler(serverId);
+      
+      res.json({ 
+        message: `Scheduler stopped for server ${serverId}`,
+        serverId
+      });
+    } catch (error) {
+      console.error('Error stopping scheduler:', error);
+      res.status(500).json({ error: 'Failed to stop scheduler' });
     }
   });
 

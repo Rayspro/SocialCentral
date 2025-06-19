@@ -91,6 +91,10 @@ export const vastServers = pgTable("vast_servers", {
   status: text("status").notNull().default("available"), // available, launching, running, stopping, stopped, configuring
   setupStatus: text("setup_status").default("pending"), // pending, installing, ready, failed
   comfyuiPort: integer("comfyui_port").default(8188),
+  schedulerActive: boolean("scheduler_active").default(false),
+  schedulerChecks: integer("scheduler_checks").default(0),
+  schedulerStarted: timestamp("scheduler_started"),
+  schedulerLastCheck: timestamp("scheduler_last_check"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

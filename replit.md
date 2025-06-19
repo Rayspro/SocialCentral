@@ -139,6 +139,7 @@ Changelog:
 - June 19, 2025. Implemented comprehensive ComfyUI integration with text-to-image generation, model management, workflow system, and gallery - includes real-time status monitoring, model downloading from URLs, custom workflows, and complete process saving for server restarts
 - June 19, 2025. Fixed image generation connectivity issues by implementing proper error handling, ComfyUI connection status indicators, and comprehensive troubleshooting guides for users to set up ComfyUI on Vast.ai instances
 - June 19, 2025. Completed real-time ComfyUI setup automation system that automatically triggers when servers become ready - includes live progress monitoring through WebSocket connections, automatic execution tracking with 2-second polling intervals, and comprehensive step-by-step installation progress display showing system dependencies, Python environment setup, repository cloning, requirements installation, model downloading, and server startup phases
+- June 19, 2025. Implemented comprehensive scheduler system for automatic ComfyUI setup monitoring - includes 30-second interval status checking, automated setup triggering when servers reach running state, progress tracking with check counts and status history, dedicated server detail page with real-time monitoring capabilities, scheduler API endpoints for manual control, and complete integration with VastServers workflow for seamless automated ComfyUI installation
 ```
 
 ## User Preferences

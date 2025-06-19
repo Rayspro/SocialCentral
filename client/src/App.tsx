@@ -17,6 +17,7 @@ import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 import VastServers from "@/pages/VastServers";
 import ServerDetails from "@/pages/ServerDetails";
+import ServerDetail from "@/pages/ServerDetail";
 import ComfyUI from "@/pages/ComfyUI";
 import PerformanceStory from "@/pages/PerformanceStory";
 import AuditLog from "@/pages/AuditLog";
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/schedule" component={Schedule} />
       <Route path="/vast-servers" component={VastServers} />
       <Route path="/vast-servers/:id" component={ServerDetails} />
+      <Route path="/server-detail/:serverId" component={ServerDetail} />
       <Route path="/comfy-ui" component={ComfyUI} />
       <Route path="/performance-story" component={PerformanceStory} />
       <Route path="/audit-log" component={AuditLog} />

@@ -18,7 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3, Home, ChevronRight, User, LogOut, Bell } from "lucide-react";
+import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3, Home, ChevronRight, User, LogOut, Bell, Timer } from "lucide-react";
 import { LoadingSpinner, LoadingCard, LoadingPage } from "@/components/ui/loading-spinner";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -577,7 +577,16 @@ export default function VastServers() {
                           className="flex-1"
                         >
                           <BarChart3 className="h-4 w-4 mr-1" />
-                          Details
+                          Analytics
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => window.location.href = `/server-detail/${server.id}`}
+                          className="flex-1"
+                        >
+                          <Timer className="h-4 w-4 mr-1" />
+                          Monitor
                         </Button>
                         {server.status === 'running' && (
                           <Button

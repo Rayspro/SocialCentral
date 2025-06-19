@@ -136,7 +136,7 @@ class VastAIService {
       if (filters.verified_only) params.append('verified', 'true');
       
       params.append('order', 'dph_total');
-      params.append('limit', '100'); // Get more results to filter and paginate
+      params.append('limit', '100');
 
       if (params.toString()) {
         query += `?${params.toString()}`;
@@ -279,18 +279,19 @@ class VastAIService {
 // Route handlers
 export async function getVastServers(req: Request, res: Response) {
   try {
+    const { storage } = req.app.locals;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     
-    // Check for Vast.ai API key
-    const vastApiKey = process.env.VAST_API_KEY;
-    if (!vastApiKey) {
+    // Get Vast.ai API key from database
+    const vastApiKey = await storage.getApiKeyByService('vast');
+    if (!vastApiKey || !vastApiKey.keyValue) {
       return res.status(400).json({ 
-        error: "Vast.ai API key not configured. Please add your API key in environment variables." 
+        error: "Vast.ai API key not configured. Please add your API key in Settings." 
       });
     }
 
-    const vastService = new VastAIService(vastApiKey);
+    const vastService = new VastAIService(vastApiKey.keyValue);
     const result = await vastService.getInstances(page, limit);
     
     res.json({
@@ -313,6 +314,7 @@ export async function getVastServers(req: Request, res: Response) {
 
 export async function getAvailableServers(req: Request, res: Response) {
   try {
+    const { storage } = req.app.locals;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const filters = {
@@ -324,14 +326,15 @@ export async function getAvailableServers(req: Request, res: Response) {
       verified_only: req.query.verified_only === 'true'
     };
 
-    const vastApiKey = process.env.VAST_API_KEY;
-    if (!vastApiKey) {
+    // Get Vast.ai API key from database
+    const vastApiKey = await storage.getApiKeyByService('vast');
+    if (!vastApiKey || !vastApiKey.keyValue) {
       return res.status(400).json({ 
-        error: "Vast.ai API key not configured. Please add your API key in environment variables." 
+        error: "Vast.ai API key not configured. Please add your API key in Settings." 
       });
     }
 
-    const vastService = new VastAIService(vastApiKey);
+    const vastService = new VastAIService(vastApiKey.keyValue);
     const result = await vastService.getAvailableOffers(page, limit, filters);
     
     res.json({
@@ -354,6 +357,7 @@ export async function getAvailableServers(req: Request, res: Response) {
 
 export async function createVastServer(req: Request, res: Response) {
   try {
+    const { storage } = req.app.locals;
     const { offerId, image, setupScript } = req.body;
     
     if (!offerId) {
@@ -364,14 +368,15 @@ export async function createVastServer(req: Request, res: Response) {
       return res.status(400).json({ error: "Docker image is required" });
     }
 
-    const vastApiKey = process.env.VAST_API_KEY;
-    if (!vastApiKey) {
+    // Get Vast.ai API key from database
+    const vastApiKey = await storage.getApiKeyByService('vast');
+    if (!vastApiKey || !vastApiKey.keyValue) {
       return res.status(400).json({ 
-        error: "Vast.ai API key not configured. Please add your API key in environment variables." 
+        error: "Vast.ai API key not configured. Please add your API key in Settings." 
       });
     }
 
-    const vastService = new VastAIService(vastApiKey);
+    const vastService = new VastAIService(vastApiKey.keyValue);
     const instance = await vastService.createInstance(offerId, image, setupScript);
     
     if (!instance) {

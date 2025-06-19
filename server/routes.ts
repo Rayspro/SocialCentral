@@ -771,18 +771,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Launch the server
-      const launchedServer = await storage.launchVastServer(server.id);
-      
-      // Simulate server launch time and update status
-      setTimeout(async () => {
-        await storage.updateVastServer(server.id, {
-          status: "running",
-          serverUrl: `https://server-${vastId}.vast.ai:8080`
-        });
-      }, 5000);
+      if (!server) {
+        return res.status(404).json({ error: "Server not found" });
+      }
 
-      res.json(launchedServer);
+      // Set initial status to launching
+      await storage.updateVastServer(server.id, { status: "launching" });
+
+      // Make real API call to Vast.ai using fetch directly
+      const vastApiUrl = 'https://console.vast.ai/api/v0';
+      const dockerImage = "pytorch/pytorch:latest";
+      const offerId = parseInt(vastId.replace('vast_', ''));
+      
+      try {
+        // Create instance on Vast.ai platform
+        const createResponse = await fetch(`${vastApiUrl}/asks/${offerId}/`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${vastApiKey.keyValue}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: 'me',
+            image: dockerImage,
+            args: [],
+            env: {},
+          }),
+        });
+
+        if (!createResponse.ok) {
+          await storage.updateVastServer(server.id, { status: "error" });
+          return res.status(400).json({ 
+            error: `Failed to create instance on Vast.ai: ${createResponse.status} ${createResponse.statusText}` 
+          });
+        }
+
+        const createResult = await createResponse.json();
+        
+        if (!createResult.success) {
+          await storage.updateVastServer(server.id, { status: "error" });
+          return res.status(400).json({ 
+            error: createResult.msg || "Failed to create instance on Vast.ai platform" 
+          });
+        }
+
+        // Get instance details
+        const instanceId = createResult.new_contract;
+        const instanceResponse = await fetch(`${vastApiUrl}/instances/`, {
+          headers: {
+            'Authorization': `Bearer ${vastApiKey.keyValue}`,
+          },
+        });
+
+        let instanceData = null;
+        if (instanceResponse.ok) {
+          const instances = await instanceResponse.json();
+          instanceData = instances.instances?.find((inst: any) => inst.id === instanceId);
+        }
+
+        // Update server with real instance information
+        const launchedServer = await storage.updateVastServer(server.id, {
+          status: instanceData?.actual_status === 'running' ? "running" : "launching",
+          isLaunched: true,
+          launchedAt: new Date(),
+          serverUrl: instanceData?.ssh_host ? `${instanceData.ssh_host}:${instanceData.ssh_port || 22}` : null,
+          sshConnection: instanceData?.ssh_host ? `ssh root@${instanceData.ssh_host} -p ${instanceData.ssh_port || 22}` : null,
+          metadata: {
+            vastInstanceId: instanceId,
+            vastStatus: instanceData?.actual_status || 'unknown'
+          }
+        });
+
+        res.json(launchedServer);
+
+      } catch (error) {
+        console.error("Vast.ai API error:", error);
+        await storage.updateVastServer(server.id, { status: "error" });
+        res.status(500).json({ 
+          error: "Failed to communicate with Vast.ai platform. Please check your API key." 
+        });
+      }
     } catch (error) {
       console.error("Launch server error:", error);
       res.status(500).json({ error: "Failed to launch server" });

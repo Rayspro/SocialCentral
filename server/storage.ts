@@ -410,6 +410,46 @@ class MemStorage implements IStorage {
   ];
   private schedules: Schedule[] = [];
   private apiKeys: ApiKey[] = [];
+  private vastServers: VastServer[] = [];
+  private setupScripts: SetupScript[] = [
+    {
+      id: 1,
+      name: "ComfyUI Setup",
+      description: "Complete ComfyUI installation with dependencies",
+      category: "ai-tools",
+      script: `#!/bin/bash
+# ComfyUI Installation Script
+echo "Starting ComfyUI installation..."
+cd /workspace
+git clone https://github.com/comfyanonymous/ComfyUI.git
+cd ComfyUI
+python -m pip install -r requirements.txt
+echo "ComfyUI installation completed!"`,
+      isActive: true,
+      estimatedTime: 15,
+      requirements: {},
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 2,
+      name: "Stable Diffusion Models",
+      description: "Download essential Stable Diffusion models",
+      category: "models",
+      script: `#!/bin/bash
+# Download SD Models
+echo "Downloading Stable Diffusion models..."
+cd /workspace/ComfyUI/models/checkpoints
+wget https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt
+echo "Model download completed!"`,
+      isActive: true,
+      estimatedTime: 10,
+      requirements: {},
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ];
+  private serverExecutions: ServerExecution[] = [];
 
   async getUser(id: number): Promise<User | undefined> {
     return this.users.find(u => u.id === id);
@@ -566,6 +606,102 @@ class MemStorage implements IStorage {
       postsThisMonth: this.content.length,
       generatedMedia: this.content.filter(c => c.type === 'image' || c.type === 'video').length
     };
+  }
+
+  // Vast Server methods
+  async getVastServers(): Promise<VastServer[]> {
+    return this.vastServers;
+  }
+
+  async getVastServer(id: number): Promise<VastServer | undefined> {
+    return this.vastServers.find(s => s.id === id);
+  }
+
+  async getVastServerByVastId(vastId: string): Promise<VastServer | undefined> {
+    return this.vastServers.find(s => s.vastId === vastId);
+  }
+
+  async createVastServer(server: InsertVastServer): Promise<VastServer> {
+    const newServer = { ...server, id: this.vastServers.length + 1, createdAt: new Date(), updatedAt: new Date() } as VastServer;
+    this.vastServers.push(newServer);
+    return newServer;
+  }
+
+  async updateVastServer(id: number, server: Partial<InsertVastServer>): Promise<VastServer | undefined> {
+    const index = this.vastServers.findIndex(s => s.id === id);
+    if (index === -1) return undefined;
+    this.vastServers[index] = { ...this.vastServers[index], ...server, updatedAt: new Date() };
+    return this.vastServers[index];
+  }
+
+  async deleteVastServer(id: number): Promise<boolean> {
+    const index = this.vastServers.findIndex(s => s.id === id);
+    if (index === -1) return false;
+    this.vastServers.splice(index, 1);
+    return true;
+  }
+
+  async launchVastServer(id: number): Promise<VastServer | undefined> {
+    const server = await this.getVastServer(id);
+    if (!server) return undefined;
+    return this.updateVastServer(id, { status: 'running', isLaunched: true });
+  }
+
+  async stopVastServer(id: number): Promise<VastServer | undefined> {
+    const server = await this.getVastServer(id);
+    if (!server) return undefined;
+    return this.updateVastServer(id, { status: 'stopped', isLaunched: false });
+  }
+
+  // Setup Script methods
+  async getSetupScripts(): Promise<SetupScript[]> {
+    return this.setupScripts;
+  }
+
+  async getSetupScript(id: number): Promise<SetupScript | undefined> {
+    return this.setupScripts.find(s => s.id === id);
+  }
+
+  async getSetupScriptsByCategory(category: string): Promise<SetupScript[]> {
+    return this.setupScripts.filter(s => s.category === category);
+  }
+
+  async createSetupScript(script: InsertSetupScript): Promise<SetupScript> {
+    const newScript = { ...script, id: this.setupScripts.length + 1, createdAt: new Date(), updatedAt: new Date() } as SetupScript;
+    this.setupScripts.push(newScript);
+    return newScript;
+  }
+
+  async updateSetupScript(id: number, script: Partial<InsertSetupScript>): Promise<SetupScript | undefined> {
+    const index = this.setupScripts.findIndex(s => s.id === id);
+    if (index === -1) return undefined;
+    this.setupScripts[index] = { ...this.setupScripts[index], ...script, updatedAt: new Date() };
+    return this.setupScripts[index];
+  }
+
+  async deleteSetupScript(id: number): Promise<boolean> {
+    const index = this.setupScripts.findIndex(s => s.id === id);
+    if (index === -1) return false;
+    this.setupScripts.splice(index, 1);
+    return true;
+  }
+
+  // Server Execution methods
+  async getServerExecutions(serverId: number): Promise<ServerExecution[]> {
+    return this.serverExecutions.filter(e => e.serverId === serverId);
+  }
+
+  async createServerExecution(execution: InsertServerExecution): Promise<ServerExecution> {
+    const newExecution = { ...execution, id: this.serverExecutions.length + 1, createdAt: new Date() } as ServerExecution;
+    this.serverExecutions.push(newExecution);
+    return newExecution;
+  }
+
+  async updateServerExecution(id: number, execution: Partial<InsertServerExecution>): Promise<ServerExecution | undefined> {
+    const index = this.serverExecutions.findIndex(e => e.id === id);
+    if (index === -1) return undefined;
+    this.serverExecutions[index] = { ...this.serverExecutions[index], ...execution };
+    return this.serverExecutions[index];
   }
 }
 

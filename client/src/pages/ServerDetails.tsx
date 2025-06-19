@@ -231,194 +231,375 @@ export default function ServerDetails() {
         </div>
       </div>
 
-      {/* Enhanced Server Overview with Charts */}
+      {/* Professional Metrics Dashboard */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">CPU Usage</CardTitle>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-3 w-3 text-green-500" />
-              <Cpu className="h-4 w-4 text-muted-foreground" />
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
+                  <Cpu className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  CPU Load
+                </CardTitle>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {metrics.cpuUsage.toFixed(0)}%
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  {server.cpuCores} cores
+                </div>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.cpuUsage.toFixed(1)}%</div>
-            <Progress value={metrics.cpuUsage} className="mt-2" />
-            <div className="mt-2 h-8">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsHistory.slice(-10)}>
-                  <Line 
-                    type="monotone" 
-                    dataKey="cpu" 
-                    stroke="#3b82f6" 
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-blue-500 to-blue-600 h-2 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${metrics.cpuUsage}%` }}
+                ></div>
+              </div>
+              <div className="h-12">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={metricsHistory.slice(-12)} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                    <Line 
+                      type="monotone" 
+                      dataKey="cpu" 
+                      stroke="#3b82f6" 
+                      strokeWidth={1.5}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">GPU Usage</CardTitle>
-            <div className="flex items-center gap-2">
-              <Zap className="h-3 w-3 text-yellow-500" />
-              <Activity className="h-4 w-4 text-muted-foreground" />
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100 dark:bg-amber-900 rounded-lg">
+                  <Zap className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  GPU Load
+                </CardTitle>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {metrics.gpuUsage.toFixed(0)}%
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  {server.gpu}
+                </div>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.gpuUsage.toFixed(1)}%</div>
-            <Progress value={metrics.gpuUsage} className="mt-2" />
-            <div className="mt-2 h-8">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsHistory.slice(-10)}>
-                  <Line 
-                    type="monotone" 
-                    dataKey="gpu" 
-                    stroke="#f59e0b" 
-                    strokeWidth={2}
-                    dot={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 h-2 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${metrics.gpuUsage}%` }}
+                ></div>
+              </div>
+              <div className="h-12">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={metricsHistory.slice(-12)} margin={{ top: 2, right: 2, left: 2, bottom: 2 }}>
+                    <Line 
+                      type="monotone" 
+                      dataKey="gpu" 
+                      stroke="#f59e0b" 
+                      strokeWidth={1.5}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Memory Usage</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
-              <HardDriveIcon className="h-4 w-4 text-muted-foreground" />
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-violet-100 dark:bg-violet-900 rounded-lg">
+                  <HardDriveIcon className="h-4 w-4 text-violet-600 dark:text-violet-400" />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Memory
+                </CardTitle>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {metrics.memoryUsage.toFixed(0)}%
+                </div>
+                <div className="text-xs text-slate-500 dark:text-slate-400">
+                  {((metrics.memoryUsage / 100) * server.ram).toFixed(1)} / {server.ram} GB
+                </div>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.memoryUsage.toFixed(1)}%</div>
-            <Progress value={metrics.memoryUsage} className="mt-2" />
-            <p className="text-xs text-muted-foreground mt-1">
-              {((metrics.memoryUsage / 100) * server.ram).toFixed(1)} GB / {server.ram} GB
-            </p>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                <div 
+                  className="bg-gradient-to-r from-violet-500 to-violet-600 h-2 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${metrics.memoryUsage}%` }}
+                ></div>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                <span>Available: {(server.ram - (metrics.memoryUsage / 100) * server.ram).toFixed(1)} GB</span>
+                <span className="text-violet-600 dark:text-violet-400 font-medium">
+                  {metrics.memoryUsage > 80 ? 'High' : metrics.memoryUsage > 60 ? 'Medium' : 'Low'}
+                </span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-lg transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Temperature</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                metrics.temperature > 75 ? 'bg-red-500 animate-ping' : 
-                metrics.temperature > 65 ? 'bg-yellow-500' : 'bg-green-500'
-              }`}></div>
-              <Activity className="h-4 w-4 text-muted-foreground" />
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700 hover:shadow-xl transition-all duration-300">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`p-2 rounded-lg ${
+                  metrics.temperature > 75 ? 'bg-red-100 dark:bg-red-900' : 
+                  metrics.temperature > 65 ? 'bg-amber-100 dark:bg-amber-900' : 
+                  'bg-emerald-100 dark:bg-emerald-900'
+                }`}>
+                  <Activity className={`h-4 w-4 ${
+                    metrics.temperature > 75 ? 'text-red-600 dark:text-red-400' : 
+                    metrics.temperature > 65 ? 'text-amber-600 dark:text-amber-400' : 
+                    'text-emerald-600 dark:text-emerald-400'
+                  }`} />
+                </div>
+                <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                  Thermal
+                </CardTitle>
+              </div>
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {metrics.temperature.toFixed(0)}°C
+                </div>
+                <div className={`text-xs font-medium ${
+                  metrics.temperature > 75 ? 'text-red-600 dark:text-red-400' : 
+                  metrics.temperature > 65 ? 'text-amber-600 dark:text-amber-400' : 
+                  'text-emerald-600 dark:text-emerald-400'
+                }`}>
+                  {metrics.temperature > 75 ? 'Critical' : metrics.temperature > 65 ? 'Elevated' : 'Optimal'}
+                </div>
+              </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.temperature.toFixed(0)}°C</div>
-            <Progress 
-              value={(metrics.temperature / 85) * 100} 
-              className="mt-2"
-            />
-            <p className="text-xs text-muted-foreground mt-1">
-              Max: 85°C
-            </p>
+          <CardContent className="pt-0">
+            <div className="space-y-2">
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-700 ease-out ${
+                    metrics.temperature > 75 ? 'bg-gradient-to-r from-red-500 to-red-600' : 
+                    metrics.temperature > 65 ? 'bg-gradient-to-r from-amber-500 to-amber-600' : 
+                    'bg-gradient-to-r from-emerald-500 to-emerald-600'
+                  }`}
+                  style={{ width: `${(metrics.temperature / 85) * 100}%` }}
+                ></div>
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400">
+                <span>Threshold: 75°C</span>
+                <span>Max: 85°C</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Real-time Performance Charts */}
+      {/* Professional Performance Analytics */}
       <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Resource Usage Trends
-            </CardTitle>
-            <CardDescription>Real-time CPU, GPU, and Memory utilization</CardDescription>
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Resource Utilization
+                </CardTitle>
+                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                  System performance metrics over time
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <span className="text-slate-600 dark:text-slate-400">CPU</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-amber-500"></div>
+                  <span className="text-slate-600 dark:text-slate-400">GPU</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-violet-500"></div>
+                  <span className="text-slate-600 dark:text-slate-400">Memory</span>
+                </div>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
+          <CardContent className="pt-0">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={metricsHistory}>
+                <LineChart data={metricsHistory} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                   <defs>
                     <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                      <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                      <stop offset="100%" stopColor="#3b82f6" stopOpacity={0}/>
                     </linearGradient>
                     <linearGradient id="gpuGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.1}/>
+                      <stop offset="0%" stopColor="#f59e0b" stopOpacity={0.2}/>
+                      <stop offset="100%" stopColor="#f59e0b" stopOpacity={0}/>
                     </linearGradient>
                     <linearGradient id="memoryGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                      <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.2}/>
+                      <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis />
-                  <Tooltip />
+                  <CartesianGrid 
+                    strokeDasharray="2 2" 
+                    stroke="#e2e8f0" 
+                    strokeOpacity={0.3}
+                  />
+                  <XAxis 
+                    dataKey="time" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    dx={-10}
+                    domain={[0, 100]}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value, name) => [`${Number(value).toFixed(1)}%`, name]}
+                  />
                   <Area 
                     type="monotone" 
                     dataKey="cpu" 
-                    stackId="1"
                     stroke="#3b82f6" 
+                    strokeWidth={2}
                     fill="url(#cpuGradient)"
-                    name="CPU %"
+                    name="CPU"
+                    dot={false}
                   />
                   <Area 
                     type="monotone" 
                     dataKey="gpu" 
-                    stackId="2"
                     stroke="#f59e0b" 
+                    strokeWidth={2}
                     fill="url(#gpuGradient)"
-                    name="GPU %"
+                    name="GPU"
+                    dot={false}
                   />
                   <Area 
                     type="monotone" 
                     dataKey="memory" 
-                    stackId="3"
                     stroke="#8b5cf6" 
+                    strokeWidth={2}
                     fill="url(#memoryGradient)"
-                    name="Memory %"
+                    name="Memory"
+                    dot={false}
                   />
-                </AreaChart>
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Globe className="h-5 w-5" />
-              Network Activity
-            </CardTitle>
-            <CardDescription>Bandwidth utilization over time</CardDescription>
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                  Network Throughput
+                </CardTitle>
+                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                  Real-time bandwidth monitoring
+                </CardDescription>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-emerald-500"></div>
+                  <span className="text-slate-600 dark:text-slate-400">Ingress</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                  <span className="text-slate-600 dark:text-slate-400">Egress</span>
+                </div>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
-            <div className="h-64">
+          <CardContent className="pt-0">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsHistory}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [formatBytes(Number(value)), '']} />
+                <LineChart data={metricsHistory} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                  <CartesianGrid 
+                    strokeDasharray="2 2" 
+                    stroke="#e2e8f0" 
+                    strokeOpacity={0.3}
+                  />
+                  <XAxis 
+                    dataKey="time" 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    dy={10}
+                  />
+                  <YAxis 
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 11, fill: '#64748b' }}
+                    dx={-10}
+                    tickFormatter={(value) => formatBytes(value)}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value, name) => [formatBytes(Number(value)), name]}
+                  />
                   <Line 
                     type="monotone" 
                     dataKey="networkIn" 
                     stroke="#10b981" 
-                    strokeWidth={3}
-                    name="Download"
+                    strokeWidth={2}
+                    name="Ingress"
+                    dot={false}
+                    strokeDasharray="0"
                   />
                   <Line 
                     type="monotone" 
                     dataKey="networkOut" 
                     stroke="#ef4444" 
-                    strokeWidth={3}
-                    name="Upload"
+                    strokeWidth={2}
+                    name="Egress"
+                    dot={false}
+                    strokeDasharray="4 4"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -427,94 +608,156 @@ export default function ServerDetails() {
         </Card>
       </div>
 
-      {/* System Health Dashboard */}
+      {/* Professional System Analytics */}
       <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">System Health</CardTitle>
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Memory Analysis
+            </CardTitle>
+            <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+              Current allocation and utilization
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-48 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: 'Used', value: metrics.memoryUsage, fill: '#8b5cf6' },
-                      { name: 'Free', value: 100 - metrics.memoryUsage, fill: '#e5e7eb' }
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={40}
-                    outerRadius={70}
-                    startAngle={90}
-                    endAngle={450}
-                    dataKey="value"
-                  >
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}%`, '']} />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="text-center">
-              <p className="text-sm text-muted-foreground">Memory Usage</p>
-              <p className="text-2xl font-bold">{metrics.memoryUsage.toFixed(1)}%</p>
+          <CardContent className="pt-0">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Utilized</span>
+                <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {metrics.memoryUsage.toFixed(1)}%
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3">
+                <div 
+                  className="bg-gradient-to-r from-violet-500 to-purple-600 h-3 rounded-full transition-all duration-500 ease-out"
+                  style={{ width: `${metrics.memoryUsage}%` }}
+                ></div>
+              </div>
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <div className="text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Used</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {((metrics.memoryUsage / 100) * server.ram).toFixed(1)} GB
+                  </p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Available</p>
+                  <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {(server.ram - (metrics.memoryUsage / 100) * server.ram).toFixed(1)} GB
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Power Consumption</CardTitle>
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Power Management
+            </CardTitle>
+            <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+              Energy consumption metrics
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-48 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={[
-                  { name: 'Current', power: metrics.powerConsumption },
-                  { name: 'Average', power: 250 },
-                  { name: 'Peak', power: 320 }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [`${value}W`, '']} />
-                  <Bar dataKey="power" fill="#f59e0b" />
-                </BarChart>
-              </ResponsiveContainer>
+          <CardContent className="pt-0">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Current Draw</span>
+                <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  {metrics.powerConsumption}W
+                </span>
+              </div>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Efficiency</span>
+                  <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                    {((320 - metrics.powerConsumption) / 320 * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
+                  <div 
+                    className="bg-gradient-to-r from-amber-400 to-orange-500 h-2 rounded-full transition-all duration-500"
+                    style={{ width: `${(metrics.powerConsumption / 350) * 100}%` }}
+                  ></div>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-center">
+                    <p className="text-slate-500 dark:text-slate-400">Min</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">200W</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-slate-500 dark:text-slate-400">Avg</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">250W</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-slate-500 dark:text-slate-400">Max</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">350W</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Temperature Monitor</CardTitle>
+        <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
+          <CardHeader className="pb-4">
+            <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Thermal Status
+            </CardTitle>
+            <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+              Temperature monitoring and alerts
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="h-48 flex items-center justify-center">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsHistory.slice(-10)}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="time" />
-                  <YAxis domain={[50, 85]} />
-                  <Tooltip formatter={(value) => [`${value}°C`, '']} />
-                  <Line 
-                    type="monotone" 
-                    dataKey="temperature" 
-                    stroke={metrics.temperature > 75 ? "#ef4444" : metrics.temperature > 65 ? "#f59e0b" : "#10b981"}
-                    strokeWidth={4}
-                    dot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="text-center mt-2">
-              <p className="text-2xl font-bold">{metrics.temperature.toFixed(0)}°C</p>
-              <p className={`text-sm ${
-                metrics.temperature > 75 ? 'text-red-500' : 
-                metrics.temperature > 65 ? 'text-yellow-500' : 'text-green-500'
-              }`}>
-                {metrics.temperature > 75 ? 'High' : metrics.temperature > 65 ? 'Moderate' : 'Normal'}
-              </p>
+          <CardContent className="pt-0">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Current</span>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${
+                    metrics.temperature > 75 ? 'bg-red-500' : 
+                    metrics.temperature > 65 ? 'bg-amber-500' : 'bg-emerald-500'
+                  }`}></div>
+                  <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                    {metrics.temperature.toFixed(0)}°C
+                  </span>
+                </div>
+              </div>
+              <div className="h-20">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={metricsHistory.slice(-8)} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+                    <Line 
+                      type="monotone" 
+                      dataKey="temperature" 
+                      stroke={metrics.temperature > 75 ? "#ef4444" : metrics.temperature > 65 ? "#f59e0b" : "#10b981"}
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Status</span>
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                    metrics.temperature > 75 ? 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300' : 
+                    metrics.temperature > 65 ? 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300' : 
+                    'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'
+                  }`}>
+                    {metrics.temperature > 75 ? 'Critical' : metrics.temperature > 65 ? 'Elevated' : 'Optimal'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-slate-500 dark:text-slate-400">Threshold</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">75°C</p>
+                  </div>
+                  <div>
+                    <p className="text-slate-500 dark:text-slate-400">Maximum</p>
+                    <p className="font-medium text-slate-900 dark:text-slate-100">85°C</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

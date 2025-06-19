@@ -600,19 +600,19 @@ export default function ComfyUI() {
                       </div>
                     </div>
 
-                    {workflows && workflows.length > 0 && (
+                    {workflows && Array.isArray(workflows) && workflows.length > 0 && (
                       <div>
                         <Label>Workflow (Optional)</Label>
                         <Select 
-                          value={selectedWorkflow?.toString() || ""} 
-                          onValueChange={(value) => setSelectedWorkflow(value ? parseInt(value) : null)}
+                          value={selectedWorkflow?.toString() || "default"} 
+                          onValueChange={(value) => setSelectedWorkflow(value === "default" ? null : parseInt(value))}
                         >
                           <SelectTrigger>
                             <SelectValue placeholder="Use default workflow" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Default Text-to-Image</SelectItem>
-                            {workflows.map((workflow: ComfyWorkflow) => (
+                            <SelectItem value="default">Default Text-to-Image</SelectItem>
+                            {(workflows as any[]).map((workflow: any) => (
                               <SelectItem key={workflow.id} value={workflow.id.toString()}>
                                 {workflow.name}
                               </SelectItem>
@@ -660,13 +660,13 @@ export default function ComfyUI() {
                   <CardContent>
                     {availableModelsLoading ? (
                       <LoadingCard />
-                    ) : availableModels ? (
+                    ) : availableModels && typeof availableModels === 'object' ? (
                       <div className="space-y-4">
-                        {availableModels.checkpoints && Array.isArray(availableModels.checkpoints) && (
+                        {(availableModels as any).checkpoints && Array.isArray((availableModels as any).checkpoints) && (
                           <div>
                             <h4 className="font-medium mb-2">Checkpoints</h4>
                             <div className="space-y-1">
-                              {availableModels.checkpoints.map((model: string, index: number) => (
+                              {(availableModels as any).checkpoints.map((model: string, index: number) => (
                                 <div key={index} className="text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
                                   {model}
                                 </div>
@@ -674,11 +674,11 @@ export default function ComfyUI() {
                             </div>
                           </div>
                         )}
-                        {availableModels.loras && Array.isArray(availableModels.loras) && (
+                        {(availableModels as any).loras && Array.isArray((availableModels as any).loras) && (
                           <div>
                             <h4 className="font-medium mb-2">LoRAs</h4>
                             <div className="space-y-1">
-                              {availableModels.loras.map((model: string, index: number) => (
+                              {(availableModels as any).loras.map((model: string, index: number) => (
                                 <div key={index} className="text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
                                   {model}
                                 </div>
@@ -686,11 +686,11 @@ export default function ComfyUI() {
                             </div>
                           </div>
                         )}
-                        {availableModels.vae && Array.isArray(availableModels.vae) && (
+                        {(availableModels as any).vae && Array.isArray((availableModels as any).vae) && (
                           <div>
                             <h4 className="font-medium mb-2">VAE</h4>
                             <div className="space-y-1">
-                              {availableModels.vae.map((model: string, index: number) => (
+                              {(availableModels as any).vae.map((model: string, index: number) => (
                                 <div key={index} className="text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
                                   {model}
                                 </div>
@@ -1206,7 +1206,7 @@ export default function ComfyUI() {
                               {generation.status}
                             </Badge>
                             <span className="text-sm text-muted-foreground">
-                              {new Date(generation.createdAt).toLocaleString()}
+                              {generation.createdAt ? new Date(generation.createdAt).toLocaleString() : 'Unknown'}
                             </span>
                           </div>
                           

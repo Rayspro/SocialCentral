@@ -17,6 +17,7 @@ import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 import VastServers from "@/pages/VastServers";
 import ServerDetails from "@/pages/ServerDetails";
+import ComfyUI from "@/pages/ComfyUI";
 import SignIn from "@/pages/SignIn";
 import SignUp from "@/pages/SignUp";
 import NotFound from "@/pages/not-found";
@@ -32,6 +33,7 @@ function Router() {
       <Route path="/schedule" component={Schedule} />
       <Route path="/vast-servers" component={VastServers} />
       <Route path="/vast-servers/:id" component={ServerDetails} />
+      <Route path="/comfy-ui" component={ComfyUI} />
       <Route path="/settings" component={Settings} />
       <Route path="/signin" component={SignIn} />
       <Route path="/signup" component={SignUp} />

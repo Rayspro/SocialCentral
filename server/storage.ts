@@ -8,6 +8,9 @@ import {
   vastServers,
   setupScripts,
   serverExecutions,
+  comfyModels,
+  comfyWorkflows,
+  comfyGenerations,
   type User,
   type InsertUser,
   type Platform,
@@ -25,7 +28,13 @@ import {
   type SetupScript,
   type InsertSetupScript,
   type ServerExecution,
-  type InsertServerExecution
+  type InsertServerExecution,
+  type ComfyModel,
+  type InsertComfyModel,
+  type ComfyWorkflow,
+  type InsertComfyWorkflow,
+  type ComfyGeneration,
+  type InsertComfyGeneration,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -94,6 +103,29 @@ export interface IStorage {
   getServerExecutions(serverId: number): Promise<ServerExecution[]>;
   createServerExecution(execution: InsertServerExecution): Promise<ServerExecution>;
   updateServerExecution(id: number, execution: Partial<InsertServerExecution>): Promise<ServerExecution | undefined>;
+
+  // ComfyUI Model methods
+  getComfyModels(): Promise<ComfyModel[]>;
+  getComfyModelsByServer(serverId: number): Promise<ComfyModel[]>;
+  getComfyModel(id: number): Promise<ComfyModel | undefined>;
+  createComfyModel(model: InsertComfyModel): Promise<ComfyModel>;
+  updateComfyModel(id: number, model: Partial<InsertComfyModel>): Promise<ComfyModel | undefined>;
+  deleteComfyModel(id: number): Promise<boolean>;
+
+  // ComfyUI Workflow methods
+  getComfyWorkflows(): Promise<ComfyWorkflow[]>;
+  getComfyWorkflow(id: number): Promise<ComfyWorkflow | undefined>;
+  createComfyWorkflow(workflow: InsertComfyWorkflow): Promise<ComfyWorkflow>;
+  updateComfyWorkflow(id: number, workflow: Partial<InsertComfyWorkflow>): Promise<ComfyWorkflow | undefined>;
+  deleteComfyWorkflow(id: number): Promise<boolean>;
+
+  // ComfyUI Generation methods
+  getComfyGenerations(): Promise<ComfyGeneration[]>;
+  getComfyGenerationsByServer(serverId: number): Promise<ComfyGeneration[]>;
+  getComfyGeneration(id: number): Promise<ComfyGeneration | undefined>;
+  createComfyGeneration(generation: InsertComfyGeneration): Promise<ComfyGeneration>;
+  updateComfyGeneration(id: number, generation: Partial<InsertComfyGeneration>): Promise<ComfyGeneration | undefined>;
+  deleteComfyGeneration(id: number): Promise<boolean>;
 
   // Stats
   getStats(): Promise<{
@@ -467,6 +499,9 @@ echo "Model download completed!"`,
     }
   ];
   private serverExecutions: ServerExecution[] = [];
+  private comfyModels: ComfyModel[] = [];
+  private comfyWorkflows: ComfyWorkflow[] = [];
+  private comfyGenerations: ComfyGeneration[] = [];
 
   async getUser(id: number): Promise<User | undefined> {
     return this.users.find(u => u.id === id);
@@ -729,6 +764,122 @@ echo "Model download completed!"`,
     if (index === -1) return undefined;
     this.serverExecutions[index] = { ...this.serverExecutions[index], ...execution };
     return this.serverExecutions[index];
+  }
+
+  // ComfyUI Model methods
+  async getComfyModels(): Promise<ComfyModel[]> {
+    return this.comfyModels.slice();
+  }
+
+  async getComfyModelsByServer(serverId: number): Promise<ComfyModel[]> {
+    return this.comfyModels.filter(m => m.serverId === serverId);
+  }
+
+  async getComfyModel(id: number): Promise<ComfyModel | undefined> {
+    return this.comfyModels.find(m => m.id === id);
+  }
+
+  async createComfyModel(model: InsertComfyModel): Promise<ComfyModel> {
+    const newModel: ComfyModel = {
+      ...model,
+      id: this.comfyModels.length + 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.comfyModels.push(newModel);
+    return newModel;
+  }
+
+  async updateComfyModel(id: number, model: Partial<InsertComfyModel>): Promise<ComfyModel | undefined> {
+    const index = this.comfyModels.findIndex(m => m.id === id);
+    if (index === -1) return undefined;
+
+    this.comfyModels[index] = { ...this.comfyModels[index], ...model, updatedAt: new Date() };
+    return this.comfyModels[index];
+  }
+
+  async deleteComfyModel(id: number): Promise<boolean> {
+    const index = this.comfyModels.findIndex(m => m.id === id);
+    if (index === -1) return false;
+
+    this.comfyModels.splice(index, 1);
+    return true;
+  }
+
+  // ComfyUI Workflow methods
+  async getComfyWorkflows(): Promise<ComfyWorkflow[]> {
+    return this.comfyWorkflows.slice();
+  }
+
+  async getComfyWorkflow(id: number): Promise<ComfyWorkflow | undefined> {
+    return this.comfyWorkflows.find(w => w.id === id);
+  }
+
+  async createComfyWorkflow(workflow: InsertComfyWorkflow): Promise<ComfyWorkflow> {
+    const newWorkflow: ComfyWorkflow = {
+      ...workflow,
+      id: this.comfyWorkflows.length + 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.comfyWorkflows.push(newWorkflow);
+    return newWorkflow;
+  }
+
+  async updateComfyWorkflow(id: number, workflow: Partial<InsertComfyWorkflow>): Promise<ComfyWorkflow | undefined> {
+    const index = this.comfyWorkflows.findIndex(w => w.id === id);
+    if (index === -1) return undefined;
+
+    this.comfyWorkflows[index] = { ...this.comfyWorkflows[index], ...workflow, updatedAt: new Date() };
+    return this.comfyWorkflows[index];
+  }
+
+  async deleteComfyWorkflow(id: number): Promise<boolean> {
+    const index = this.comfyWorkflows.findIndex(w => w.id === id);
+    if (index === -1) return false;
+
+    this.comfyWorkflows.splice(index, 1);
+    return true;
+  }
+
+  // ComfyUI Generation methods
+  async getComfyGenerations(): Promise<ComfyGeneration[]> {
+    return this.comfyGenerations.slice();
+  }
+
+  async getComfyGenerationsByServer(serverId: number): Promise<ComfyGeneration[]> {
+    return this.comfyGenerations.filter(g => g.serverId === serverId);
+  }
+
+  async getComfyGeneration(id: number): Promise<ComfyGeneration | undefined> {
+    return this.comfyGenerations.find(g => g.id === id);
+  }
+
+  async createComfyGeneration(generation: InsertComfyGeneration): Promise<ComfyGeneration> {
+    const newGeneration: ComfyGeneration = {
+      ...generation,
+      id: this.comfyGenerations.length + 1,
+      createdAt: new Date(),
+      completedAt: null,
+    };
+    this.comfyGenerations.push(newGeneration);
+    return newGeneration;
+  }
+
+  async updateComfyGeneration(id: number, generation: Partial<InsertComfyGeneration>): Promise<ComfyGeneration | undefined> {
+    const index = this.comfyGenerations.findIndex(g => g.id === id);
+    if (index === -1) return undefined;
+
+    this.comfyGenerations[index] = { ...this.comfyGenerations[index], ...generation };
+    return this.comfyGenerations[index];
+  }
+
+  async deleteComfyGeneration(id: number): Promise<boolean> {
+    const index = this.comfyGenerations.findIndex(g => g.id === id);
+    if (index === -1) return false;
+
+    this.comfyGenerations.splice(index, 1);
+    return true;
   }
 }
 

@@ -5,6 +5,23 @@ import { insertAccountSchema, insertContentSchema, insertScheduleSchema, insertS
 import { z } from "zod";
 import OpenAI from "openai";
 import bcrypt from "bcrypt";
+import {
+  getVastServers,
+  getAvailableServers,
+  createVastServer,
+  destroyVastServer,
+  restartVastServer,
+} from "./vast-ai";
+import {
+  getComfyModels,
+  addComfyModel,
+  getAvailableModels,
+  getComfyWorkflows,
+  createComfyWorkflow,
+  generateImage,
+  getGenerationStatus,
+  getGenerations,
+} from "./comfy-ui";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
@@ -1484,6 +1501,22 @@ echo "CUDA environment configured!"`,
       res.status(500).json({ message: "Failed to fetch today's server analytics" });
     }
   });
+
+  // ComfyUI API routes
+  
+  // Model management
+  app.get('/api/comfy/:serverId/models', getComfyModels);
+  app.post('/api/comfy/:serverId/models', addComfyModel);
+  app.get('/api/comfy/:serverId/available-models', getAvailableModels);
+  
+  // Workflow management
+  app.get('/api/comfy/workflows', getComfyWorkflows);
+  app.post('/api/comfy/workflows', createComfyWorkflow);
+  
+  // Image generation
+  app.post('/api/comfy/:serverId/generate', generateImage);
+  app.get('/api/comfy/generation/:generationId', getGenerationStatus);
+  app.get('/api/comfy/:serverId/generations', getGenerations);
 
   const httpServer = createServer(app);
   return httpServer;

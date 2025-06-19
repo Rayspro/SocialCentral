@@ -8,7 +8,8 @@ import {
   Calendar, 
   Settings, 
   Server,
-  RotateCw 
+  RotateCw,
+  Wand2
 } from "lucide-react";
 
 const navigationItems = [
@@ -19,6 +20,7 @@ const navigationItems = [
   { path: "/media", label: "Media Library", icon: Images },
   { path: "/schedule", label: "Schedule", icon: Calendar },
   { path: "/vast-servers", label: "Vast.ai Servers", icon: Server },
+  { path: "/comfy-ui", label: "ComfyUI", icon: Wand2 },
   { path: "/settings", label: "Settings", icon: Settings },
 ];
 

@@ -121,6 +121,52 @@ export const serverExecutions = pgTable("server_executions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ComfyUI Models table
+export const comfyModels = pgTable("comfy_models", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  url: text("url").notNull(),
+  folder: text("folder").notNull(), // checkpoints, loras, vae, etc.
+  description: text("description"),
+  serverId: integer("server_id"),
+  status: text("status").notNull().default("pending"), // pending, downloading, ready, failed
+  fileName: text("file_name"),
+  fileSize: integer("file_size"),
+  downloadProgress: integer("download_progress").default(0),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ComfyUI Workflows table
+export const comfyWorkflows = pgTable("comfy_workflows", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  workflowJson: text("workflow_json").notNull(), // JSON workflow definition
+  isTemplate: boolean("is_template").default(false),
+  category: text("category").default("text-to-image"), // text-to-image, image-to-image, etc.
+  serverId: integer("server_id"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ComfyUI Generations table
+export const comfyGenerations = pgTable("comfy_generations", {
+  id: serial("id").primaryKey(),
+  serverId: integer("server_id").notNull(),
+  workflowId: integer("workflow_id"),
+  prompt: text("prompt"),
+  negativePrompt: text("negative_prompt"),
+  parameters: text("parameters"), // JSON parameters
+  status: text("status").notNull().default("pending"), // pending, running, completed, failed
+  imageUrls: text("image_urls").array(),
+  queueId: text("queue_id"),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
 // Insert schemas
 export const insertPlatformSchema = createInsertSchema(platforms).omit({
   id: true,
@@ -166,6 +212,24 @@ export const insertServerExecutionSchema = createInsertSchema(serverExecutions).
   createdAt: true,
 });
 
+export const insertComfyModelSchema = createInsertSchema(comfyModels).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertComfyWorkflowSchema = createInsertSchema(comfyWorkflows).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertComfyGenerationSchema = createInsertSchema(comfyGenerations).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
 // Types
 export type Platform = typeof platforms.$inferSelect;
 export type InsertPlatform = z.infer<typeof insertPlatformSchema>;
@@ -190,6 +254,15 @@ export type InsertSetupScript = z.infer<typeof insertSetupScriptSchema>;
 
 export type ServerExecution = typeof serverExecutions.$inferSelect;
 export type InsertServerExecution = z.infer<typeof insertServerExecutionSchema>;
+
+export type ComfyModel = typeof comfyModels.$inferSelect;
+export type InsertComfyModel = z.infer<typeof insertComfyModelSchema>;
+
+export type ComfyWorkflow = typeof comfyWorkflows.$inferSelect;
+export type InsertComfyWorkflow = z.infer<typeof insertComfyWorkflowSchema>;
+
+export type ComfyGeneration = typeof comfyGenerations.$inferSelect;
+export type InsertComfyGeneration = z.infer<typeof insertComfyGenerationSchema>;
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;

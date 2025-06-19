@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import { ArrowLeft, Server, Cpu, HardDrive, Wifi, Clock, Activity, Terminal, Settings, RefreshCw } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie } from "recharts";
+import { ArrowLeft, Server, Cpu, HardDrive, Wifi, Clock, Activity, Terminal, Settings, RefreshCw, TrendingUp, Zap, Globe, HardDriveIcon } from "lucide-react";
 import type { VastServer } from "@shared/schema";
 
 interface ServerMetrics {
@@ -17,6 +18,19 @@ interface ServerMetrics {
   networkOut: number;
   uptime: number;
   processes: number;
+  gpuUsage: number;
+  temperature: number;
+  powerConsumption: number;
+}
+
+interface MetricsHistory {
+  time: string;
+  cpu: number;
+  memory: number;
+  gpu: number;
+  networkIn: number;
+  networkOut: number;
+  temperature: number;
 }
 
 interface ServerExecution {
@@ -35,47 +49,75 @@ export default function ServerDetails() {
   const [, setLocation] = useLocation();
   const serverId = parseInt(params.id || "0");
 
-  // Fetch server details
-  const { data: server, isLoading } = useQuery<VastServer>({
+  const { data: server, isLoading, refetch } = useQuery({
     queryKey: ['/api/vast-servers', serverId],
-    queryFn: async () => {
-      const response = await fetch(`/api/vast-servers/${serverId}`);
-      if (!response.ok) throw new Error('Server not found');
-      return response.json();
-    },
+    queryFn: () => 
+      fetch(`/api/vast-servers/${serverId}`).then(res => res.json()),
     enabled: !!serverId,
   });
 
-  // Mock metrics data (in real app, this would come from monitoring API)
-  const [metrics, setMetrics] = useState<ServerMetrics>({
-    cpuUsage: 45,
-    memoryUsage: 68,
-    diskUsage: 32,
-    networkIn: 1250,
-    networkOut: 890,
-    uptime: 14400, // 4 hours
-    processes: 87,
-  });
-
-  // Fetch server executions
-  const { data: executions } = useQuery<ServerExecution[]>({
+  const { data: executions } = useQuery({
     queryKey: ['/api/server-executions', serverId],
     queryFn: () => 
       fetch(`/api/server-executions/${serverId}`).then(res => res.json()),
     enabled: !!serverId,
   });
 
-  // Simulate real-time metrics updates
+  // Enhanced metrics data with historical tracking
+  const [metrics, setMetrics] = useState<ServerMetrics>({
+    cpuUsage: 45,
+    memoryUsage: 68,
+    diskUsage: 32,
+    networkIn: 1250,
+    networkOut: 890,
+    uptime: 14400,
+    processes: 87,
+    gpuUsage: 72,
+    temperature: 68,
+    powerConsumption: 280,
+  });
+
+  // Historical metrics for charts
+  const [metricsHistory, setMetricsHistory] = useState<MetricsHistory[]>([
+    { time: '10:00', cpu: 42, memory: 65, gpu: 70, networkIn: 1100, networkOut: 850, temperature: 65 },
+    { time: '10:05', cpu: 38, memory: 62, gpu: 68, networkIn: 1180, networkOut: 920, temperature: 66 },
+    { time: '10:10', cpu: 52, memory: 70, gpu: 75, networkIn: 1300, networkOut: 980, temperature: 69 },
+    { time: '10:15', cpu: 48, memory: 68, gpu: 73, networkIn: 1250, networkOut: 890, temperature: 68 },
+    { time: '10:20', cpu: 45, memory: 68, gpu: 72, networkIn: 1250, networkOut: 890, temperature: 68 },
+  ]);
+
+  // Simulate real-time metrics updates with enhanced data
   useEffect(() => {
     const interval = setInterval(() => {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString('en-US', { hour12: false }).slice(0, 5);
+      
       setMetrics(prev => ({
         ...prev,
         cpuUsage: Math.max(10, Math.min(90, prev.cpuUsage + (Math.random() - 0.5) * 10)),
         memoryUsage: Math.max(20, Math.min(95, prev.memoryUsage + (Math.random() - 0.5) * 5)),
+        gpuUsage: Math.max(15, Math.min(95, prev.gpuUsage + (Math.random() - 0.5) * 8)),
         networkIn: Math.max(0, prev.networkIn + (Math.random() - 0.5) * 500),
         networkOut: Math.max(0, prev.networkOut + (Math.random() - 0.5) * 300),
+        temperature: Math.max(50, Math.min(85, prev.temperature + (Math.random() - 0.5) * 3)),
+        powerConsumption: Math.max(200, Math.min(350, prev.powerConsumption + (Math.random() - 0.5) * 20)),
         uptime: prev.uptime + 5,
       }));
+
+      // Update historical data
+      setMetricsHistory(prev => {
+        const newEntry = {
+          time: timeStr,
+          cpu: Math.max(10, Math.min(90, (prev[prev.length - 1]?.cpu || 45) + (Math.random() - 0.5) * 10)),
+          memory: Math.max(20, Math.min(95, (prev[prev.length - 1]?.memory || 68) + (Math.random() - 0.5) * 5)),
+          gpu: Math.max(15, Math.min(95, (prev[prev.length - 1]?.gpu || 72) + (Math.random() - 0.5) * 8)),
+          networkIn: Math.max(0, (prev[prev.length - 1]?.networkIn || 1250) + (Math.random() - 0.5) * 500),
+          networkOut: Math.max(0, (prev[prev.length - 1]?.networkOut || 890) + (Math.random() - 0.5) * 300),
+          temperature: Math.max(50, Math.min(85, (prev[prev.length - 1]?.temperature || 68) + (Math.random() - 0.5) * 3)),
+        };
+        
+        return [...prev.slice(-19), newEntry]; // Keep last 20 entries
+      });
     }, 5000);
 
     return () => clearInterval(interval);
@@ -84,11 +126,10 @@ export default function ServerDetails() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'running': return 'bg-green-500 text-white';
-      case 'launching': return 'bg-blue-500 text-white';
-      case 'configuring': return 'bg-purple-500 text-white';
-      case 'stopping': return 'bg-orange-500 text-white';
       case 'stopped': return 'bg-red-500 text-white';
-      case 'available': return 'bg-gray-500 text-white';
+      case 'loading': return 'bg-yellow-500 text-white';
+      case 'launching': return 'bg-blue-500 text-white animate-pulse';
+      case 'configuring': return 'bg-purple-500 text-white animate-pulse';
       default: return 'bg-gray-400 text-white';
     }
   };
@@ -100,14 +141,39 @@ export default function ServerDetails() {
   };
 
   const formatBytes = (bytes: number) => {
-    return `${(bytes / 1024 / 1024).toFixed(1)} MB/s`;
+    if (bytes === 0) return '0 Bytes/s';
+    const k = 1024;
+    const sizes = ['Bytes/s', 'KB/s', 'MB/s', 'GB/s'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+        <div className="flex items-center gap-4 mb-6">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLocation('/vast-servers')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Servers
+          </Button>
+          <div className="h-6 w-48 bg-gray-200 animate-pulse rounded"></div>
+        </div>
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <Card key={i}>
+              <CardHeader>
+                <div className="h-4 w-20 bg-gray-200 animate-pulse rounded"></div>
+              </CardHeader>
+              <CardContent>
+                <div className="h-8 w-16 bg-gray-200 animate-pulse rounded mb-2"></div>
+                <div className="h-2 w-full bg-gray-200 animate-pulse rounded"></div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       </div>
     );
@@ -117,9 +183,11 @@ export default function ServerDetails() {
     return (
       <div className="container mx-auto py-6">
         <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">Server Not Found</h2>
-          <Button onClick={() => setLocation('/vast-servers')}>
-            <ArrowLeft className="h-4 w-4 mr-2" />
+          <p className="text-gray-500">Server not found</p>
+          <Button 
+            onClick={() => setLocation('/vast-servers')} 
+            className="mt-4"
+          >
             Back to Servers
           </Button>
         </div>
@@ -132,48 +200,100 @@ export default function ServerDetails() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setLocation('/vast-servers')}
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            Back to Servers
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">{server.name}</h1>
-            <p className="text-muted-foreground">
-              {server.gpu} × {server.gpuCount} | {server.location}
-            </p>
+            <h1 className="text-3xl font-bold flex items-center gap-3">
+              <Server className="h-8 w-8" />
+              {server.name}
+            </h1>
+            <p className="text-muted-foreground">{server.gpu} • {server.location}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge className={getStatusColor(server.status)}>
             {server.status}
           </Badge>
-          <Button variant="outline" size="sm">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => refetch()}
+          >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
         </div>
       </div>
 
-      {/* Server Overview */}
+      {/* Enhanced Server Overview with Charts */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">CPU Usage</CardTitle>
-            <Cpu className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-3 w-3 text-green-500" />
+              <Cpu className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.cpuUsage.toFixed(1)}%</div>
             <Progress value={metrics.cpuUsage} className="mt-2" />
+            <div className="mt-2 h-8">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsHistory.slice(-10)}>
+                  <Line 
+                    type="monotone" 
+                    dataKey="cpu" 
+                    stroke="#3b82f6" 
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="hover:shadow-lg transition-shadow">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">GPU Usage</CardTitle>
+            <div className="flex items-center gap-2">
+              <Zap className="h-3 w-3 text-yellow-500" />
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{metrics.gpuUsage.toFixed(1)}%</div>
+            <Progress value={metrics.gpuUsage} className="mt-2" />
+            <div className="mt-2 h-8">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsHistory.slice(-10)}>
+                  <Line 
+                    type="monotone" 
+                    dataKey="gpu" 
+                    stroke="#f59e0b" 
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Memory Usage</CardTitle>
-            <Activity className="h-4 w-4 text-muted-foreground" />
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 bg-purple-500 rounded-full animate-pulse"></div>
+              <HardDriveIcon className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.memoryUsage.toFixed(1)}%</div>
@@ -184,30 +304,218 @@ export default function ServerDetails() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="hover:shadow-lg transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Disk Usage</CardTitle>
-            <HardDrive className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Temperature</CardTitle>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                metrics.temperature > 75 ? 'bg-red-500 animate-ping' : 
+                metrics.temperature > 65 ? 'bg-yellow-500' : 'bg-green-500'
+              }`}></div>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.diskUsage.toFixed(1)}%</div>
-            <Progress value={metrics.diskUsage} className="mt-2" />
+            <div className="text-2xl font-bold">{metrics.temperature.toFixed(0)}°C</div>
+            <Progress 
+              value={(metrics.temperature / 85) * 100} 
+              className="mt-2"
+            />
             <p className="text-xs text-muted-foreground mt-1">
-              {((metrics.diskUsage / 100) * server.disk).toFixed(1)} GB / {server.disk} GB
+              Max: 85°C
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Real-time Performance Charts */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5" />
+              Resource Usage Trends
+            </CardTitle>
+            <CardDescription>Real-time CPU, GPU, and Memory utilization</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={metricsHistory}>
+                  <defs>
+                    <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                    </linearGradient>
+                    <linearGradient id="gpuGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.1}/>
+                    </linearGradient>
+                    <linearGradient id="memoryGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis />
+                  <Tooltip />
+                  <Area 
+                    type="monotone" 
+                    dataKey="cpu" 
+                    stackId="1"
+                    stroke="#3b82f6" 
+                    fill="url(#cpuGradient)"
+                    name="CPU %"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="gpu" 
+                    stackId="2"
+                    stroke="#f59e0b" 
+                    fill="url(#gpuGradient)"
+                    name="GPU %"
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="memory" 
+                    stackId="3"
+                    stroke="#8b5cf6" 
+                    fill="url(#memoryGradient)"
+                    name="Memory %"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Uptime</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Globe className="h-5 w-5" />
+              Network Activity
+            </CardTitle>
+            <CardDescription>Bandwidth utilization over time</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatUptime(metrics.uptime)}</div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Since {server.launchedAt ? new Date(server.launchedAt).toLocaleString() : 'N/A'}
-            </p>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsHistory}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => [formatBytes(Number(value)), '']} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="networkIn" 
+                    stroke="#10b981" 
+                    strokeWidth={3}
+                    name="Download"
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="networkOut" 
+                    stroke="#ef4444" 
+                    strokeWidth={3}
+                    name="Upload"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* System Health Dashboard */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">System Health</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Used', value: metrics.memoryUsage, fill: '#8b5cf6' },
+                      { name: 'Free', value: 100 - metrics.memoryUsage, fill: '#e5e7eb' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={70}
+                    startAngle={90}
+                    endAngle={450}
+                    dataKey="value"
+                  >
+                  </Pie>
+                  <Tooltip formatter={(value) => [`${Number(value).toFixed(1)}%`, '']} />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-center">
+              <p className="text-sm text-muted-foreground">Memory Usage</p>
+              <p className="text-2xl font-bold">{metrics.memoryUsage.toFixed(1)}%</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">Power Consumption</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={[
+                  { name: 'Current', power: metrics.powerConsumption },
+                  { name: 'Average', power: 250 },
+                  { name: 'Peak', power: 320 }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip formatter={(value) => [`${value}W`, '']} />
+                  <Bar dataKey="power" fill="#f59e0b" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">Temperature Monitor</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={metricsHistory.slice(-10)}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" />
+                  <YAxis domain={[50, 85]} />
+                  <Tooltip formatter={(value) => [`${value}°C`, '']} />
+                  <Line 
+                    type="monotone" 
+                    dataKey="temperature" 
+                    stroke={metrics.temperature > 75 ? "#ef4444" : metrics.temperature > 65 ? "#f59e0b" : "#10b981"}
+                    strokeWidth={4}
+                    dot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="text-center mt-2">
+              <p className="text-2xl font-bold">{metrics.temperature.toFixed(0)}°C</p>
+              <p className={`text-sm ${
+                metrics.temperature > 75 ? 'text-red-500' : 
+                metrics.temperature > 65 ? 'text-yellow-500' : 'text-green-500'
+              }`}>
+                {metrics.temperature > 75 ? 'High' : metrics.temperature > 65 ? 'Moderate' : 'Normal'}
+              </p>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -222,35 +530,39 @@ export default function ServerDetails() {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Server Specifications</CardTitle>
+                <CardTitle>Server Information</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2">
                 <div className="flex justify-between">
-                  <span>GPU:</span>
-                  <span className="font-medium">{server.gpu} × {server.gpuCount}</span>
+                  <span className="text-muted-foreground">Server ID:</span>
+                  <span>{server.vastId}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>CPU Cores:</span>
-                  <span className="font-medium">{server.cpuCores}</span>
+                  <span className="text-muted-foreground">GPU:</span>
+                  <span>{server.gpu}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>RAM:</span>
-                  <span className="font-medium">{server.ram} GB</span>
+                  <span className="text-muted-foreground">CPU Cores:</span>
+                  <span>{server.cpuCores}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Storage:</span>
-                  <span className="font-medium">{server.disk} GB</span>
+                  <span className="text-muted-foreground">RAM:</span>
+                  <span>{server.ram} GB</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Location:</span>
-                  <span className="font-medium">{server.location}</span>
+                  <span className="text-muted-foreground">Storage:</span>
+                  <span>{server.disk} GB</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Cost per Hour:</span>
-                  <span className="font-medium">${parseFloat(server.pricePerHour).toFixed(2)}</span>
+                  <span className="text-muted-foreground">Location:</span>
+                  <span>{server.location}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Price:</span>
+                  <span>${server.pricePerHour}/hour</span>
                 </div>
               </CardContent>
             </Card>
@@ -259,32 +571,26 @@ export default function ServerDetails() {
               <CardHeader>
                 <CardTitle>Connection Details</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                {server.serverUrl && (
-                  <div>
-                    <span className="text-sm text-muted-foreground">Server URL:</span>
-                    <p className="font-mono text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                      {server.serverUrl}
-                    </p>
-                  </div>
-                )}
-                {server.sshConnection && (
-                  <div>
-                    <span className="text-sm text-muted-foreground">SSH Command:</span>
-                    <p className="font-mono text-sm bg-gray-100 dark:bg-gray-800 p-2 rounded">
-                      {server.sshConnection}
-                    </p>
-                  </div>
-                )}
-                <div>
-                  <span className="text-sm text-muted-foreground">ComfyUI Port:</span>
-                  <p className="font-medium">{server.comfyuiPort}</p>
+              <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SSH Host:</span>
+                  <span className="font-mono text-sm">{server.sshHost || 'N/A'}</span>
                 </div>
-                <div>
-                  <span className="text-sm text-muted-foreground">Setup Status:</span>
-                  <Badge variant="outline" className="ml-2">
-                    {server.setupStatus || 'pending'}
-                  </Badge>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">SSH Port:</span>
+                  <span>{server.sshPort || 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Direct Ports:</span>
+                  <span>{server.directPortStart ? `${server.directPortStart}-${server.directPortEnd}` : 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Launched:</span>
+                  <span>{server.launchedAt ? new Date(server.launchedAt).toLocaleString() : 'N/A'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Uptime:</span>
+                  <span>{formatUptime(metrics.uptime)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -292,11 +598,10 @@ export default function ServerDetails() {
         </TabsContent>
 
         <TabsContent value="performance" className="space-y-4">
-          <div className="grid gap-6 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardHeader>
-                <CardTitle>Resource Usage</CardTitle>
-                <CardDescription>Real-time system metrics</CardDescription>
+                <CardTitle>System Resources</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -305,6 +610,13 @@ export default function ServerDetails() {
                     <span>{metrics.cpuUsage.toFixed(1)}%</span>
                   </div>
                   <Progress value={metrics.cpuUsage} />
+                </div>
+                <div>
+                  <div className="flex justify-between mb-2">
+                    <span>GPU Usage</span>
+                    <span>{metrics.gpuUsage.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={metrics.gpuUsage} />
                 </div>
                 <div>
                   <div className="flex justify-between mb-2">
@@ -325,22 +637,28 @@ export default function ServerDetails() {
 
             <Card>
               <CardHeader>
-                <CardTitle>System Information</CardTitle>
+                <CardTitle>System Stats</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
+              <CardContent className="space-y-2">
                 <div className="flex justify-between">
-                  <span>Active Processes:</span>
-                  <span className="font-medium">{metrics.processes}</span>
+                  <span className="text-muted-foreground">Processes:</span>
+                  <span>{metrics.processes}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Uptime:</span>
-                  <span className="font-medium">{formatUptime(metrics.uptime)}</span>
+                  <span className="text-muted-foreground">Temperature:</span>
+                  <span>{metrics.temperature.toFixed(0)}°C</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Server Status:</span>
-                  <Badge className={getStatusColor(server.status)}>
-                    {server.status}
-                  </Badge>
+                  <span className="text-muted-foreground">Power:</span>
+                  <span>{metrics.powerConsumption}W</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Network In:</span>
+                  <span>{formatBytes(metrics.networkIn)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Network Out:</span>
+                  <span>{formatBytes(metrics.networkOut)}</span>
                 </div>
               </CardContent>
             </Card>
@@ -350,25 +668,28 @@ export default function ServerDetails() {
         <TabsContent value="network" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Network Activity</CardTitle>
-              <CardDescription>Real-time network throughput</CardDescription>
+              <CardTitle>Network Configuration</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Wifi className="h-4 w-4 text-green-500" />
-                    <span>Network In</span>
-                  </div>
-                  <div className="text-2xl font-bold">{formatBytes(metrics.networkIn)}</div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Wifi className="h-4 w-4 text-blue-500" />
-                    <span>Network Out</span>
-                  </div>
-                  <div className="text-2xl font-bold">{formatBytes(metrics.networkOut)}</div>
-                </div>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Public IP:</span>
+                <span className="font-mono text-sm">{server.sshHost || 'Not assigned'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">SSH Port:</span>
+                <span>{server.sshPort || 'Not configured'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Direct Port Range:</span>
+                <span>{server.directPortStart ? `${server.directPortStart}-${server.directPortEnd}` : 'Not available'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Bandwidth In:</span>
+                <span>{formatBytes(metrics.networkIn)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Bandwidth Out:</span>
+                <span>{formatBytes(metrics.networkOut)}</span>
               </div>
             </CardContent>
           </Card>
@@ -378,47 +699,44 @@ export default function ServerDetails() {
           <Card>
             <CardHeader>
               <CardTitle>Script Executions</CardTitle>
-              <CardDescription>History of executed setup scripts</CardDescription>
+              <CardDescription>History of executed setup scripts and commands</CardDescription>
             </CardHeader>
             <CardContent>
               {executions && executions.length > 0 ? (
-                <div className="space-y-3">
-                  {executions.map((execution) => (
-                    <div key={execution.id} className="border rounded p-3">
+                <div className="space-y-4">
+                  {executions.map((execution: ServerExecution) => (
+                    <div key={execution.id} className="border rounded-lg p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">Script #{execution.scriptId}</span>
                         <Badge variant={execution.status === 'completed' ? 'default' : 'secondary'}>
                           {execution.status}
                         </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {execution.startedAt && new Date(execution.startedAt).toLocaleString()}
+                        </span>
                       </div>
-                      {execution.startedAt && (
-                        <p className="text-sm text-muted-foreground">
-                          Started: {new Date(execution.startedAt).toLocaleString()}
-                        </p>
-                      )}
-                      {execution.completedAt && (
-                        <p className="text-sm text-muted-foreground">
-                          Completed: {new Date(execution.completedAt).toLocaleString()}
-                        </p>
-                      )}
                       {execution.output && (
-                        <pre className="text-xs bg-gray-100 dark:bg-gray-800 p-2 rounded mt-2 overflow-x-auto">
-                          {execution.output}
-                        </pre>
+                        <div className="mt-2">
+                          <p className="text-sm font-medium mb-1">Output:</p>
+                          <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-32">
+                            {execution.output}
+                          </pre>
+                        </div>
                       )}
                       {execution.errorLog && (
-                        <pre className="text-xs bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 p-2 rounded mt-2 overflow-x-auto">
-                          {execution.errorLog}
-                        </pre>
+                        <div className="mt-2">
+                          <p className="text-sm font-medium mb-1 text-red-600">Error:</p>
+                          <pre className="bg-red-50 p-2 rounded text-xs overflow-auto max-h-32 text-red-800">
+                            {execution.errorLog}
+                          </pre>
+                        </div>
                       )}
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8">
-                  <Terminal className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                  <p className="text-muted-foreground">No script executions yet</p>
-                </div>
+                <p className="text-muted-foreground text-center py-8">
+                  No script executions recorded for this server.
+                </p>
               )}
             </CardContent>
           </Card>

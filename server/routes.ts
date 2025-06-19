@@ -549,33 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Vast.ai Server routes
-  app.get("/api/vast-servers", async (req, res) => {
-    try {
-      const servers = await storage.getVastServers();
-      res.json(servers);
-    } catch (error) {
-      console.error("Get Vast servers error:", error);
-      res.status(500).json({ error: "Failed to fetch Vast.ai servers" });
-    }
-  });
-
-  app.get("/api/vast-servers/:id", async (req, res) => {
-    try {
-      const id = parseInt(req.params.id);
-      const server = await storage.getVastServer(id);
-      
-      if (!server) {
-        return res.status(404).json({ error: "Server not found" });
-      }
-
-      res.json(server);
-    } catch (error) {
-      console.error("Get server error:", error);
-      res.status(500).json({ error: "Failed to fetch server details" });
-    }
-  });
-
+  // Vast.ai Server routes - specific routes must come before parameterized routes
   app.get("/api/vast-servers/available", async (req, res) => {
     try {
       const vastApiKey = await storage.getApiKeyByService('vast');
@@ -649,6 +623,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Get available servers error:", error);
       res.status(500).json({ error: "Failed to fetch available servers" });
+    }
+  });
+
+  app.get("/api/vast-servers", async (req, res) => {
+    try {
+      const servers = await storage.getVastServers();
+      res.json(servers);
+    } catch (error) {
+      console.error("Get Vast servers error:", error);
+      res.status(500).json({ error: "Failed to fetch Vast.ai servers" });
+    }
+  });
+
+  app.get("/api/vast-servers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      if (isNaN(id)) {
+        return res.status(400).json({ error: "Invalid server ID" });
+      }
+      
+      const server = await storage.getVastServer(id);
+      
+      if (!server) {
+        return res.status(404).json({ error: "Server not found" });
+      }
+
+      // Sync status with Vast.ai if server is launched
+      if (server.vastId && server.isLaunched) {
+        const vastApiKey = await storage.getApiKeyByService('vast');
+        if (vastApiKey && vastApiKey.keyValue) {
+          try {
+            const response = await fetch(`https://console.vast.ai/api/v0/instances/`, {
+              headers: {
+                'Authorization': `Bearer ${vastApiKey.keyValue}`,
+              },
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              const vastInstance = data.instances?.find((inst: any) => 
+                inst.id.toString() === server.vastId || 
+                inst.label === server.vastId
+              );
+
+              if (vastInstance) {
+                let updatedStatus = server.status;
+                if (vastInstance.actual_status === 'running') {
+                  updatedStatus = 'running';
+                } else if (vastInstance.actual_status === 'stopped') {
+                  updatedStatus = 'stopped';
+                } else if (vastInstance.actual_status === 'loading') {
+                  updatedStatus = 'loading';
+                }
+
+                if (updatedStatus !== server.status) {
+                  await storage.updateVastServer(server.id, { 
+                    status: updatedStatus
+                  });
+                  server.status = updatedStatus;
+                }
+              }
+            }
+          } catch (syncError) {
+            console.log("Failed to sync status with Vast.ai:", syncError);
+          }
+        }
+      }
+
+      res.json(server);
+    } catch (error) {
+      console.error("Get server error:", error);
+      res.status(500).json({ error: "Failed to fetch server details" });
     }
   });
 

@@ -939,6 +939,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Import vast.ai handlers
+  const { 
+    getVastServers, 
+    getAvailableServers, 
+    createVastServer, 
+    destroyVastServer, 
+    restartVastServer 
+  } = await import('./vast-ai');
+
+  // Vast.ai routes with pagination
+  app.get("/api/vast-servers", getVastServers);
+  app.get("/api/vast-servers/available", getAvailableServers);
+  app.post("/api/vast-servers", createVastServer);
+  app.delete("/api/vast-servers/:id", destroyVastServer);
+  app.put("/api/vast-servers/:id/restart", restartVastServer);
+
+  // Setup scripts endpoint
+  app.get("/api/setup-scripts", async (req, res) => {
+    const setupScripts = [
+      {
+        id: 1,
+        name: "Python ML Environment",
+        description: "Python with PyTorch, TensorFlow, and common ML libraries",
+        script: `#!/bin/bash
+apt update && apt install -y python3-pip git wget
+pip install torch torchvision tensorflow jupyter pandas numpy matplotlib scikit-learn
+jupyter notebook --generate-config
+echo "Setup complete!"`,
+        category: "ml"
+      },
+      {
+        id: 2,
+        name: "Node.js Development",
+        description: "Node.js with npm and common development tools",
+        script: `#!/bin/bash
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+apt-get install -y nodejs git
+npm install -g pm2 nodemon
+echo "Node.js environment ready!"`,
+        category: "web"
+      },
+      {
+        id: 3,
+        name: "CUDA Development",
+        description: "CUDA toolkit and development environment",
+        script: `#!/bin/bash
+apt update && apt install -y build-essential
+wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/cuda-ubuntu2004.pin
+mv cuda-ubuntu2004.pin /etc/apt/preferences.d/cuda-repository-pin-600
+apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2004/x86_64/7fa2af80.pub
+echo "CUDA environment configured!"`,
+        category: "gpu"
+      }
+    ];
+    
+    res.json(setupScripts);
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }

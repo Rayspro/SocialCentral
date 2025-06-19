@@ -388,4 +388,185 @@ export class DatabaseStorage implements IStorage {
   }
 }
 
-export const storage = new DatabaseStorage();
+// Temporarily using MemStorage due to database connection issues
+// export const storage = new DatabaseStorage();
+
+class MemStorage implements IStorage {
+  private users: User[] = [];
+  private platforms: Platform[] = [
+    { id: 1, name: "youtube", displayName: "YouTube", icon: "youtube", color: "#FF0000", isActive: true },
+    { id: 2, name: "instagram", displayName: "Instagram", icon: "instagram", color: "#E4405F", isActive: true },
+    { id: 3, name: "twitter", displayName: "Twitter", icon: "twitter", color: "#1DA1F2", isActive: true },
+    { id: 4, name: "linkedin", displayName: "LinkedIn", icon: "linkedin", color: "#0077B5", isActive: true }
+  ];
+  private accounts: Account[] = [
+    { id: 1, platformId: 1, name: "Tech Channel", username: "@techchannel", isActive: true, accessToken: "yt_token", refreshToken: "yt_refresh", externalId: "yt123", metadata: {}, createdAt: new Date() },
+    { id: 2, platformId: 2, name: "Brand Account", username: "@brandaccount", isActive: true, accessToken: "ig_token", refreshToken: "ig_refresh", externalId: "ig123", metadata: {}, createdAt: new Date() },
+    { id: 3, platformId: 3, name: "Company Twitter", username: "@company", isActive: true, accessToken: "tw_token", refreshToken: "tw_refresh", externalId: "tw123", metadata: {}, createdAt: new Date() },
+    { id: 4, platformId: 4, name: "Professional", username: "@professional", isActive: true, accessToken: "li_token", refreshToken: "li_refresh", externalId: "li123", metadata: {}, createdAt: new Date() }
+  ];
+  private content: Content[] = [
+    { id: 1, title: "Travel Video Story", description: "Amazing journey through mountains", type: "video", sourceText: "A story about mountain adventures", status: "pending", platformId: 1, accountId: 1, contentUrl: null, generationPrompt: null, metadata: {}, createdAt: new Date(), thumbnailUrl: null, updatedAt: new Date() }
+  ];
+  private schedules: Schedule[] = [];
+  private apiKeys: ApiKey[] = [];
+
+  async getUser(id: number): Promise<User | undefined> {
+    return this.users.find(u => u.id === id);
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    return this.users.find(u => u.username === username);
+  }
+
+  async createUser(user: InsertUser): Promise<User> {
+    const newUser = { ...user, id: this.users.length + 1 } as User;
+    this.users.push(newUser);
+    return newUser;
+  }
+
+  async getPlatforms(): Promise<Platform[]> {
+    return this.platforms;
+  }
+
+  async getPlatform(id: number): Promise<Platform | undefined> {
+    return this.platforms.find(p => p.id === id);
+  }
+
+  async createPlatform(platform: InsertPlatform): Promise<Platform> {
+    const newPlatform = { ...platform, id: this.platforms.length + 1 } as Platform;
+    this.platforms.push(newPlatform);
+    return newPlatform;
+  }
+
+  async updatePlatform(id: number, platform: Partial<InsertPlatform>): Promise<Platform | undefined> {
+    const index = this.platforms.findIndex(p => p.id === id);
+    if (index === -1) return undefined;
+    this.platforms[index] = { ...this.platforms[index], ...platform };
+    return this.platforms[index];
+  }
+
+  async getAccounts(): Promise<Account[]> {
+    return this.accounts;
+  }
+
+  async getAccountsByPlatform(platformId: number): Promise<Account[]> {
+    return this.accounts.filter(a => a.platformId === platformId);
+  }
+
+  async getAccount(id: number): Promise<Account | undefined> {
+    return this.accounts.find(a => a.id === id);
+  }
+
+  async createAccount(account: InsertAccount): Promise<Account> {
+    const newAccount = { ...account, id: this.accounts.length + 1 } as Account;
+    this.accounts.push(newAccount);
+    return newAccount;
+  }
+
+  async updateAccount(id: number, account: Partial<InsertAccount>): Promise<Account | undefined> {
+    const index = this.accounts.findIndex(a => a.id === id);
+    if (index === -1) return undefined;
+    this.accounts[index] = { ...this.accounts[index], ...account };
+    return this.accounts[index];
+  }
+
+  async deleteAccount(id: number): Promise<boolean> {
+    const index = this.accounts.findIndex(a => a.id === id);
+    if (index === -1) return false;
+    this.accounts.splice(index, 1);
+    return true;
+  }
+
+  async getContent(): Promise<Content[]> {
+    return this.content;
+  }
+
+  async getContentByStatus(status: string): Promise<Content[]> {
+    return this.content.filter(c => c.status === status);
+  }
+
+  async getContentById(id: number): Promise<Content | undefined> {
+    return this.content.find(c => c.id === id);
+  }
+
+  async createContent(contentData: InsertContent): Promise<Content> {
+    const newContent = { ...contentData, id: this.content.length + 1 } as Content;
+    this.content.push(newContent);
+    return newContent;
+  }
+
+  async updateContent(id: number, contentData: Partial<InsertContent>): Promise<Content | undefined> {
+    const index = this.content.findIndex(c => c.id === id);
+    if (index === -1) return undefined;
+    this.content[index] = { ...this.content[index], ...contentData };
+    return this.content[index];
+  }
+
+  async deleteContent(id: number): Promise<boolean> {
+    const index = this.content.findIndex(c => c.id === id);
+    if (index === -1) return false;
+    this.content.splice(index, 1);
+    return true;
+  }
+
+  async getSchedules(): Promise<Schedule[]> {
+    return this.schedules;
+  }
+
+  async getSchedulesByAccount(accountId: number): Promise<Schedule[]> {
+    return this.schedules.filter(s => s.accountId === accountId);
+  }
+
+  async createSchedule(schedule: InsertSchedule): Promise<Schedule> {
+    const newSchedule = { ...schedule, id: this.schedules.length + 1 } as Schedule;
+    this.schedules.push(newSchedule);
+    return newSchedule;
+  }
+
+  async updateSchedule(id: number, schedule: Partial<InsertSchedule>): Promise<Schedule | undefined> {
+    const index = this.schedules.findIndex(s => s.id === id);
+    if (index === -1) return undefined;
+    this.schedules[index] = { ...this.schedules[index], ...schedule };
+    return this.schedules[index];
+  }
+
+  async getApiKeys(): Promise<ApiKey[]> {
+    return this.apiKeys;
+  }
+
+  async getApiKeyByService(service: string): Promise<ApiKey | undefined> {
+    return this.apiKeys.find(k => k.service === service && k.isActive);
+  }
+
+  async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {
+    const newApiKey = { ...apiKey, id: this.apiKeys.length + 1, isActive: true } as ApiKey;
+    this.apiKeys.push(newApiKey);
+    return newApiKey;
+  }
+
+  async updateApiKey(id: number, apiKey: Partial<InsertApiKey>): Promise<ApiKey | undefined> {
+    const index = this.apiKeys.findIndex(k => k.id === id);
+    if (index === -1) return undefined;
+    this.apiKeys[index] = { ...this.apiKeys[index], ...apiKey };
+    return this.apiKeys[index];
+  }
+
+  async deleteApiKey(id: number): Promise<boolean> {
+    const index = this.apiKeys.findIndex(k => k.id === id);
+    if (index === -1) return false;
+    this.apiKeys.splice(index, 1);
+    return true;
+  }
+
+  async getStats(): Promise<{ connectedAccounts: number; pendingApprovals: number; postsThisMonth: number; generatedMedia: number; }> {
+    return {
+      connectedAccounts: this.accounts.length,
+      pendingApprovals: this.content.filter(c => c.status === 'pending').length,
+      postsThisMonth: this.content.length,
+      generatedMedia: this.content.filter(c => c.type === 'image' || c.type === 'video').length
+    };
+  }
+}
+
+export const storage = new MemStorage();

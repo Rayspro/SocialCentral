@@ -664,10 +664,22 @@ export default function VastServers() {
           {/* Filters and Search */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Filter className="h-4 w-4" />
-                Filter & Search Servers
-              </CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Filter className="h-4 w-4" />
+                  Filter & Search Servers
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/vast-servers/available'] })}
+                  disabled={isLoadingAvailable}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoadingAvailable ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">

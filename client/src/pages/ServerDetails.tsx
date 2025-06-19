@@ -244,10 +244,10 @@ export default function ServerDetails() {
               <Server className="h-7 w-7 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                 {server.name}
               </h1>
-              <p className="text-lg text-slate-600 dark:text-slate-400">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 {server.gpu} • {server.location} • ${server.pricePerHour}/hour
               </p>
             </div>
@@ -447,10 +447,10 @@ export default function ServerDetails() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
                   Resource Utilization
                 </CardTitle>
-                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                <CardDescription className="text-xs text-slate-600 dark:text-slate-400">
                   System performance metrics over time
                 </CardDescription>
               </div>
@@ -471,9 +471,9 @@ export default function ServerDetails() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="h-72">
+            <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsHistory} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                <LineChart data={metricsHistory} margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
                   <defs>
                     <linearGradient id="cpuGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2}/>
@@ -497,23 +497,25 @@ export default function ServerDetails() {
                     dataKey="time" 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    dy={10}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    dy={5}
                   />
                   <YAxis 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    dx={-10}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    dx={-5}
                     domain={[0, 100]}
+                    width={30}
                   />
                   <Tooltip 
                     contentStyle={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                      fontSize: '12px'
+                      borderRadius: '6px',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      fontSize: '11px',
+                      padding: '8px'
                     }}
                     formatter={(value, name) => [`${Number(value).toFixed(1)}%`, name]}
                   />
@@ -521,7 +523,7 @@ export default function ServerDetails() {
                     type="monotone" 
                     dataKey="cpu" 
                     stroke="#3b82f6" 
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     fill="url(#cpuGradient)"
                     name="CPU"
                     dot={false}
@@ -530,7 +532,7 @@ export default function ServerDetails() {
                     type="monotone" 
                     dataKey="gpu" 
                     stroke="#f59e0b" 
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     fill="url(#gpuGradient)"
                     name="GPU"
                     dot={false}
@@ -539,7 +541,7 @@ export default function ServerDetails() {
                     type="monotone" 
                     dataKey="memory" 
                     stroke="#8b5cf6" 
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     fill="url(#memoryGradient)"
                     name="Memory"
                     dot={false}
@@ -554,10 +556,10 @@ export default function ServerDetails() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
                   Network Throughput
                 </CardTitle>
-                <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+                <CardDescription className="text-xs text-slate-600 dark:text-slate-400">
                   Real-time bandwidth monitoring
                 </CardDescription>
               </div>
@@ -574,9 +576,9 @@ export default function ServerDetails() {
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="h-72">
+            <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={metricsHistory} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                <LineChart data={metricsHistory} margin={{ top: 5, right: 10, left: 5, bottom: 5 }}>
                   <CartesianGrid 
                     strokeDasharray="2 2" 
                     stroke="#e2e8f0" 
@@ -586,23 +588,25 @@ export default function ServerDetails() {
                     dataKey="time" 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    dy={10}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    dy={5}
                   />
                   <YAxis 
                     axisLine={false}
                     tickLine={false}
-                    tick={{ fontSize: 11, fill: '#64748b' }}
-                    dx={-10}
+                    tick={{ fontSize: 10, fill: '#64748b' }}
+                    dx={-5}
                     tickFormatter={(value) => formatBytes(value)}
+                    width={50}
                   />
                   <Tooltip 
                     contentStyle={{
                       backgroundColor: 'rgba(255, 255, 255, 0.95)',
                       border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                      fontSize: '12px'
+                      borderRadius: '6px',
+                      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)',
+                      fontSize: '11px',
+                      padding: '8px'
                     }}
                     formatter={(value, name) => [formatBytes(Number(value)), name]}
                   />
@@ -610,7 +614,7 @@ export default function ServerDetails() {
                     type="monotone" 
                     dataKey="networkIn" 
                     stroke="#10b981" 
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     name="Ingress"
                     dot={false}
                     strokeDasharray="0"
@@ -619,7 +623,7 @@ export default function ServerDetails() {
                     type="monotone" 
                     dataKey="networkOut" 
                     stroke="#ef4444" 
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     name="Egress"
                     dot={false}
                     strokeDasharray="4 4"
@@ -635,10 +639,10 @@ export default function ServerDetails() {
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Memory Analysis
             </CardTitle>
-            <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+            <CardDescription className="text-xs text-slate-600 dark:text-slate-400">
               Current allocation and utilization
             </CardDescription>
           </CardHeader>
@@ -676,18 +680,18 @@ export default function ServerDetails() {
 
         <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Power Management
             </CardTitle>
-            <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+            <CardDescription className="text-xs text-slate-600 dark:text-slate-400">
               Energy consumption metrics
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Current Draw</span>
-                <span className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                <span className="text-xs font-medium text-slate-700 dark:text-slate-300">Current</span>
+                <span className="text-xl font-bold text-slate-900 dark:text-slate-100">
                   {metrics.powerConsumption}W
                 </span>
               </div>
@@ -725,10 +729,10 @@ export default function ServerDetails() {
 
         <Card className="bg-gradient-to-br from-slate-50 to-white dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <CardTitle className="text-base font-semibold text-slate-900 dark:text-slate-100">
               Thermal Status
             </CardTitle>
-            <CardDescription className="text-sm text-slate-600 dark:text-slate-400">
+            <CardDescription className="text-xs text-slate-600 dark:text-slate-400">
               Temperature monitoring and alerts
             </CardDescription>
           </CardHeader>

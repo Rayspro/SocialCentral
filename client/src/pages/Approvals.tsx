@@ -1,15 +1,16 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Check, X, Eye } from "lucide-react";
+import { Check, X, Eye, Home, ChevronRight, ClipboardCheck } from "lucide-react";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Content } from "@shared/schema";
 
 export default function Approvals() {
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const { data: pendingContent, isLoading } = useQuery({
@@ -82,21 +83,25 @@ export default function Approvals() {
   };
 
   const getPlatformName = (platformId: number | null) => {
-    const platforms: Record<number, string> = {
+    const platforms = {
       1: "YouTube",
       2: "Instagram", 
       3: "Twitter",
-      4: "LinkedIn",
+      4: "LinkedIn"
     };
-    return platforms[platformId || 0] || "Unknown";
+    return platforms[platformId as keyof typeof platforms] || "Unknown";
   };
 
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case "video":
+  const getPlatformIcon = (platformId: number | null) => {
+    switch (platformId) {
+      case 1:
         return "🎥";
-      case "image":
-        return "🖼️";
+      case 2:
+        return "📷";
+      case 3:
+        return "🐦";
+      case 4:
+        return "💼";
       default:
         return "📄";
     }
@@ -104,10 +109,38 @@ export default function Approvals() {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
-        <Header title="Approvals" subtitle="Review and approve pending content" />
-        
-        <div className="p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+        <div className="container mx-auto px-6 py-8 space-y-8">
+          <nav className="flex items-center space-x-2 text-sm">
+            <button 
+              onClick={() => setLocation('/')}
+              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Dashboard
+            </button>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <span className="text-slate-900 dark:text-slate-100 font-medium">
+              Approvals
+            </span>
+          </nav>
+
+          <div className="space-y-2">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-xl">
+                <ClipboardCheck className="h-7 w-7 text-green-600 dark:text-green-400" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                  Content Approvals
+                </h1>
+                <p className="text-sm text-slate-600 dark:text-slate-400">
+                  Review and approve pending content
+                </p>
+              </div>
+            </div>
+          </div>
+
           <Card>
             <CardHeader>
               <CardTitle>Pending Content</CardTitle>
@@ -115,18 +148,17 @@ export default function Approvals() {
             <CardContent className="space-y-4">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
-                  <div className="flex items-center gap-4">
-                    <Skeleton className="h-16 w-16 rounded-lg" />
+                  <div className="flex items-center space-x-4">
+                    <Skeleton className="h-12 w-12 rounded" />
                     <div className="space-y-2">
-                      <Skeleton className="h-4 w-40" />
-                      <Skeleton className="h-3 w-32" />
-                      <Skeleton className="h-3 w-24" />
+                      <Skeleton className="h-4 w-[200px]" />
+                      <Skeleton className="h-3 w-[100px]" />
                     </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Skeleton className="h-8 w-8" />
-                    <Skeleton className="h-8 w-8" />
-                    <Skeleton className="h-8 w-8" />
+                  <div className="flex items-center space-x-2">
+                    <Skeleton className="h-8 w-8 rounded" />
+                    <Skeleton className="h-8 w-8 rounded" />
+                    <Skeleton className="h-8 w-8 rounded" />
                   </div>
                 </div>
               ))}
@@ -138,76 +170,85 @@ export default function Approvals() {
   }
 
   return (
-    <div className="space-y-6">
-      <Header title="Approvals" subtitle="Review and approve pending content" />
-      
-      <div className="p-6">
-        <Card className="border border-gray-200 dark:border-slate-700">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-gray-900 dark:text-white">Pending Content</CardTitle>
-              <Badge variant="secondary">
-                {pendingContent?.length || 0} items
-              </Badge>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        <nav className="flex items-center space-x-2 text-sm">
+          <button 
+            onClick={() => setLocation('/')}
+            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+          >
+            <Home className="h-4 w-4" />
+            Dashboard
+          </button>
+          <ChevronRight className="h-4 w-4 text-slate-400" />
+          <span className="text-slate-900 dark:text-slate-100 font-medium">
+            Approvals
+          </span>
+        </nav>
+
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-green-100 dark:bg-green-900/50 rounded-xl">
+              <ClipboardCheck className="h-7 w-7 text-green-600 dark:text-green-400" />
             </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                Content Approvals
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Review and approve pending content
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Pending Content</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {pendingContent && pendingContent.length > 0 ? (
+            {pendingContent && Array.isArray(pendingContent) && pendingContent.length > 0 ? (
               pendingContent.map((content: Content) => (
-                <div
-                  key={content.id}
-                  className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg border border-gray-200 dark:border-slate-600"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-2xl">
-                      {getTypeIcon(content.type)}
+                <div key={content.id} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-white text-xl">
+                      {getPlatformIcon(content.platformId)}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 dark:text-white">
+                      <h3 className="font-medium text-gray-900 dark:text-white">
                         {content.title}
                       </h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                        {content.description}
-                      </p>
-                      <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
                         <span>{getPlatformName(content.platformId)}</span>
                         <span>•</span>
                         <span>{getTimeAgo(content.createdAt)}</span>
-                        <span>•</span>
-                        <Badge variant="outline" className="text-xs">
-                          {content.type}
-                        </Badge>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
-                    {content.contentUrl && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(content.contentUrl!, '_blank')}
-                        className="h-8 w-8 p-0"
-                      >
-                        <Eye className="h-3 w-3" />
-                      </Button>
-                    )}
-                    
+                  <div className="flex items-center space-x-2">
                     <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 p-0"
+                    >
+                      <Eye className="h-3 w-3" />
+                    </Button>
+                    <Button
+                      variant="ghost"
                       size="sm"
                       onClick={() => handleApprove(content.id)}
                       disabled={approveMutation.isPending || rejectMutation.isPending}
-                      className="h-8 w-8 bg-green-600 hover:bg-green-700 text-white p-0"
+                      className="h-8 w-8 p-0 text-green-600 hover:text-green-700 hover:bg-green-50"
                     >
                       <Check className="h-3 w-3" />
                     </Button>
-                    
                     <Button
-                      variant="destructive"
+                      variant="ghost"
                       size="sm"
                       onClick={() => handleReject(content.id)}
                       disabled={approveMutation.isPending || rejectMutation.isPending}
-                      className="h-8 w-8 p-0"
+                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
                       <X className="h-3 w-3" />
                     </Button>

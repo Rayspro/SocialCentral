@@ -26,7 +26,10 @@ import {
   Edit,
   Trash2,
   Eye,
-  EyeOff
+  EyeOff,
+  Settings as SettingsIcon,
+  Home,
+  ChevronRight
 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
@@ -35,6 +38,7 @@ import { z } from "zod";
 import { useTheme } from "@/contexts/ThemeContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 import type { ApiKey } from "@shared/schema";
 
 const apiKeyFormSchema = z.object({
@@ -48,6 +52,7 @@ type ApiKeyForm = z.infer<typeof apiKeyFormSchema>;
 export default function Settings() {
   const { theme, setTheme } = useTheme();
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [showApiKeyDialog, setShowApiKeyDialog] = useState(false);
   const [editingApiKey, setEditingApiKey] = useState<ApiKey | null>(null);
   const [showKeyValue, setShowKeyValue] = useState<{ [key: number]: boolean }>({});
@@ -187,10 +192,40 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6">
-      <Header title="Settings" subtitle="Manage your account preferences and system configuration" />
-      
-      <div className="p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        {/* Elegant Breadcrumb Navigation */}
+        <nav className="flex items-center space-x-2 text-sm">
+          <button 
+            onClick={() => setLocation('/')}
+            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+          >
+            <Home className="h-4 w-4" />
+            Dashboard
+          </button>
+          <ChevronRight className="h-4 w-4 text-slate-400" />
+          <span className="text-slate-900 dark:text-slate-100 font-medium">
+            Settings
+          </span>
+        </nav>
+
+        {/* Enhanced Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gray-100 dark:bg-gray-900/50 rounded-xl">
+              <SettingsIcon className="h-7 w-7 text-gray-600 dark:text-gray-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                Settings
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Manage your account preferences and integrations
+              </p>
+            </div>
+          </div>
+        </div>
+        
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="profile" className="flex items-center gap-2">

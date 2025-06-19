@@ -1,5 +1,4 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { Header } from "@/components/Header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,12 +8,13 @@ import { Calendar } from "@/components/ui/calendar";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Calendar as CalendarIcon, Clock, Plus, Edit, Trash2 } from "lucide-react";
+import { Calendar as CalendarIcon, Clock, Plus, Edit, Trash2, Home, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
+import { useLocation } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Content, Account, Schedule } from "@shared/schema";
@@ -31,6 +31,7 @@ type ScheduleForm = z.infer<typeof scheduleFormSchema>;
 export default function Schedule() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [showScheduleDialog, setShowScheduleDialog] = useState(false);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const { data: schedules } = useQuery({
@@ -60,7 +61,7 @@ export default function Schedule() {
     },
   });
 
-  const createScheduleMutation = useMutation({
+  const scheduleMutation = useMutation({
     mutationFn: async (data: ScheduleForm) => {
       const scheduledDateTime = new Date(data.scheduledAt);
       const [hours, minutes] = data.time.split(':');
@@ -77,29 +78,33 @@ export default function Schedule() {
       setShowScheduleDialog(false);
       form.reset();
       toast({
-        title: "Post scheduled",
+        title: "Content scheduled",
         description: "Your content has been scheduled successfully.",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to schedule post",
+        description: error.message || "Failed to schedule content",
         variant: "destructive",
       });
     },
   });
 
   const onSubmit = (data: ScheduleForm) => {
-    createScheduleMutation.mutate(data);
+    scheduleMutation.mutate(data);
   };
 
   const getSchedulesForDate = (date: Date) => {
-    if (!schedules) return [];
+    if (!schedules || !Array.isArray(schedules)) return [];
     return schedules.filter((schedule: Schedule) => {
       const scheduleDate = new Date(schedule.scheduledAt);
       return scheduleDate.toDateString() === date.toDateString();
     });
+  };
+
+  const formatTime = (dateString: string) => {
+    return format(new Date(dateString), "h:mm a");
   };
 
   const getContentTitle = (contentId: number) => {
@@ -112,48 +117,63 @@ export default function Schedule() {
     return account?.name || "Unknown Account";
   };
 
-  const formatTime = (dateString: string) => {
-    return new Date(dateString).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "published": return "bg-green-100 dark:bg-green-900/20 text-green-600 dark:text-green-400";
-      case "pending": return "bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400";
-      case "failed": return "bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400";
-      default: return "bg-gray-100 dark:bg-gray-900/20 text-gray-600 dark:text-gray-400";
-    }
-  };
-
-  const timeSlots = Array.from({ length: 24 }, (_, i) => {
+  // Generate time options
+  const timeOptions = Array.from({ length: 24 }, (_, i) => {
     const hour = i.toString().padStart(2, '0');
     return `${hour}:00`;
   });
 
   return (
-    <div className="space-y-6">
-      <Header title="Schedule" subtitle="Plan and schedule your content posts" />
-      
-      <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        {/* Elegant Breadcrumb Navigation */}
+        <nav className="flex items-center space-x-2 text-sm">
+          <button 
+            onClick={() => setLocation('/')}
+            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+          >
+            <Home className="h-4 w-4" />
+            Dashboard
+          </button>
+          <ChevronRight className="h-4 w-4 text-slate-400" />
+          <span className="text-slate-900 dark:text-slate-100 font-medium">
+            Schedule
+          </span>
+        </nav>
+
+        {/* Enhanced Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-orange-100 dark:bg-orange-900/50 rounded-xl">
+              <CalendarIcon className="h-7 w-7 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                Schedule
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Plan and schedule your content posts
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Calendar */}
           <Card className="lg:col-span-2">
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Content Calendar</CardTitle>
+              <CardTitle className="flex items-center justify-between">
+                <span>Content Calendar</span>
                 <Dialog open={showScheduleDialog} onOpenChange={setShowScheduleDialog}>
                   <DialogTrigger asChild>
-                    <Button className="bg-purple-600 hover:bg-purple-700 text-white">
+                    <Button>
                       <Plus className="h-4 w-4 mr-2" />
-                      Schedule Post
+                      Schedule Content
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-md">
+                  <DialogContent className="sm:max-w-[425px]">
                     <DialogHeader>
-                      <DialogTitle>Schedule New Post</DialogTitle>
+                      <DialogTitle>Schedule Content</DialogTitle>
                     </DialogHeader>
                     <Form {...form}>
                       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -219,7 +239,7 @@ export default function Schedule() {
                                   selected={field.value}
                                   onSelect={field.onChange}
                                   disabled={(date) => date < new Date()}
-                                  className="rounded-md border"
+                                  initialFocus
                                 />
                               </div>
                               <FormMessage />
@@ -240,9 +260,9 @@ export default function Schedule() {
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  {timeSlots.map((time) => (
+                                  {timeOptions.map((time) => (
                                     <SelectItem key={time} value={time}>
-                                      {time}
+                                      {format(new Date(`2000-01-01T${time}`), "h:mm a")}
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -252,18 +272,23 @@ export default function Schedule() {
                           )}
                         />
 
-                        <Button 
-                          type="submit" 
-                          className="w-full"
-                          disabled={createScheduleMutation.isPending}
-                        >
-                          {createScheduleMutation.isPending ? "Scheduling..." : "Schedule Post"}
-                        </Button>
+                        <div className="flex justify-end space-x-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowScheduleDialog(false)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={scheduleMutation.isPending}>
+                            {scheduleMutation.isPending ? "Scheduling..." : "Schedule"}
+                          </Button>
+                        </div>
                       </form>
                     </Form>
                   </DialogContent>
                 </Dialog>
-              </div>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex justify-center">
@@ -277,62 +302,46 @@ export default function Schedule() {
             </CardContent>
           </Card>
 
-          {/* Daily Schedule */}
+          {/* Scheduled Posts */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <CalendarIcon className="h-5 w-5" />
-                {selectedDate ? format(selectedDate, "MMM dd, yyyy") : "Select a date"}
+                <Clock className="h-5 w-5" />
+                {selectedDate ? `Scheduled for ${format(selectedDate, "MMM d")}` : "Select a date"}
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {selectedDate ? (
-                <div className="space-y-3">
-                  {getSchedulesForDate(selectedDate).map((schedule: Schedule) => (
-                    <div
-                      key={schedule.id}
-                      className="p-3 bg-gray-50 dark:bg-slate-700 rounded-lg border"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-gray-500" />
-                          <span className="text-sm font-medium">
-                            {formatTime(schedule.scheduledAt)}
-                          </span>
-                        </div>
-                        <Badge className={getStatusColor(schedule.status)}>
-                          {schedule.status}
+              <div className="space-y-3">
+                {selectedDate && getSchedulesForDate(selectedDate).length > 0 ? (
+                  getSchedulesForDate(selectedDate).map((schedule: Schedule) => (
+                    <div key={schedule.id} className="p-3 border rounded-lg space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">
+                          {formatTime(schedule.scheduledAt)}
+                        </span>
+                        <Badge variant="secondary" className="text-xs">
+                          Scheduled
                         </Badge>
                       </div>
-                      <p className="text-sm text-gray-900 dark:text-white font-medium">
-                        {getContentTitle(schedule.contentId)}
-                      </p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        {getAccountName(schedule.accountId)}
-                      </p>
-                      <div className="flex gap-1 mt-2">
-                        <Button size="sm" variant="outline">
-                          <Edit className="h-3 w-3" />
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-red-600">
-                          <Trash2 className="h-3 w-3" />
-                        </Button>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {getContentTitle(schedule.contentId)}
+                        </p>
+                        <p className="text-xs text-gray-600 dark:text-gray-400">
+                          {getAccountName(schedule.accountId)}
+                        </p>
                       </div>
                     </div>
-                  ))}
-                  {getSchedulesForDate(selectedDate).length === 0 && (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      <CalendarIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                      <p className="text-sm">No posts scheduled for this date</p>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                  <CalendarIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">Select a date to view schedule</p>
-                </div>
-              )}
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                    <CalendarIcon className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">
+                      {selectedDate ? "No posts scheduled for this date" : "Select a date to view scheduled posts"}
+                    </p>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -344,37 +353,34 @@ export default function Schedule() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {schedules && schedules.length > 0 ? (
+              {schedules && Array.isArray(schedules) && schedules.length > 0 ? (
                 schedules
                   .filter((schedule: Schedule) => new Date(schedule.scheduledAt) > new Date())
-                  .slice(0, 5)
                   .map((schedule: Schedule) => (
-                    <div
-                      key={schedule.id}
-                      className="flex items-center justify-between p-4 bg-gray-50 dark:bg-slate-700 rounded-lg"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center text-white font-semibold">
-                          {format(new Date(schedule.scheduledAt), "dd")}
+                    <div key={schedule.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <div className="text-center">
+                          <div className="text-sm font-medium">
+                            {format(new Date(schedule.scheduledAt), "MMM d")}
+                          </div>
+                          <div className="text-xs text-gray-600 dark:text-gray-400">
+                            {formatTime(schedule.scheduledAt)}
+                          </div>
                         </div>
                         <div>
-                          <h3 className="font-medium text-gray-900 dark:text-white">
-                            {getContentTitle(schedule.contentId)}
-                          </h3>
+                          <p className="font-medium">{getContentTitle(schedule.contentId)}</p>
                           <p className="text-sm text-gray-600 dark:text-gray-400">
-                            {getAccountName(schedule.accountId)} • {format(new Date(schedule.scheduledAt), "MMM dd, yyyy 'at' hh:mm a")}
+                            {getAccountName(schedule.accountId)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(schedule.status)}>
-                          {schedule.status}
-                        </Badge>
-                        <Button size="sm" variant="outline">
-                          <Edit className="h-3 w-3" />
+                      <div className="flex items-center space-x-2">
+                        <Badge variant="secondary">Scheduled</Badge>
+                        <Button variant="ghost" size="sm">
+                          <Edit className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="outline" className="text-red-600">
-                          <Trash2 className="h-3 w-3" />
+                        <Button variant="ghost" size="sm">
+                          <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>

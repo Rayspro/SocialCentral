@@ -475,10 +475,9 @@ export default function VastServers() {
               {launchedServers.map((server) => (
                 <Card 
                   key={server.id} 
-                  className="cursor-pointer hover:shadow-lg transition-shadow duration-200"
+                  className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 transform hover:border-blue-300 dark:hover:border-blue-600"
                   onClick={() => {
-                    setAnalyticsServerId(server.id);
-                    setShowAnalyticsModal(true);
+                    window.location.href = `/server/${server.id}`;
                   }}
                 >
                   <CardHeader>
@@ -807,7 +806,10 @@ export default function VastServers() {
                   </TableHeader>
                   <TableBody>
                     {filteredServers.map((server) => (
-                      <TableRow key={server.vastId}>
+                      <TableRow 
+                        key={server.vastId}
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors duration-200"
+                      >
                         <TableCell>
                           <div>
                             <div className="font-medium">{server.name}</div>

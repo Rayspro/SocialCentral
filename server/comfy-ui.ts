@@ -3,6 +3,95 @@ import { storage } from './storage';
 import type { InsertComfyModel, InsertComfyWorkflow, InsertComfyGeneration } from '@shared/schema';
 import { comfyConnectionManager, ComfyUIHTTPClient } from './comfy-connection';
 
+// Generate varied demo image URLs based on prompt keywords
+function generateDemoImageUrls(promptKeywords: string, generationId: number): string[] {
+  const imageCategories = {
+    landscape: [
+      'photo-1506905925346-21bda4d32df4', // mountain landscape
+      'photo-1441974231531-c6227db76b6e', // forest landscape  
+      'photo-1426604966848-d7adac402bff', // mountain lake
+      'photo-1447752875215-b2761acb3c5d', // ocean sunset
+      'photo-1464822759844-d150baec0494' // rolling hills
+    ],
+    nature: [
+      'photo-1440342359438-84a27d4b03e2', // flowers
+      'photo-1542273917363-3b1817f69a2d', // trees
+      'photo-1469474968028-56623f02e42e', // nature path
+      'photo-1518837695005-2083093ee35b', // green field
+      'photo-1506905925346-21bda4d32df4'  // mountains
+    ],
+    portrait: [
+      'photo-1507003211169-0a1dd7228f2d', // male portrait
+      'photo-1494790108755-2616c997252c', // female portrait
+      'photo-1500648767791-00dcc994a43e', // casual portrait
+      'photo-1438761681033-6461ffad8d80', // woman portrait
+      'photo-1472099645785-5658abf4ff4e'  // man portrait
+    ],
+    fantasy: [
+      'photo-1518709268805-4e9042af2ac5', // magical forest
+      'photo-1506905925346-21bda4d32df4', // mystical mountains
+      'photo-1519904981063-b0cf448d479e', // ethereal landscape
+      'photo-1441974231531-c6227db76b6e', // enchanted forest
+      'photo-1447752875215-b2761acb3c5d'  // magical sunset
+    ],
+    anime: [
+      'photo-1578662996442-48f60103fc96', // anime-style art
+      'photo-1514041181368-bca62cceffcd', // colorful illustration
+      'photo-1579952363873-27d3bfda9385', // digital art
+      'photo-1533090161767-e6ffed986c88', // abstract art
+      'photo-1541961017774-22349e4a1262'  // vibrant colors
+    ],
+    abstract: [
+      'photo-1533090161767-e6ffed986c88', // abstract patterns
+      'photo-1541961017774-22349e4a1262', // geometric art
+      'photo-1519904981063-b0cf448d479e', // color gradients
+      'photo-1578662996442-48f60103fc96', // digital abstract
+      'photo-1514041181368-bca62cceffcd'  // colorful abstract
+    ]
+  };
+
+  // Determine category based on prompt keywords
+  let category = 'landscape'; // default
+  
+  if (promptKeywords.includes('portrait') || promptKeywords.includes('person') || 
+      promptKeywords.includes('face') || promptKeywords.includes('character')) {
+    category = 'portrait';
+  } else if (promptKeywords.includes('anime') || promptKeywords.includes('manga') || 
+             promptKeywords.includes('cartoon')) {
+    category = 'anime';
+  } else if (promptKeywords.includes('fantasy') || promptKeywords.includes('magic') || 
+             promptKeywords.includes('dragon') || promptKeywords.includes('wizard')) {
+    category = 'fantasy';
+  } else if (promptKeywords.includes('abstract') || promptKeywords.includes('geometric') || 
+             promptKeywords.includes('pattern')) {
+    category = 'abstract';
+  } else if (promptKeywords.includes('nature') || promptKeywords.includes('flower') || 
+             promptKeywords.includes('tree') || promptKeywords.includes('forest')) {
+    category = 'nature';
+  }
+
+  const categoryImages = imageCategories[category as keyof typeof imageCategories];
+  
+  // Select random images from the category
+  const numImages = Math.floor(Math.random() * 2) + 1; // 1-2 images
+  const selectedImages: string[] = [];
+  
+  for (let i = 0; i < numImages; i++) {
+    const randomIndex = Math.floor(Math.random() * categoryImages.length);
+    const imageId = categoryImages[randomIndex];
+    
+    // Add random parameters for variety
+    const width = 512 + Math.floor(Math.random() * 256); // 512-768
+    const height = 512 + Math.floor(Math.random() * 256); // 512-768
+    const seed = Math.floor(Math.random() * 1000000);
+    
+    const imageUrl = `https://images.unsplash.com/${imageId}?w=${width}&h=${height}&fit=crop&crop=center&auto=format&q=80&seed=${seed}`;
+    selectedImages.push(imageUrl);
+  }
+  
+  return selectedImages;
+}
+
 // ComfyUI API client class
 class ComfyUIClient {
   private baseUrl: string;
@@ -424,7 +513,7 @@ export async function generateImage(req: Request, res: Response) {
     });
 
     if (isDemoReady) {
-      // Handle demo generation for ready servers
+      // Handle demo generation for ready servers with varied outputs
       const generationData: InsertComfyGeneration = {
         serverId,
         workflowId: workflowId || null,
@@ -437,22 +526,24 @@ export async function generateImage(req: Request, res: Response) {
 
       const generation = await storage.createComfyGeneration(generationData);
       
-      // Simulate generation process
+      // Generate varied demo images based on prompt keywords
+      const promptKeywords = (prompt || '').toLowerCase();
+      const imageUrls = generateDemoImageUrls(promptKeywords, generation.id);
+      
+      // Simulate generation process with realistic timing
       setTimeout(async () => {
         await storage.updateComfyGeneration(generation.id, {
           status: 'completed',
-          imageUrls: [
-            'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=512&h=512&fit=crop',
-            'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=512&h=512&fit=crop'
-          ]
+          imageUrls,
+          completedAt: new Date()
         });
-      }, 3000);
+      }, Math.random() * 2000 + 2000); // 2-4 seconds random timing
 
       return res.json({
         success: true,
         generationId: generation.id,
         message: 'Image generation started (Demo mode)',
-        estimatedTime: '3-5 seconds',
+        estimatedTime: '2-4 seconds',
         queueId: generation.queueId
       });
     }

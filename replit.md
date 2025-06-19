@@ -107,6 +107,9 @@ Changelog:
 - June 18, 2025. Initial setup
 - June 19, 2025. Added comprehensive Vast.ai server management system with filterable table view, pricing display, and launch capabilities
 - June 19, 2025. Implemented ComfyUI shell script execution system with predefined setup scripts for automated model downloads and server configuration
+- June 19, 2025. Fixed server startup crashes by implementing complete MemStorage interface with all required Vast.ai and setup script methods
+- June 19, 2025. Resolved VastServers page crashes with proper array validation and API error handling
+- June 19, 2025. Fixed API key management system - keys now save and display correctly in settings page
 ```
 
 ## User Preferences

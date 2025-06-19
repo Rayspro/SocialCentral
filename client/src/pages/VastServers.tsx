@@ -72,7 +72,12 @@ export default function VastServers() {
   // Fetch available servers
   const { data: availableServers, isLoading: isLoadingAvailable } = useQuery<AvailableServer[]>({
     queryKey: ['/api/vast-servers/available'],
-    queryFn: () => fetch('/api/vast-servers/available').then(res => res.json()),
+    queryFn: async () => {
+      const response = await fetch('/api/vast-servers/available');
+      const data = await response.json();
+      // Ensure we always return an array, even if there's an error
+      return Array.isArray(data) ? data : [];
+    },
   });
 
   // Fetch setup scripts
@@ -228,7 +233,7 @@ export default function VastServers() {
 
   // Filter and sort available servers
   const filteredServers = useMemo(() => {
-    if (!availableServers) return [];
+    if (!availableServers || !Array.isArray(availableServers)) return [];
     
     let filtered = availableServers.filter(server => {
       // Search filter

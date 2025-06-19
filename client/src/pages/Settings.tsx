@@ -565,7 +565,10 @@ export default function Settings() {
                               </p>
                               <div className="flex items-center gap-2">
                                 <code className="text-xs bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded">
-                                  {showKeyValue[apiKey.id] ? apiKey.keyValue : apiKey.keyValue}
+                                  {showKeyValue[apiKey.id] 
+                                    ? apiKey.keyValue 
+                                    : `${'*'.repeat(Math.min(apiKey.keyValue.length, 20))}...`
+                                  }
                                 </code>
                                 <Button
                                   size="sm"

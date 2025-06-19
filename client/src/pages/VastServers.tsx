@@ -338,18 +338,18 @@ export default function VastServers() {
     return filtered;
   }, [availableServers, searchTerm, gpuFilter, locationFilter, priceRange, sortBy, sortOrder]);
 
-  // Get unique values for filters
+  // Get unique values for filters from current page
   const uniqueGpus = useMemo(() => {
     if (!availableServers) return [];
     const gpuSet = new Set<string>();
-    availableServers.forEach(s => gpuSet.add(s.gpu));
+    availableServers.forEach((s: any) => gpuSet.add(s.gpu));
     return Array.from(gpuSet);
   }, [availableServers]);
 
   const uniqueLocations = useMemo(() => {
     if (!availableServers) return [];
     const locationSet = new Set<string>();
-    availableServers.forEach(s => locationSet.add(s.location));
+    availableServers.forEach((s: any) => locationSet.add(s.location));
     return Array.from(locationSet);
   }, [availableServers]);
 

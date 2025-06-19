@@ -132,6 +132,7 @@ Changelog:
 - June 19, 2025. Implemented complete authentication system with real credential validation - replaced mock authentication with secure bcrypt password hashing, proper route protection, and API validation that prevents unauthorized access with random credentials
 - June 19, 2025. Enhanced chart tooltips with proper formatting and readable information display - tooltips now show formatted currency, percentages, and detailed server information with proper styling and dark mode support
 - June 19, 2025. Implemented automatic server synchronization with Vast.ai API - servers now automatically sync status, connection details, and metadata from live Vast.ai instances with database updates for accurate server tracking. System automatically imports existing Vast.ai instances when API key is configured and removes deleted instances from database to maintain sync with actual Vast.ai console
+- June 19, 2025. Added server-side pagination and filtering for Available Servers page - moved all filtering logic to API level for better performance with large datasets, added pagination controls with page navigation and results count display
 ```
 
 ## User Preferences

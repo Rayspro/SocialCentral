@@ -29,6 +29,8 @@ import {
 import { startupComfyUI } from "./routes-comfy-startup";
 import { workflowAnalyzer } from "./workflow-analyzer";
 import { comfyDiagnostics } from "./comfy-diagnostics";
+import { comfyDirectTester } from "./comfy-direct-test";
+import { comfyFallback } from "./comfy-fallback";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 

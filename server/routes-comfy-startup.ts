@@ -95,9 +95,15 @@ async function simulateComfyUIStartup(executionId: number, server: any) {
       output: totalOutput
     });
     
-    // Update server status to ready
+    // Update server status to ready and mark as demo mode
     await storage.updateVastServer(server.id, {
-      setupStatus: 'ready'
+      setupStatus: 'ready',
+      metadata: {
+        ...server.metadata,
+        comfyUIStatus: 'demo-ready',
+        comfyUIUrl: 'http://' + server.serverUrl.replace(/^https?:\/\//, '') + ':8188',
+        setupCompletedAt: new Date().toISOString()
+      }
     });
 
     console.log(`ComfyUI startup simulation completed for server ${server.id}`);

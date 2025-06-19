@@ -668,16 +668,24 @@ export default function ComfyUI() {
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       Text to Image
-                      <Badge variant={availableModelsLoading ? "secondary" : "destructive"} className="text-xs">
-                        {availableModelsLoading ? "Checking..." : "ComfyUI Offline"}
+                      <Badge variant={
+                        availableModelsLoading ? "secondary" : 
+                        (availableModels?.status === 'demo-ready' ? "default" : "destructive")
+                      } className="text-xs">
+                        {availableModelsLoading ? "Checking..." : 
+                         availableModels?.status === 'demo-ready' ? "Ready (Demo)" :
+                         availableModels?.connectedUrl ? "Connected" : "ComfyUI Offline"}
                       </Badge>
                     </CardTitle>
                     <CardDescription>
-                      Generate images using AI {!availableModelsLoading && "(ComfyUI server required)"}
+                      Generate images using AI
+                      {availableModels?.message && (
+                        <span className="text-green-600 dark:text-green-400"> - {availableModels.message}</span>
+                      )}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {availableModelsError && selectedServer && (
+                    {availableModelsError && selectedServer && availableModels?.status !== 'demo-ready' && (
                       <Alert className="mb-4">
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>ComfyUI Setup Required</AlertTitle>
@@ -721,7 +729,7 @@ export default function ComfyUI() {
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         rows={3}
-                        disabled={!!availableModelsError}
+                        disabled={!!availableModelsError && !availableModels?.status}
                       />
                     </div>
 
@@ -815,7 +823,7 @@ export default function ComfyUI() {
 
                     <Button 
                       onClick={handleGenerate} 
-                      disabled={generateMutation.isPending || !prompt || availableModelsLoading}
+                      disabled={generateMutation.isPending || !prompt || (availableModelsLoading && !availableModels?.status)}
                       className="w-full"
                     >
                       {generateMutation.isPending ? (

@@ -1330,8 +1330,8 @@ echo "CUDA environment configured!"`,
         return res.status(400).json({ error: "Vast.ai API key not configured" });
       }
 
-      const vastService = new VastAIService(vastApiKey.keyValue);
-      const { instances } = await vastService.getInstances();
+      const vastInstance = await import('./vast-ai');
+      const instances = await vastInstance.getVastServers(vastApiKey.keyValue);
       
       const storedServers = await storage.getVastServers();
       let syncedCount = 0;

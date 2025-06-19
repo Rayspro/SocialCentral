@@ -887,22 +887,272 @@ export default function ComfyUI() {
                   </CardContent>
                 </Card>
 
-                {/* Available Models */}
+                {/* Model Management */}
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-lg">Available Models</CardTitle>
-                        <CardDescription>Models loaded in ComfyUI</CardDescription>
+                        <CardTitle className="text-lg">Model Management</CardTitle>
+                        <CardDescription>Manage your ComfyUI models</CardDescription>
                       </div>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => refetchAvailableModels()}
-                        disabled={availableModelsLoading}
-                      >
-                        <RefreshCw className={`h-4 w-4 ${availableModelsLoading ? 'animate-spin' : ''}`} />
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-2" />
+                              View All Models
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>All Available Models</DialogTitle>
+                              <DialogDescription>
+                                Complete list of models in your ComfyUI installation
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="max-h-96 overflow-y-auto">
+                              {availableModelsLoading ? (
+                                <LoadingCard />
+                              ) : availableModels?.models ? (
+                                <div className="space-y-4">
+                                  {Object.entries(availableModels.models).map(([category, modelList]) => (
+                                    <div key={category} className="space-y-2">
+                                      <h4 className="font-semibold capitalize text-sm text-muted-foreground border-b pb-1">
+                                        {category} ({Array.isArray(modelList) ? modelList.length : 0})
+                                      </h4>
+                                      <div className="grid gap-2">
+                                        {Array.isArray(modelList) ? modelList.map((model, index) => (
+                                          <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                                            <span className="text-sm font-mono">{model}</span>
+                                            <Badge variant="secondary" className="text-xs">
+                                              {category.slice(0, -1)}
+                                            </Badge>
+                                          </div>
+                                        )) : (
+                                          <div className="text-sm text-muted-foreground">No models in this category</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center text-muted-foreground py-8">
+                                  No models available
+                                </div>
+                              )}
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Settings className="h-4 w-4 mr-2" />
+                              Manage Library
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-3xl">
+                            <DialogHeader>
+                              <DialogTitle>Model Library Management</DialogTitle>
+                              <DialogDescription>
+                                Download, delete, and organize your ComfyUI models
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Tabs defaultValue="download" className="w-full">
+                              <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="download">Download Models</TabsTrigger>
+                                <TabsTrigger value="installed">Installed Models</TabsTrigger>
+                                <TabsTrigger value="cleanup">Cleanup & Tools</TabsTrigger>
+                              </TabsList>
+                              
+                              <TabsContent value="download" className="space-y-4">
+                                <div className="space-y-4">
+                                  <div>
+                                    <Label htmlFor="model-url">Model URL</Label>
+                                    <Input
+                                      id="model-url"
+                                      value={newModelUrl}
+                                      onChange={(e) => setNewModelUrl(e.target.value)}
+                                      placeholder="https://huggingface.co/model/file.safetensors"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="model-folder">Folder</Label>
+                                    <Select value={newModelFolder} onValueChange={setNewModelFolder}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select folder" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="checkpoints">Checkpoints</SelectItem>
+                                        <SelectItem value="loras">LoRAs</SelectItem>
+                                        <SelectItem value="vae">VAE</SelectItem>
+                                        <SelectItem value="controlnet">ControlNet</SelectItem>
+                                        <SelectItem value="embeddings">Embeddings</SelectItem>
+                                        <SelectItem value="upscale_models">Upscale Models</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="model-name">Custom Name (Optional)</Label>
+                                    <Input
+                                      id="model-name"
+                                      value={newModelName}
+                                      onChange={(e) => setNewModelName(e.target.value)}
+                                      placeholder="Leave empty to use filename"
+                                    />
+                                  </div>
+                                  <Button 
+                                    onClick={handleAddModel} 
+                                    disabled={addModelMutation.isPending || !newModelUrl || !newModelFolder}
+                                    className="w-full"
+                                  >
+                                    {addModelMutation.isPending ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Adding Model...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Add Model
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </TabsContent>
+                              
+                              <TabsContent value="installed" className="space-y-4">
+                                <div className="max-h-96 overflow-y-auto">
+                                  {modelsLoading ? (
+                                    <LoadingCard />
+                                  ) : models && Array.isArray(models) && models.length > 0 ? (
+                                    <div className="space-y-3">
+                                      {models.map((model: any) => (
+                                        <div key={model.id} className="border rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <div className="flex-1">
+                                              <h4 className="font-medium">{model.name}</h4>
+                                              <div className="text-sm text-muted-foreground">
+                                                {model.folder} • {model.fileSize ? `${(model.fileSize / 1024 / 1024 / 1024).toFixed(2)} GB` : 'Size unknown'}
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Badge className={getStatusColor(model.status)}>
+                                                {model.status}
+                                              </Badge>
+                                              {(model.status === 'completed' || model.status === 'failed') && (
+                                                <Button
+                                                  variant="destructive"
+                                                  size="sm"
+                                                  onClick={() => handleDeleteModel(model.id)}
+                                                  className="h-7 px-2"
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          </div>
+                                          {model.status === 'downloading' && (
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                              <div 
+                                                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                                style={{ width: formatProgress(model.downloadProgress) }}
+                                              ></div>
+                                            </div>
+                                          )}
+                                          {model.errorMessage && (
+                                            <div className="text-sm text-red-500 mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                                              <strong>Error:</strong> {model.errorMessage}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center text-muted-foreground py-8">
+                                      <Download className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                      <p>No models downloaded yet</p>
+                                      <p className="text-sm">Use the Download Models tab to add models</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              
+                              <TabsContent value="cleanup" className="space-y-4">
+                                <div className="space-y-4">
+                                  <div className="p-4 border rounded-lg">
+                                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                                      <Trash2 className="h-4 w-4" />
+                                      Cleanup Failed Downloads
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-3">
+                                      Remove failed model downloads to free up space and clean your library
+                                    </p>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        if (models && Array.isArray(models)) {
+                                          const failedModels = models.filter((m: any) => m.status === 'failed');
+                                          failedModels.forEach((model: any) => handleDeleteModel(model.id));
+                                        }
+                                      }}
+                                      disabled={!models || !Array.isArray(models) || !models.some((m: any) => m.status === 'failed')}
+                                    >
+                                      Clean Failed Downloads
+                                    </Button>
+                                  </div>
+                                  
+                                  <div className="p-4 border rounded-lg">
+                                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                                      <RefreshCw className="h-4 w-4" />
+                                      Refresh Model Library
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-3">
+                                      Scan ComfyUI installation for manually added models
+                                    </p>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/models`] });
+                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/available-models`] });
+                                      }}
+                                    >
+                                      <RefreshCw className="h-4 w-4 mr-2" />
+                                      Refresh Library
+                                    </Button>
+                                  </div>
+                                  
+                                  <div className="p-4 border rounded-lg">
+                                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                                      <Eye className="h-4 w-4" />
+                                      Storage Usage
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      Total models: {models && Array.isArray(models) ? models.length : 0}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Estimated size: {
+                                        models && Array.isArray(models) ? 
+                                        `${(models.reduce((total: number, model: any) => total + (model.fileSize || 0), 0) / 1024 / 1024 / 1024).toFixed(2)} GB` :
+                                        'Unknown'
+                                      }
+                                    </p>
+                                  </div>
+                                </div>
+                              </TabsContent>
+                            </Tabs>
+                          </DialogContent>
+                        </Dialog>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => refetchAvailableModels()}
+                          disabled={availableModelsLoading}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${availableModelsLoading ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent>

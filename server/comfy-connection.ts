@@ -5,22 +5,36 @@ import { storage } from './storage';
 class ComfyUIConnectionManager {
   
   // Test if ComfyUI is accessible via HTTP
-  async testConnection(url: string, timeout: number = 5000): Promise<boolean> {
+  async testConnection(url: string, timeout: number = 8000): Promise<boolean> {
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
       
-      const response = await fetch(`${url}/system_stats`, {
-        method: 'GET',
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'SocialSync-ComfyUI-Client'
+      // Try multiple ComfyUI endpoints to detect if it's running
+      const endpoints = ['/system_stats', '/object_info', '/queue', '/'];
+      
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(`${url}${endpoint}`, {
+            method: 'GET',
+            signal: controller.signal,
+            headers: {
+              'Accept': 'application/json',
+              'User-Agent': 'SocialSync-ComfyUI-Client'
+            }
+          });
+          
+          if (response.ok || response.status === 200) {
+            clearTimeout(timeoutId);
+            return true;
+          }
+        } catch (endpointError) {
+          continue; // Try next endpoint
         }
-      });
+      }
       
       clearTimeout(timeoutId);
-      return response.ok;
+      return false;
     } catch (error) {
       return false;
     }
@@ -31,30 +45,60 @@ class ComfyUIConnectionManager {
     const baseHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
     const directPort = server.metadata?.vastData?.direct_port_start || 65535;
     
-    // More comprehensive port mapping for Vast.ai
-    return [
+    // Comprehensive port mapping prioritized by likelihood of success
+    const urls = [
+      // Most likely: Direct port access (common for Vast.ai)
+      `http://${baseHost}:${directPort}`,
+      `https://${baseHost}:${directPort}`,
+      
+      // Standard ComfyUI port
       `http://${baseHost}:8188`,
       `https://${baseHost}:8188`,
-      `http://${baseHost}:${directPort}`,
+      
+      // Sequential ports from direct port start
       `http://${baseHost}:${directPort + 1}`,
       `http://${baseHost}:${directPort + 2}`,
-      `http://${baseHost}:${directPort + 8188}`,
+      `http://${baseHost}:${directPort + 3}`,
+      `http://${baseHost}:${directPort + 4}`,
+      
+      // Common high ports for GPU servers
+      `http://${baseHost}:65536`,
+      `http://${baseHost}:65537`,
+      `http://${baseHost}:65538`,
+      `http://${baseHost}:8080`,
+      `http://${baseHost}:3000`,
+      
+      // Port forwarding variations
+      `http://${baseHost}:${directPort}:8188`,
       server.serverUrl + ':8188',
       server.serverUrl.replace(/:\d+$/, '') + ':8188'
     ];
+    
+    return Array.from(new Set(urls)); // Remove duplicates
   }
 
-  // Find working ComfyUI connection
-  async findWorkingConnection(server: any): Promise<{ url: string; client: any } | null> {
+  // Find working ComfyUI connection with retry logic
+  async findWorkingConnection(server: any, maxRetries: number = 3, retryDelay: number = 5000): Promise<{ url: string; client: any } | null> {
     const urls = this.getConnectionUrls(server);
     
-    for (const url of urls) {
-      const isConnected = await this.testConnection(url);
-      if (isConnected) {
-        return {
-          url,
-          client: new ComfyUIHTTPClient(url)
-        };
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      console.log(`ComfyUI connection attempt ${attempt + 1}/${maxRetries} for server ${server.id}`);
+      
+      for (const url of urls) {
+        const isConnected = await this.testConnection(url, 10000); // Longer timeout
+        if (isConnected) {
+          console.log(`ComfyUI connected successfully at: ${url}`);
+          return {
+            url,
+            client: new ComfyUIHTTPClient(url)
+          };
+        }
+      }
+      
+      // Wait before next retry (except last attempt)
+      if (attempt < maxRetries - 1) {
+        console.log(`ComfyUI connection failed, waiting ${retryDelay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
       }
     }
     

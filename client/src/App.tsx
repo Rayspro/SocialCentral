@@ -14,6 +14,8 @@ import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 import VastServers from "@/pages/VastServers";
 import ServerDetails from "@/pages/ServerDetails";
+import SignIn from "@/pages/SignIn";
+import SignUp from "@/pages/SignUp";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -28,6 +30,8 @@ function Router() {
       <Route path="/vast-servers" component={VastServers} />
       <Route path="/vast-servers/:id" component={ServerDetails} />
       <Route path="/settings" component={Settings} />
+      <Route path="/signin" component={SignIn} />
+      <Route path="/signup" component={SignUp} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>

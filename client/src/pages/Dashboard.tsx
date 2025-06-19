@@ -20,7 +20,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-6 py-8 space-y-8">
+      <div className="container mx-auto px-6 py-4 space-y-6">
         {/* Header with Breadcrumb and Profile */}
         <div className="flex items-center justify-between">
           <nav className="flex items-center space-x-2 text-sm">
@@ -30,18 +30,18 @@ export default function Dashboard() {
             </span>
           </nav>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <ThemeSwitcher />
             
-            <Button variant="ghost" size="sm" className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
-              <Bell className="h-4 w-4" />
+            <Button variant="ghost" size="sm" className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+              <Bell className="h-3.5 w-3.5" />
             </Button>
             
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="p-0 w-8 h-8 rounded-full">
-                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
-                    <span className="text-white text-sm font-medium">JD</span>
+                <Button variant="ghost" className="p-0 w-7 h-7 rounded-full">
+                  <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
+                    <span className="text-white text-xs font-medium">JD</span>
                   </div>
                 </Button>
               </DropdownMenuTrigger>
@@ -76,14 +76,14 @@ export default function Dashboard() {
         {/* Enhanced Header */}
         <div className="space-y-2">
           <div className="flex items-center gap-3">
-            <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
-              <BarChart3 className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+            <div className="p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
+              <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
                 Dashboard
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400">
+              <p className="text-xs text-slate-600 dark:text-slate-400">
                 Manage your social media presence and AI workloads
               </p>
             </div>

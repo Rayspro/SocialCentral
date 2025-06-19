@@ -1,0 +1,865 @@
+{
+  "info": {
+    "name": "SocialSync API",
+    "description": "Complete API collection for SocialSync - AI-Powered Social Media Management Platform\n\nThis collection provides comprehensive access to all SocialSync endpoints including:\n- Server Management (Vast.ai integration)\n- ComfyUI AI Content Generation\n- Model Management\n- Analytics & Monitoring\n- Audit Logging\n- WebSocket Integration\n\nBase URL: {{baseUrl}}\nVersion: 1.0.0\n\nSetup Instructions:\n1. Import this collection into Postman\n2. Set up environment variables (see Environment section)\n3. Configure authentication if needed\n4. Start testing endpoints\n\nFor detailed documentation, see: README.md and API.md",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "description": "Base URL for the SocialSync API"
+    }
+  ],
+  "item": [
+    {
+      "name": "🖥️ Server Management",
+      "description": "Endpoints for managing Vast.ai GPU servers",
+      "item": [
+        {
+          "name": "Get All Servers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vast-servers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vast-servers"]
+            },
+            "description": "Retrieves a list of all managed servers with their current status, specifications, and metadata."
+          },
+          "response": [
+            {
+              "name": "Success Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vast-servers",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "vast-servers"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n  {\n    \"id\": 1,\n    \"vastId\": \"21401999\",\n    \"name\": \"GPU Server RTX 4090\",\n    \"gpu\": \"RTX 4090\",\n    \"gpuCount\": 1,\n    \"cpuCores\": 16,\n    \"ram\": 32,\n    \"disk\": 100,\n    \"pricePerHour\": \"0.50\",\n    \"location\": \"US-East\",\n    \"status\": \"running\",\n    \"setupStatus\": \"ready\",\n    \"serverUrl\": \"https://ssh8.vast.ai:22\",\n    \"sshConnection\": \"ssh root@ssh8.vast.ai -p 11998\",\n    \"metadata\": {\n      \"comfyUIStatus\": \"ready\",\n      \"setupCompletedAt\": \"2025-06-19T10:00:00Z\"\n    },\n    \"createdAt\": \"2025-06-19T09:00:00Z\",\n    \"updatedAt\": \"2025-06-19T10:00:00Z\"\n  }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Get Available Servers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vast-servers/available?limit=50&minGpu=RTX%204090&maxPrice=1.00",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vast-servers", "available"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "description": "Maximum number of results to return"
+                },
+                {
+                  "key": "minGpu",
+                  "value": "RTX 4090",
+                  "description": "Minimum GPU requirement"
+                },
+                {
+                  "key": "maxPrice",
+                  "value": "1.00",
+                  "description": "Maximum price per hour"
+                }
+              ]
+            },
+            "description": "Fetches available servers from Vast.ai marketplace with filtering options."
+          }
+        },
+        {
+          "name": "Launch Server",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"offerId\": \"12345\",\n  \"image\": \"pytorch/pytorch:latest\",\n  \"onStartScript\": \"#!/bin/bash\\necho 'Server starting...'\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vast-servers",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vast-servers"]
+            },
+            "description": "Launches a new server instance from Vast.ai marketplace."
+          },
+          "response": [
+            {
+              "name": "Launch Success",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"offerId\": \"12345\",\n  \"image\": \"pytorch/pytorch:latest\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/vast-servers",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "vast-servers"]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"id\": 2,\n  \"vastId\": \"12345\",\n  \"status\": \"launching\",\n  \"message\": \"Server launch initiated successfully\",\n  \"estimatedReadyTime\": \"2-5 minutes\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Server",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"setupStatus\": \"ready\",\n  \"metadata\": {\n    \"comfyUIStatus\": \"installed\",\n    \"lastHealthCheck\": \"2025-06-19T10:00:00Z\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vast-servers/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vast-servers", "{{serverId}}"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1",
+                  "description": "Server ID to update"
+                }
+              ]
+            },
+            "description": "Updates server configuration, status, or metadata."
+          }
+        },
+        {
+          "name": "Delete Server",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vast-servers/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vast-servers", "{{serverId}}"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1",
+                  "description": "Server ID to delete"
+                }
+              ]
+            },
+            "description": "Destroys the server instance and removes it from management."
+          }
+        },
+        {
+          "name": "Get Server Details",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vast-servers/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vast-servers", "{{serverId}}"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1",
+                  "description": "Server ID to retrieve"
+                }
+              ]
+            },
+            "description": "Retrieves detailed information about a specific server."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🎨 ComfyUI Integration",
+      "description": "AI content generation and ComfyUI management endpoints",
+      "item": [
+        {
+          "name": "Generate Image",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"beautiful landscape mountain view with crystal clear lake, sunset lighting, photorealistic, highly detailed\",\n  \"negativePrompt\": \"blurry, low quality, distorted, ugly, deformed\",\n  \"workflowId\": 1,\n  \"parameters\": {\n    \"width\": 512,\n    \"height\": 512,\n    \"steps\": 20,\n    \"cfg_scale\": 7.5,\n    \"sampler\": \"euler_a\",\n    \"seed\": -1\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/generate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "generate"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1",
+                  "description": "Server ID for generation"
+                }
+              ]
+            },
+            "description": "Initiates AI image generation using ComfyUI with specified parameters."
+          },
+          "response": [
+            {
+              "name": "Generation Started",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"prompt\": \"beautiful landscape\",\n  \"negativePrompt\": \"blurry\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/comfy/1/generate",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "comfy", "1", "generate"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"success\": true,\n  \"generationId\": 123,\n  \"queueId\": \"queue_abc123\",\n  \"message\": \"Image generation started\",\n  \"estimatedTime\": \"30-60 seconds\",\n  \"status\": \"processing\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Generations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/generations?limit=20&status=completed",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "generations"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of results to return"
+                },
+                {
+                  "key": "status",
+                  "value": "completed",
+                  "description": "Filter by generation status"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1",
+                  "description": "Server ID"
+                }
+              ]
+            },
+            "description": "Retrieves list of image generations with optional filtering."
+          }
+        },
+        {
+          "name": "Get Generation Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/generations/{{generationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "generations", "{{generationId}}"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                },
+                {
+                  "key": "generationId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Gets detailed status and results of a specific generation."
+          }
+        },
+        {
+          "name": "Auto Setup ComfyUI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"setupScript\": \"#!/bin/bash\\n# ComfyUI Auto Setup\\necho 'Starting ComfyUI installation...'\\ncd /workspace\\ngit clone https://github.com/comfyanonymous/ComfyUI.git\\ncd ComfyUI\\npython -m pip install -r requirements.txt\\necho 'ComfyUI installation completed!'\",\n  \"downloadModels\": true,\n  \"modelUrls\": [\n    \"https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/auto-setup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "auto-setup"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Initiates automated ComfyUI setup on a server."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Model Management",
+      "description": "ComfyUI model download and management endpoints",
+      "item": [
+        {
+          "name": "List Installed Models",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/models",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "models"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Retrieves list of installed models on a specific server."
+          }
+        },
+        {
+          "name": "Download Model",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Stable Diffusion v1.5\",\n  \"url\": \"https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt\",\n  \"folder\": \"checkpoints\",\n  \"description\": \"Base Stable Diffusion model for general image generation\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/models",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "models"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Initiates download of a new model to the server."
+          }
+        },
+        {
+          "name": "Delete Model",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/models/{{modelId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "models", "{{modelId}}"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                },
+                {
+                  "key": "modelId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Removes a model from the server."
+          }
+        },
+        {
+          "name": "Get Available Models",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/{{serverId}}/available-models",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "{{serverId}}", "available-models"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Gets categorized list of available models for download."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄 Workflow Management",
+      "description": "ComfyUI workflow creation and management",
+      "item": [
+        {
+          "name": "List Workflows",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/workflows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "workflows"]
+            },
+            "description": "Retrieves all saved ComfyUI workflows."
+          }
+        },
+        {
+          "name": "Create Workflow",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Basic Text to Image\",\n  \"description\": \"Simple workflow for text to image generation with Stable Diffusion\",\n  \"workflowJson\": {\n    \"1\": {\n      \"class_type\": \"CheckpointLoaderSimple\",\n      \"inputs\": {\n        \"ckpt_name\": \"v1-5-pruned-emaonly.ckpt\"\n      }\n    },\n    \"2\": {\n      \"class_type\": \"CLIPTextEncode\",\n      \"inputs\": {\n        \"text\": \"{{prompt}}\",\n        \"clip\": [\"1\", 1]\n      }\n    }\n  },\n  \"category\": \"basic\",\n  \"isTemplate\": true,\n  \"serverId\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/comfy/workflows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "comfy", "workflows"]
+            },
+            "description": "Creates a new ComfyUI workflow template."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Analytics & Monitoring",
+      "description": "System analytics, monitoring, and audit endpoints",
+      "item": [
+        {
+          "name": "Server Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/server-analytics?period=7d",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "server-analytics"],
+              "query": [
+                {
+                  "key": "period",
+                  "value": "7d",
+                  "description": "Time period (1d, 7d, 30d)"
+                }
+              ]
+            },
+            "description": "Retrieves server usage analytics and performance metrics."
+          }
+        },
+        {
+          "name": "Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats"]
+            },
+            "description": "Gets key metrics for dashboard display."
+          }
+        },
+        {
+          "name": "Audit Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/audit-logs?limit=100&category=user_action&severity=info",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "audit-logs"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100",
+                  "description": "Number of logs to return"
+                },
+                {
+                  "key": "category",
+                  "value": "user_action",
+                  "description": "Filter by log category"
+                },
+                {
+                  "key": "severity",
+                  "value": "info",
+                  "description": "Filter by severity level"
+                }
+              ]
+            },
+            "description": "Retrieves system audit logs with filtering options."
+          }
+        },
+        {
+          "name": "Audit Log Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/audit-logs/summary",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "audit-logs", "summary"]
+            },
+            "description": "Gets summarized audit log statistics."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔧 Server Operations",
+      "description": "Server setup, scheduling, and execution management",
+      "item": [
+        {
+          "name": "Get Server Executions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/server-executions/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "server-executions", "{{serverId}}"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Retrieves setup execution logs for a server."
+          }
+        },
+        {
+          "name": "Get Server Scheduler Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/server-scheduler/{{serverId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "server-scheduler", "{{serverId}}"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Gets current scheduler status for a server."
+          }
+        },
+        {
+          "name": "Start Server Scheduler",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/server-scheduler/{{serverId}}/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "server-scheduler", "{{serverId}}", "start"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Starts automated monitoring scheduler for a server."
+          }
+        },
+        {
+          "name": "Stop Server Scheduler",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/server-scheduler/{{serverId}}/stop",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "server-scheduler", "{{serverId}}", "stop"],
+              "variable": [
+                {
+                  "key": "serverId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Stops automated monitoring scheduler for a server."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔑 API Key Management",
+      "description": "External service API key configuration",
+      "item": [
+        {
+          "name": "List API Keys",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/api-keys",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "api-keys"]
+            },
+            "description": "Retrieves configured API keys (values are masked for security)."
+          }
+        },
+        {
+          "name": "Create/Update API Key",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service\": \"vast\",\n  \"keyName\": \"VAST_API_KEY\",\n  \"keyValue\": \"your-vast-api-key-here\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/api-keys",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "api-keys"]
+            },
+            "description": "Creates or updates an API key for external services."
+          }
+        },
+        {
+          "name": "Delete API Key",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/api-keys/{{keyId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "api-keys", "{{keyId}}"],
+              "variable": [
+                {
+                  "key": "keyId",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "Removes an API key configuration."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔍 Health & Diagnostics",
+      "description": "System health checks and diagnostic endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Performs comprehensive system health check including database and external API connectivity."
+          },
+          "response": [
+            {
+              "name": "Healthy System",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/health",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n  \"status\": \"healthy\",\n  \"timestamp\": \"2025-06-19T10:00:00Z\",\n  \"services\": {\n    \"database\": \"up\",\n    \"vastApi\": \"up\",\n    \"openaiApi\": \"up\"\n  },\n  \"version\": \"1.0.0\",\n  \"uptime\": \"2d 4h 32m\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "API Version",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/version",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "version"]
+            },
+            "description": "Returns current API version and build information."
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request script for SocialSync API",
+          "// This script runs before every request in the collection",
+          "",
+          "// Set up common headers",
+          "pm.request.headers.add({",
+          "    key: 'User-Agent',",
+          "    value: 'SocialSync-Postman-Collection/1.0.0'",
+          "});",
+          "",
+          "// Add timestamp to request",
+          "pm.globals.set('requestTimestamp', new Date().toISOString());",
+          "",
+          "// Log request details for debugging",
+          "console.log('Making request to:', pm.request.url.toString());",
+          "console.log('Method:', pm.request.method);",
+          "console.log('Timestamp:', pm.globals.get('requestTimestamp'));"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test script for SocialSync API",
+          "// This script runs after every request in the collection",
+          "",
+          "// Basic response validation",
+          "pm.test('Response time is reasonable', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});",
+          "",
+          "pm.test('Status code is valid', function () {",
+          "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 204, 400, 401, 403, 404, 500, 503]);",
+          "});",
+          "",
+          "// Check for JSON response when expected",
+          "if (pm.response.headers.get('Content-Type') && pm.response.headers.get('Content-Type').includes('application/json')) {",
+          "    pm.test('Response is valid JSON', function () {",
+          "        pm.response.to.have.jsonBody();",
+          "    });",
+          "}",
+          "",
+          "// Log response details",
+          "console.log('Response status:', pm.response.status);",
+          "console.log('Response time:', pm.response.responseTime + 'ms');",
+          "",
+          "// Store common response data for chaining requests",
+          "if (pm.response.code === 200 || pm.response.code === 201) {",
+          "    try {",
+          "        const responseJson = pm.response.json();",
+          "        ",
+          "        // Store server ID if present",
+          "        if (responseJson.id) {",
+          "            pm.collectionVariables.set('lastServerId', responseJson.id);",
+          "        }",
+          "        ",
+          "        // Store generation ID if present",
+          "        if (responseJson.generationId) {",
+          "            pm.collectionVariables.set('lastGenerationId', responseJson.generationId);",
+          "        }",
+          "        ",
+          "        // Store model ID if present",
+          "        if (responseJson.modelId) {",
+          "            pm.collectionVariables.set('lastModelId', responseJson.modelId);",
+          "        }",
+          "    } catch (e) {",
+          "        // Response is not JSON, skip variable extraction",
+          "    }",
+          "}"
+        ]
+      }
+    }
+  ]
+}

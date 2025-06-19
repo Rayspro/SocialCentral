@@ -1,7 +1,7 @@
 import { StatsGrid } from "@/components/StatsGrid";
 import { PlatformManager } from "@/components/PlatformManager";
 import { QuickActions } from "@/components/QuickActions";
-import { ServerAnalytics } from "@/components/ServerAnalytics";
+import { ServerAnalytics } from "@/components/ServerAnalyticsFixed";
 import { Button } from "@/components/ui/button";
 import { BarChart3, Home, ChevronRight, User, Settings, LogOut, Bell } from "lucide-react";
 import { useLocation } from "wouter";

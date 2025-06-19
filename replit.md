@@ -130,6 +130,7 @@ Changelog:
 - June 19, 2025. Completed comprehensive UI redesign with Vast.ai server header pattern applied consistently across all pages (Dashboard, CreateContent, Platforms, Schedule, Approvals, MediaLibrary, Settings) with breadcrumb navigation and professional styling
 - June 19, 2025. Added profile and logout options to all page headers with breadcrumb navigation - profile dropdown now appears on opposite side from breadcrumbs with consistent styling and functionality across all pages
 - June 19, 2025. Implemented complete authentication system with real credential validation - replaced mock authentication with secure bcrypt password hashing, proper route protection, and API validation that prevents unauthorized access with random credentials
+- June 19, 2025. Enhanced chart tooltips with proper formatting and readable information display - tooltips now show formatted currency, percentages, and detailed server information with proper styling and dark mode support
 ```
 
 ## User Preferences

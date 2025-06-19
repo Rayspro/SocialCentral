@@ -727,11 +727,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const data = await response.json();
             const instances = data.instances || [];
             
-            // Sync existing servers with Vast.ai data
+            // Sync existing servers with Vast.ai data and remove deleted ones
             for (const storedServer of storedServers) {
               if (storedServer.vastId) {
                 const vastInstance = instances.find((instance: any) => instance.id.toString() === storedServer.vastId);
                 if (vastInstance) {
+                  // Update existing server with current Vast.ai data
                   await storage.updateVastServer(storedServer.id, {
                     status: vastInstance.actual_status === 'running' ? 'running' : 'stopped',
                     serverUrl: vastInstance.ssh_host ? `http://${vastInstance.ssh_host}:${vastInstance.direct_port_start || 8188}` : storedServer.serverUrl,
@@ -754,6 +755,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                       }
                     }
                   });
+                } else {
+                  // Server no longer exists on Vast.ai, remove it from our database
+                  console.log(`Removing deleted Vast.ai instance: ${storedServer.vastId}`);
+                  await storage.deleteVastServer(storedServer.id);
                 }
               }
             }

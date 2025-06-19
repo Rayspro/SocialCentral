@@ -410,7 +410,7 @@ export default function VastServers() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleSetupServer(server)}
-                            disabled={server.status === 'configuring'}
+                            disabled={server.status === 'launching'}
                           >
                             <Settings className="h-4 w-4 mr-1" />
                             Setup

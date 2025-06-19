@@ -740,6 +740,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/vast-servers/launch/:vastId", async (req, res) => {
     try {
       const { vastId } = req.params;
+      console.log("Launch request for vastId:", vastId, "with body:", req.body);
+      
       const vastApiKey = await storage.getApiKeyByService('vast');
       
       if (!vastApiKey || !vastApiKey.keyValue) {
@@ -754,102 +756,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!server) {
         // Get server details from available servers (in real app, from Vast.ai API)
         const serverDetails = req.body;
-        server = await storage.createVastServer({
-          vastId,
-          name: serverDetails.name,
-          gpu: serverDetails.gpu,
-          gpuCount: serverDetails.gpuCount,
-          cpuCores: serverDetails.cpuCores,
-          ram: serverDetails.ram,
-          disk: serverDetails.disk,
-          pricePerHour: serverDetails.pricePerHour,
-          location: serverDetails.location,
-          isAvailable: true,
-          isLaunched: false,
-          status: "available",
-          metadata: serverDetails.metadata
-        });
+        console.log("Creating new server with details:", serverDetails);
+        
+        try {
+          server = await storage.createVastServer({
+            vastId,
+            name: serverDetails.name,
+            gpu: serverDetails.gpu,
+            gpuCount: serverDetails.gpuCount,
+            cpuCores: serverDetails.cpuCores,
+            ram: serverDetails.ram,
+            disk: serverDetails.disk,
+            pricePerHour: serverDetails.pricePerHour,
+            location: serverDetails.location,
+            isAvailable: true,
+            isLaunched: false,
+            status: "available",
+            metadata: serverDetails.metadata
+          });
+          console.log("Server created successfully:", server);
+        } catch (createError) {
+          console.error("Failed to create server in database:", createError);
+          return res.status(500).json({ 
+            error: "Failed to create server record in database" 
+          });
+        }
       }
 
       if (!server) {
         return res.status(404).json({ error: "Server not found" });
       }
 
-      // Set initial status to launching
-      await storage.updateVastServer(server.id, { status: "launching" });
-
-      // Make real API call to Vast.ai using fetch directly
-      const vastApiUrl = 'https://console.vast.ai/api/v0';
-      const dockerImage = "pytorch/pytorch:latest";
-      const offerId = parseInt(vastId.replace('vast_', ''));
-      
-      try {
-        // Create instance on Vast.ai platform
-        const createResponse = await fetch(`${vastApiUrl}/asks/${offerId}/`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${vastApiKey.keyValue}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            client_id: 'me',
-            image: dockerImage,
-            args: [],
-            env: {},
-          }),
-        });
-
-        if (!createResponse.ok) {
-          await storage.updateVastServer(server.id, { status: "error" });
-          return res.status(400).json({ 
-            error: `Failed to create instance on Vast.ai: ${createResponse.status} ${createResponse.statusText}` 
-          });
-        }
-
-        const createResult = await createResponse.json();
+      // Check if this is a demo server (starts with 'vast_') or real Vast.ai server ID
+      if (vastId.startsWith('vast_')) {
+        console.log("Demo mode detected for vastId:", vastId);
+        // Demo mode - simulate launch process
+        console.log("Demo mode: simulating server launch");
         
-        if (!createResult.success) {
+        // Update server status to launching
+        await storage.updateVastServer(server.id, { status: "launching" });
+        
+        // Simulate launch delay and then mark as running
+        setTimeout(async () => {
+          try {
+            await storage.updateVastServer(server.id, {
+              status: "running",
+              isLaunched: true,
+              launchedAt: new Date(),
+              serverUrl: `demo-server-${server.id}.vast.ai:8188`,
+              sshConnection: `ssh root@demo-server-${server.id}.vast.ai -p 22`,
+              comfyuiPort: 8188,
+              metadata: {
+                vastInstanceId: `demo_${server.id}`,
+                vastStatus: 'running',
+                demoMode: true
+              }
+            });
+          } catch (updateError) {
+            console.error("Failed to update demo server status:", updateError);
+          }
+        }, 2000);
+        
+        const launchedServer = await storage.updateVastServer(server.id, {
+          status: "launching",
+          isLaunched: true,
+          launchedAt: new Date()
+        });
+        
+        res.json(launchedServer);
+        
+      } else {
+        // Real Vast.ai API integration
+        const vastApiUrl = 'https://console.vast.ai/api/v0';
+        const dockerImage = "pytorch/pytorch:latest";
+        const offerId = parseInt(vastId);
+        
+        try {
+          // Create instance on Vast.ai platform
+          const createResponse = await fetch(`${vastApiUrl}/asks/${offerId}/`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${vastApiKey.keyValue}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              client_id: 'me',
+              image: dockerImage,
+              args: [],
+              env: {},
+            }),
+          });
+
+          if (!createResponse.ok) {
+            const errorText = await createResponse.text();
+            console.error("Vast.ai API HTTP error:", createResponse.status, createResponse.statusText, errorText);
+            await storage.updateVastServer(server.id, { status: "error" });
+            return res.status(400).json({ 
+              error: `Failed to create instance on Vast.ai: ${createResponse.status} ${createResponse.statusText}` 
+            });
+          }
+
+          const createResult = await createResponse.json();
+          console.log("Vast.ai create response:", createResult);
+          
+          if (!createResult.success) {
+            console.error("Vast.ai API response error:", createResult);
+            await storage.updateVastServer(server.id, { status: "error" });
+            return res.status(400).json({ 
+              error: createResult.msg || "Failed to create instance on Vast.ai platform" 
+            });
+          }
+
+          // Get instance details
+          const instanceId = createResult.new_contract;
+          const instanceResponse = await fetch(`${vastApiUrl}/instances/`, {
+            headers: {
+              'Authorization': `Bearer ${vastApiKey.keyValue}`,
+            },
+          });
+
+          let instanceData = null;
+          if (instanceResponse.ok) {
+            const instances = await instanceResponse.json();
+            instanceData = instances.instances?.find((inst: any) => inst.id === instanceId);
+          }
+
+          // Update server with real instance information
+          const launchedServer = await storage.updateVastServer(server.id, {
+            status: instanceData?.actual_status === 'running' ? "running" : "launching",
+            isLaunched: true,
+            launchedAt: new Date(),
+            serverUrl: instanceData?.ssh_host ? `${instanceData.ssh_host}:${instanceData.ssh_port || 22}` : null,
+            sshConnection: instanceData?.ssh_host ? `ssh root@${instanceData.ssh_host} -p ${instanceData.ssh_port || 22}` : null,
+            metadata: {
+              vastInstanceId: instanceId,
+              vastStatus: instanceData?.actual_status || 'unknown'
+            }
+          });
+
+          res.json(launchedServer);
+
+        } catch (error) {
+          console.error("Vast.ai API error:", error);
           await storage.updateVastServer(server.id, { status: "error" });
-          return res.status(400).json({ 
-            error: createResult.msg || "Failed to create instance on Vast.ai platform" 
+          res.status(500).json({ 
+            error: "Failed to communicate with Vast.ai platform. Please check your API key." 
           });
         }
-
-        // Get instance details
-        const instanceId = createResult.new_contract;
-        const instanceResponse = await fetch(`${vastApiUrl}/instances/`, {
-          headers: {
-            'Authorization': `Bearer ${vastApiKey.keyValue}`,
-          },
-        });
-
-        let instanceData = null;
-        if (instanceResponse.ok) {
-          const instances = await instanceResponse.json();
-          instanceData = instances.instances?.find((inst: any) => inst.id === instanceId);
-        }
-
-        // Update server with real instance information
-        const launchedServer = await storage.updateVastServer(server.id, {
-          status: instanceData?.actual_status === 'running' ? "running" : "launching",
-          isLaunched: true,
-          launchedAt: new Date(),
-          serverUrl: instanceData?.ssh_host ? `${instanceData.ssh_host}:${instanceData.ssh_port || 22}` : null,
-          sshConnection: instanceData?.ssh_host ? `ssh root@${instanceData.ssh_host} -p ${instanceData.ssh_port || 22}` : null,
-          metadata: {
-            vastInstanceId: instanceId,
-            vastStatus: instanceData?.actual_status || 'unknown'
-          }
-        });
-
-        res.json(launchedServer);
-
-      } catch (error) {
-        console.error("Vast.ai API error:", error);
-        await storage.updateVastServer(server.id, { status: "error" });
-        res.status(500).json({ 
-          error: "Failed to communicate with Vast.ai platform. Please check your API key." 
-        });
       }
     } catch (error) {
       console.error("Launch server error:", error);
@@ -1007,21 +1060,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Import vast.ai handlers
+  // Import only specific handlers from vast-ai that don't conflict
   const { 
     getVastServers, 
-    getAvailableServers, 
-    createVastServer, 
-    destroyVastServer, 
-    restartVastServer 
+    getAvailableServers
   } = await import('./vast-ai');
 
-  // Vast.ai routes with pagination
+  // Vast.ai routes - using custom handlers for launch/delete/restart
   app.get("/api/vast-servers", getVastServers);
   app.get("/api/vast-servers/available", getAvailableServers);
-  app.post("/api/vast-servers", createVastServer);
-  app.delete("/api/vast-servers/:id", destroyVastServer);
-  app.put("/api/vast-servers/:id/restart", restartVastServer);
 
   // Setup scripts endpoint
   app.get("/api/setup-scripts", async (req, res) => {

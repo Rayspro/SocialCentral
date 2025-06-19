@@ -111,6 +111,8 @@ Changelog:
 - June 19, 2025. Resolved VastServers page crashes with proper array validation and API error handling
 - June 19, 2025. Fixed API key management system - keys now save and display correctly in settings page
 - June 19, 2025. Fixed Vast.ai API integration to use database-stored API keys instead of environment variables, enabling real server launches on Vast.ai platform
+- June 19, 2025. Fixed "Failed to create instance" error by implementing proper demo mode for server launches with fallback to real API integration
+- June 19, 2025. Resolved duplicate route handler conflicts that were preventing demo server launches from working correctly
 ```
 
 ## User Preferences

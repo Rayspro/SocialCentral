@@ -496,6 +496,41 @@ echo "Model download completed!"`,
       requirements: {},
       createdAt: new Date(),
       updatedAt: new Date()
+    },
+    {
+      id: 3,
+      name: "ComfyUI Auto-Start Service",
+      description: "Set up ComfyUI to start automatically and run in background",
+      category: "ai-tools",
+      script: `#!/bin/bash
+# ComfyUI Auto-Start Setup
+echo "Setting up ComfyUI auto-start service..."
+
+# Create startup script
+cat > /workspace/start_comfyui.sh << 'EOF'
+#!/bin/bash
+cd /workspace/ComfyUI
+python main.py --listen 0.0.0.0 --port 8188 --enable-cors-header &
+echo "ComfyUI started on port 8188"
+EOF
+
+chmod +x /workspace/start_comfyui.sh
+
+# Start ComfyUI now
+echo "Starting ComfyUI server..."
+/workspace/start_comfyui.sh
+
+# Add to bashrc for auto-start
+echo "/workspace/start_comfyui.sh" >> ~/.bashrc
+
+echo "ComfyUI auto-start setup completed!"
+echo "ComfyUI is now running at http://YOUR_SERVER_IP:8188"
+echo "It will start automatically when you connect to the server"`,
+      isActive: true,
+      estimatedTime: 5,
+      requirements: {},
+      createdAt: new Date(),
+      updatedAt: new Date()
     }
   ];
   private serverExecutions: ServerExecution[] = [];

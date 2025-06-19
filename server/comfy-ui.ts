@@ -353,7 +353,15 @@ export async function generateImage(req: Request, res: Response) {
     // Check if ComfyUI is accessible
     const isOnline = await client.checkStatus();
     if (!isOnline) {
-      return res.status(503).json({ error: 'ComfyUI server is not accessible' });
+      return res.status(503).json({ 
+        error: 'ComfyUI server is not accessible. Please ensure ComfyUI is running on the server.',
+        details: `Attempted to connect to: ${comfyUrl}`,
+        troubleshooting: [
+          'Check if the Vast.ai server is running',
+          'Verify ComfyUI is installed and started on port 8188',
+          'Ensure firewall allows connections on port 8188'
+        ]
+      });
     }
 
     // Get workflow (use default if none specified)

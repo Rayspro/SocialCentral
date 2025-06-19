@@ -205,13 +205,25 @@ export default function ComfyUI() {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
       }
       
       return response.json();
     },
     onSuccess: () => {
       refetchGenerations();
+      toast({
+        title: "Success",
+        description: "Image generation started successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Generation Failed",
+        description: error.message || "Failed to start image generation",
+        variant: "destructive",
+      });
     },
   });
 
@@ -570,8 +582,15 @@ export default function ComfyUI() {
                 {/* Generation Controls */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Text to Image</CardTitle>
-                    <CardDescription>Generate images using AI</CardDescription>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      Text to Image
+                      <Badge variant={availableModelsLoading ? "secondary" : "destructive"} className="text-xs">
+                        {availableModelsLoading ? "Checking..." : "ComfyUI Offline"}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      Generate images using AI {!availableModelsLoading && "(ComfyUI server required)"}
+                    </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div>
@@ -675,7 +694,7 @@ export default function ComfyUI() {
 
                     <Button 
                       onClick={handleGenerate} 
-                      disabled={generateMutation.isPending || !prompt}
+                      disabled={generateMutation.isPending || !prompt || availableModelsLoading}
                       className="w-full"
                     >
                       {generateMutation.isPending ? (
@@ -687,6 +706,21 @@ export default function ComfyUI() {
                         </>
                       )}
                     </Button>
+                    
+                    {!availableModelsLoading && (
+                      <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 text-sm">
+                        <h4 className="font-medium text-yellow-800 dark:text-yellow-200 mb-2">ComfyUI Setup Required</h4>
+                        <p className="text-yellow-700 dark:text-yellow-300 mb-3">
+                          ComfyUI server is not running on your Vast.ai instance. To enable image generation:
+                        </p>
+                        <ol className="list-decimal list-inside text-yellow-700 dark:text-yellow-300 space-y-1">
+                          <li>SSH into your Vast.ai server</li>
+                          <li>Install ComfyUI: <code className="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">git clone https://github.com/comfyanonymous/ComfyUI.git</code></li>
+                          <li>Install dependencies: <code className="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">pip install -r requirements.txt</code></li>
+                          <li>Start ComfyUI: <code className="bg-yellow-100 dark:bg-yellow-800 px-1 rounded">python main.py --listen 0.0.0.0 --port 8188</code></li>
+                        </ol>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
 

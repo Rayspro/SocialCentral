@@ -137,6 +137,7 @@ Changelog:
 - June 19, 2025. Implemented collapsible sidebar with smooth animations and elegant loading states throughout the app - added custom loading components with skeleton screens, animated spinners, and improved user experience with smooth transitions
 - June 19, 2025. Fixed button overflow issues in server cards by reorganizing button layout into structured rows with proper spacing and responsive design
 - June 19, 2025. Implemented comprehensive ComfyUI integration with text-to-image generation, model management, workflow system, and gallery - includes real-time status monitoring, model downloading from URLs, custom workflows, and complete process saving for server restarts
+- June 19, 2025. Fixed image generation connectivity issues by implementing proper error handling, ComfyUI connection status indicators, and comprehensive troubleshooting guides for users to set up ComfyUI on Vast.ai instances
 ```
 
 ## User Preferences

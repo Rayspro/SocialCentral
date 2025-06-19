@@ -7,7 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, BarChart, Bar, PieChart, Pie } from "recharts";
-import { ArrowLeft, Server, Cpu, HardDrive, Wifi, Clock, Activity, Terminal, Settings, RefreshCw, TrendingUp, Zap, Globe, HardDriveIcon } from "lucide-react";
+import { ArrowLeft, Server, Cpu, HardDrive, Wifi, Clock, Activity, Terminal, Settings, RefreshCw, TrendingUp, Zap, Globe, HardDriveIcon, ChevronRight, Home } from "lucide-react";
+import { Breadcrumb, BreadcrumbEllipsis, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import type { VastServer } from "@shared/schema";
 
 interface ServerMetrics {
@@ -196,40 +197,62 @@ export default function ServerDetails() {
   }
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setLocation('/vast-servers')}
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Servers
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold flex items-center gap-3">
-              <Server className="h-8 w-8" />
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        {/* Elegant Breadcrumb Navigation */}
+        <div className="flex items-center justify-between">
+          <nav className="flex items-center space-x-2 text-sm">
+            <button 
+              onClick={() => setLocation('/')}
+              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Dashboard
+            </button>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <button 
+              onClick={() => setLocation('/vast-servers')}
+              className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+            >
+              Vast Servers
+            </button>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <span className="text-slate-900 dark:text-slate-100 font-medium">
               {server.name}
-            </h1>
-            <p className="text-muted-foreground">{server.gpu} • {server.location}</p>
+            </span>
+          </nav>
+          <div className="flex items-center gap-3">
+            <Badge className={getStatusColor(server.status)}>
+              {server.status}
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => refetch()}
+              className="border-slate-300 hover:border-slate-400 dark:border-slate-600 dark:hover:border-slate-500"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge className={getStatusColor(server.status)}>
-            {server.status}
-          </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => refetch()}
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+
+        {/* Enhanced Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
+              <Server className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+                {server.name}
+              </h1>
+              <p className="text-lg text-slate-600 dark:text-slate-400">
+                {server.gpu} • {server.location} • ${server.pricePerHour}/hour
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
 
       {/* Professional Metrics Dashboard */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
@@ -985,6 +1008,7 @@ export default function ServerDetails() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

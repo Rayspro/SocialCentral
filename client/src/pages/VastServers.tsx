@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3 } from "lucide-react";
+import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3, Home, ChevronRight } from "lucide-react";
+import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import type { VastServer } from "@shared/schema";
 
@@ -50,6 +51,7 @@ interface ServerExecution {
 export default function VastServers() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, setLocation] = useLocation();
   const [selectedServer, setSelectedServer] = useState<AvailableServer | null>(null);
   const [showLaunchDialog, setShowLaunchDialog] = useState(false);
   const [showSetupDialog, setShowSetupDialog] = useState(false);
@@ -341,15 +343,39 @@ export default function VastServers() {
   }, [availableServers]);
 
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">Vast.ai Servers</h1>
-          <p className="text-muted-foreground">
-            Manage your GPU servers for AI workloads
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-6 py-8 space-y-8">
+        {/* Elegant Breadcrumb Navigation */}
+        <nav className="flex items-center space-x-2 text-sm">
+          <button 
+            onClick={() => setLocation('/')}
+            className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+          >
+            <Home className="h-4 w-4" />
+            Dashboard
+          </button>
+          <ChevronRight className="h-4 w-4 text-slate-400" />
+          <span className="text-slate-900 dark:text-slate-100 font-medium">
+            Vast Servers
+          </span>
+        </nav>
+
+        {/* Enhanced Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
+              <Server className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+                Vast.ai Servers
+              </h1>
+              <p className="text-lg text-slate-600 dark:text-slate-400">
+                Deploy and manage high-performance GPU instances for AI workloads
+              </p>
+            </div>
+          </div>
         </div>
-      </div>
 
       <Tabs defaultValue="launched" className="w-full">
         <TabsList className="grid w-full grid-cols-2">
@@ -931,6 +957,7 @@ export default function VastServers() {
           )}
         </DialogContent>
       </Dialog>
+      </div>
     </div>
   );
 }

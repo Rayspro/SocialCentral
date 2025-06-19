@@ -118,6 +118,7 @@ Changelog:
 - June 19, 2025. Fixed server synchronization issues - delete and stop operations now properly destroy actual Vast.ai instances
 - June 19, 2025. Implemented proper contract ID tracking for bidirectional sync between app and Vast.ai console status
 - June 19, 2025. Fixed UI issues - added refresh button for server status updates, corrected stop button visibility, and improved status display with accurate color coding
+- June 19, 2025. Enhanced server cards with individual refresh icons and proper setupStatus display in headers with color-coded badges
 ```
 
 ## User Preferences

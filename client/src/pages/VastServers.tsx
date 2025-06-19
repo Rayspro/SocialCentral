@@ -229,6 +229,16 @@ export default function VastServers() {
     }
   };
 
+  const getSetupStatusColor = (setupStatus: string) => {
+    switch (setupStatus) {
+      case 'ready': return 'text-green-600 border-green-600';
+      case 'installing': return 'text-blue-600 border-blue-600';
+      case 'failed': return 'text-red-600 border-red-600';
+      case 'pending': return 'text-gray-600 border-gray-600';
+      default: return 'text-gray-600 border-gray-600';
+    }
+  };
+
   const formatPrice = (price: string) => {
     return `$${parseFloat(price).toFixed(2)}/hour`;
   };
@@ -355,13 +365,30 @@ export default function VastServers() {
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-lg">{server.name}</CardTitle>
-                      <Badge className={getStatusColor(server.status)}>
-                        {server.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(server.status)}>
+                          {server.status}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] })}
+                          className="h-6 w-6 p-0"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                     <CardDescription>
                       {server.gpu} × {server.gpuCount} | {server.location}
                     </CardDescription>
+                    {server.setupStatus && server.setupStatus !== 'pending' && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="outline" className={getSetupStatusColor(server.setupStatus)}>
+                          Setup: {server.setupStatus}
+                        </Badge>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2 text-sm">
@@ -395,28 +422,7 @@ export default function VastServers() {
                         </div>
                       )}
                     </div>
-                    {server.setupStatus && (
-                      <div className="flex items-center gap-2 mt-2 p-2 bg-gray-50 dark:bg-gray-800 rounded">
-                        {server.setupStatus === 'installing' && (
-                          <>
-                            <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
-                            <span className="text-sm">Setting up ComfyUI...</span>
-                          </>
-                        )}
-                        {server.setupStatus === 'ready' && (
-                          <>
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            <span className="text-sm">ComfyUI Ready</span>
-                          </>
-                        )}
-                        {server.setupStatus === 'failed' && (
-                          <>
-                            <XCircle className="h-4 w-4 text-red-500" />
-                            <span className="text-sm">Setup Failed</span>
-                          </>
-                        )}
-                      </div>
-                    )}
+
                     <div className="flex gap-2 mt-4">
                       {server.isLaunched && ['launching', 'running', 'configuring'].includes(server.status) && (
                         <>

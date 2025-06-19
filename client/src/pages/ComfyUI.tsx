@@ -674,6 +674,42 @@ export default function ComfyUI() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
+                    {availableModelsError && selectedServer && (
+                      <Alert className="mb-4">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>ComfyUI Setup Required</AlertTitle>
+                        <AlertDescription className="space-y-3 mt-2">
+                          <p>ComfyUI installation completed but server needs to be started manually:</p>
+                          
+                          <div className="bg-muted p-3 rounded-md space-y-2 text-sm">
+                            <p><strong>1. Connect to your server:</strong></p>
+                            <code className="bg-background p-1 rounded text-xs block">
+                              {selectedServer.sshConnection}
+                            </code>
+                            
+                            <p><strong>2. Navigate to ComfyUI:</strong></p>
+                            <code className="bg-background p-1 rounded text-xs block">
+                              cd /workspace/ComfyUI
+                            </code>
+                            
+                            <p><strong>3. Start ComfyUI server:</strong></p>
+                            <code className="bg-background p-1 rounded text-xs block">
+                              python main.py --listen 0.0.0.0 --port 8188
+                            </code>
+                            
+                            <p><strong>4. ComfyUI will be accessible at:</strong></p>
+                            <code className="bg-background p-1 rounded text-xs block">
+                              http://{selectedServer.serverUrl?.replace('http://', '').split(':')[0]}:8188
+                            </code>
+                          </div>
+                          
+                          <p className="text-xs text-muted-foreground">
+                            Once ComfyUI is running, this page will automatically detect the connection.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
                     <div>
                       <Label htmlFor="prompt">Prompt</Label>
                       <Textarea
@@ -682,6 +718,7 @@ export default function ComfyUI() {
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
                         rows={3}
+                        disabled={!!availableModelsError}
                       />
                     </div>
 

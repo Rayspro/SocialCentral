@@ -39,9 +39,7 @@ function Router() {
       <Route path="/vast-servers/:id" component={ServerDetails} />
       <Route path="/server-detail/:serverId" component={ServerDetail} />
       <Route path="/server/:id" component={ServerDetailPage} />
-      <Route path="/server/:serverId/comfy-ui">
-        {(params) => <ComfyUI serverId={params.serverId} />}
-      </Route>
+      <Route path="/comfy-ui" component={ComfyUI} />
       <Route path="/performance-story" component={PerformanceStory} />
       <Route path="/audit-log" component={AuditLog} />
       <Route path="/settings" component={Settings} />

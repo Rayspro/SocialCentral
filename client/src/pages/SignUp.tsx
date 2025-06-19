@@ -11,6 +11,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Eye, EyeOff, UserPlus, Mail, Lock, User, Chrome, Github, Apple } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const signUpSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
@@ -32,6 +34,8 @@ export default function SignUp() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { signup } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<SignUpForm>({
@@ -49,12 +53,18 @@ export default function SignUp() {
   const onSubmit = async (data: SignUpForm) => {
     setIsLoading(true);
     try {
-      // Simulate registration
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log("Sign up:", data);
+      await signup(data);
+      toast({
+        title: "Success",
+        description: "Your account has been created successfully! Welcome to the platform.",
+      });
       setLocation("/");
     } catch (error) {
-      console.error("Sign up error:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create account. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }

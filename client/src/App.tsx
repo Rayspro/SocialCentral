@@ -1,9 +1,11 @@
 import { Switch, Route, useLocation } from "wouter";
+import { useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/contexts/ThemeContext";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { Sidebar } from "@/components/Sidebar";
 import Dashboard from "@/pages/Dashboard";
 import Platforms from "@/pages/Platforms";
@@ -39,13 +41,39 @@ function Router() {
 }
 
 function AppLayout() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
   const isAuthPage = location === '/signin' || location === '/signup';
 
+  // Handle redirects with useEffect to avoid state updates during render
+  useEffect(() => {
+    if (isLoading) return;
+    
+    if (isAuthenticated && isAuthPage) {
+      setLocation('/');
+    } else if (!isAuthenticated && !isAuthPage) {
+      setLocation('/signin');
+    }
+  }, [isAuthenticated, isLoading, isAuthPage, setLocation]);
+
+  // Show loading spinner while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto"></div>
+          <p className="text-slate-600 dark:text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth pages without sidebar
   if (isAuthPage) {
     return <Router />;
   }
 
+  // Show main app with sidebar for authenticated users
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-slate-900">
       <Sidebar />
@@ -61,8 +89,10 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>
-          <AppLayout />
-          <Toaster />
+          <AuthProvider>
+            <AppLayout />
+            <Toaster />
+          </AuthProvider>
         </TooltipProvider>
       </ThemeProvider>
     </QueryClientProvider>

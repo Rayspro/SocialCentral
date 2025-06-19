@@ -10,6 +10,8 @@ import { Separator } from "@/components/ui/separator";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Eye, EyeOff, LogIn, Mail, Lock, Chrome, Github, Apple } from "lucide-react";
 import { useLocation } from "wouter";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
 
 const signInSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -21,6 +23,8 @@ type SignInForm = z.infer<typeof signInSchema>;
 export default function SignIn() {
   const [, setLocation] = useLocation();
   const [showPassword, setShowPassword] = useState(false);
+  const { login } = useAuth();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
   const form = useForm<SignInForm>({
@@ -34,12 +38,18 @@ export default function SignIn() {
   const onSubmit = async (data: SignInForm) => {
     setIsLoading(true);
     try {
-      // Simulate authentication
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      console.log("Sign in:", data);
+      await login(data.email, data.password);
+      toast({
+        title: "Success",
+        description: "Welcome back! You've been signed in successfully.",
+      });
       setLocation("/");
     } catch (error) {
-      console.error("Sign in error:", error);
+      toast({
+        title: "Error",
+        description: "Invalid email or password. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }

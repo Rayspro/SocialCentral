@@ -562,7 +562,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/vast-servers/available", async (req, res) => {
     try {
-      // Simulate fetching available servers from Vast.ai API
       const vastApiKey = await storage.getApiKeyByService('vast');
       if (!vastApiKey || !vastApiKey.keyValue) {
         return res.status(400).json({ 
@@ -570,167 +569,67 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Mock data for demonstration - in production this would call Vast.ai API
-      const mockServers = [
-        {
-          vastId: "vast_001",
-          name: "RTX 4090 High Performance",
-          gpu: "RTX 4090",
-          gpuCount: 1,
-          cpuCores: 16,
-          ram: 64,
-          disk: 1000,
-          pricePerHour: "0.85",
-          location: "US-East",
-          isAvailable: true,
-          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 520 }
-        },
-        {
-          vastId: "vast_002", 
-          name: "RTX 3080 Ti Budget",
-          gpu: "RTX 3080 Ti",
-          gpuCount: 1,
-          cpuCores: 12,
-          ram: 32,
-          disk: 500,
-          pricePerHour: "0.45",
-          location: "US-West",
-          isAvailable: true,
-          metadata: { bandwidth: "500Mbps", ssd: true, dlperf: 380 }
-        },
-        {
-          vastId: "vast_003",
-          name: "Dual RTX 4080 Power",
-          gpu: "RTX 4080",
-          gpuCount: 2,
-          cpuCores: 24,
-          ram: 128,
-          disk: 2000,
-          pricePerHour: "1.25",
-          location: "Europe",
-          isAvailable: true,
-          metadata: { bandwidth: "1Gbps", ssd: true, raid: true, dlperf: 460 }
-        },
-        {
-          vastId: "vast_004",
-          name: "RTX 4070 Ti Entry",
-          gpu: "RTX 4070 Ti",
-          gpuCount: 1,
-          cpuCores: 8,
-          ram: 24,
-          disk: 256,
-          pricePerHour: "0.32",
-          location: "US-Central",
-          isAvailable: true,
-          metadata: { bandwidth: "500Mbps", ssd: true, dlperf: 285 }
-        },
-        {
-          vastId: "vast_005",
-          name: "Quad RTX 3090 Workstation",
-          gpu: "RTX 3090",
-          gpuCount: 4,
-          cpuCores: 32,
-          ram: 256,
-          disk: 4000,
-          pricePerHour: "2.40",
-          location: "US-East",
-          isAvailable: true,
-          metadata: { bandwidth: "10Gbps", ssd: true, raid: true, dlperf: 850 }
-        },
-        {
-          vastId: "vast_006",
-          name: "RTX A6000 Professional",
-          gpu: "RTX A6000",
-          gpuCount: 1,
-          cpuCores: 20,
-          ram: 96,
-          disk: 1500,
-          pricePerHour: "1.15",
-          location: "Europe",
-          isAvailable: true,
-          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 495, pro: true }
-        },
-        {
-          vastId: "vast_007",
-          name: "RTX 3060 Ti Basic",
-          gpu: "RTX 3060 Ti",
-          gpuCount: 1,
-          cpuCores: 6,
-          ram: 16,
-          disk: 200,
-          pricePerHour: "0.18",
-          location: "Asia-Pacific",
-          isAvailable: true,
-          metadata: { bandwidth: "200Mbps", ssd: false, dlperf: 185 }
-        },
-        {
-          vastId: "vast_008",
-          name: "Dual RTX 4090 Beast",
-          gpu: "RTX 4090",
-          gpuCount: 2,
-          cpuCores: 32,
-          ram: 128,
-          disk: 2000,
-          pricePerHour: "1.65",
-          location: "US-West",
-          isAvailable: true,
-          metadata: { bandwidth: "10Gbps", ssd: true, raid: true, dlperf: 1040 }
-        },
-        {
-          vastId: "vast_009",
-          name: "RTX 4080 Standard",
-          gpu: "RTX 4080",
-          gpuCount: 1,
-          cpuCores: 14,
-          ram: 48,
-          disk: 800,
-          pricePerHour: "0.68",
-          location: "Canada",
-          isAvailable: true,
-          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 395 }
-        },
-        {
-          vastId: "vast_010",
-          name: "Tesla V100 Research",
-          gpu: "Tesla V100",
-          gpuCount: 1,
-          cpuCores: 16,
-          ram: 64,
-          disk: 1000,
-          pricePerHour: "0.75",
-          location: "US-East",
-          isAvailable: true,
-          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 312, research: true }
-        },
-        {
-          vastId: "vast_011",
-          name: "RTX 3070 Starter",
-          gpu: "RTX 3070",
-          gpuCount: 1,
-          cpuCores: 8,
-          ram: 20,
-          disk: 400,
-          pricePerHour: "0.28",
-          location: "Europe",
-          isAvailable: true,
-          metadata: { bandwidth: "500Mbps", ssd: true, dlperf: 220 }
-        },
-        {
-          vastId: "vast_012",
-          name: "Triple RTX 4080 Cluster",
-          gpu: "RTX 4080",
-          gpuCount: 3,
-          cpuCores: 36,
-          ram: 192,
-          disk: 3000,
-          pricePerHour: "1.95",
-          location: "US-Central",
-          isAvailable: true,
-          metadata: { bandwidth: "10Gbps", ssd: true, raid: true, dlperf: 1185 }
-        }
-      ];
+      // Fetch real offers from Vast.ai API
+      const vastApiUrl = 'https://console.vast.ai/api/v0';
+      
+      try {
+        const response = await fetch(`${vastApiUrl}/bundles/`, {
+          headers: {
+            'Authorization': `Bearer ${vastApiKey.keyValue}`,
+          },
+        });
 
-      res.json(mockServers);
+        if (!response.ok) {
+          console.error("Vast.ai API error:", response.status, response.statusText);
+          return res.status(500).json({ 
+            error: "Failed to fetch offers from Vast.ai. Please check your API key." 
+          });
+        }
+
+        const data = await response.json();
+        console.log("Vast.ai API response received with", data.offers?.length || 0, "offers");
+
+        if (!data.offers || !Array.isArray(data.offers)) {
+          return res.status(500).json({ 
+            error: "Invalid response from Vast.ai API" 
+          });
+        }
+
+        // Transform Vast.ai offers to our format
+        const availableServers = data.offers
+          .filter((offer: any) => offer.rentable && offer.verification === 'verified')
+          .slice(0, 20) // Limit to first 20 offers
+          .map((offer: any) => ({
+            vastId: offer.id.toString(),
+            name: `${offer.gpu_name} Server`,
+            gpu: offer.gpu_name,
+            gpuCount: offer.num_gpus,
+            cpuCores: offer.cpu_cores,
+            ram: Math.round(offer.cpu_ram / 1024), // Convert MB to GB
+            disk: Math.round(offer.disk_space),
+            pricePerHour: offer.dph_total.toFixed(3),
+            location: `${offer.geolocation || offer.country || 'Unknown'}`,
+            isAvailable: true,
+            metadata: {
+              reliability: offer.reliability2,
+              dlperf: offer.dlperf,
+              bandwidth: `${offer.inet_up}/${offer.inet_down} Mbps`,
+              cuda: offer.cuda_max_good,
+              verification: offer.verification,
+              machineId: offer.machine_id,
+              hostname: offer.hostname
+            }
+          }));
+
+        res.json(availableServers);
+
+      } catch (apiError) {
+        console.error("Error calling Vast.ai API:", apiError);
+        res.status(500).json({ 
+          error: "Failed to communicate with Vast.ai platform. Please check your API key and network connection." 
+        });
+      }
+
     } catch (error) {
       console.error("Get available servers error:", error);
       res.status(500).json({ error: "Failed to fetch available servers" });
@@ -787,122 +686,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Server not found" });
       }
 
-      // Check if this is a demo server (starts with 'vast_') or real Vast.ai server ID
-      if (vastId.startsWith('vast_')) {
-        console.log("Demo mode detected for vastId:", vastId);
-        // Demo mode - simulate launch process
-        console.log("Demo mode: simulating server launch");
-        
-        // Update server status to launching
-        await storage.updateVastServer(server.id, { status: "launching" });
-        
-        // Simulate launch delay and then mark as running
-        setTimeout(async () => {
-          try {
-            await storage.updateVastServer(server.id, {
-              status: "running",
-              isLaunched: true,
-              launchedAt: new Date(),
-              serverUrl: `demo-server-${server.id}.vast.ai:8188`,
-              sshConnection: `ssh root@demo-server-${server.id}.vast.ai -p 22`,
-              comfyuiPort: 8188,
-              metadata: {
-                vastInstanceId: `demo_${server.id}`,
-                vastStatus: 'running',
-                demoMode: true
-              }
-            });
-          } catch (updateError) {
-            console.error("Failed to update demo server status:", updateError);
-          }
-        }, 2000);
-        
-        const launchedServer = await storage.updateVastServer(server.id, {
-          status: "launching",
-          isLaunched: true,
-          launchedAt: new Date()
+      // Set initial status to launching
+      await storage.updateVastServer(server.id, { status: "launching" });
+
+      // Real Vast.ai API integration
+      const vastApiUrl = 'https://console.vast.ai/api/v0';
+      const dockerImage = "pytorch/pytorch:latest";
+      const offerId = parseInt(vastId);
+      
+      console.log("Creating real Vast.ai instance with offer ID:", offerId);
+      
+      try {
+        // Create instance on Vast.ai platform
+        const createResponse = await fetch(`${vastApiUrl}/asks/${offerId}/`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${vastApiKey.keyValue}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            client_id: 'me',
+            image: dockerImage,
+            args: [],
+            env: {},
+          }),
         });
-        
-        res.json(launchedServer);
-        
-      } else {
-        // Real Vast.ai API integration
-        const vastApiUrl = 'https://console.vast.ai/api/v0';
-        const dockerImage = "pytorch/pytorch:latest";
-        const offerId = parseInt(vastId);
-        
-        try {
-          // Create instance on Vast.ai platform
-          const createResponse = await fetch(`${vastApiUrl}/asks/${offerId}/`, {
-            method: 'PUT',
-            headers: {
-              'Authorization': `Bearer ${vastApiKey.keyValue}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              client_id: 'me',
-              image: dockerImage,
-              args: [],
-              env: {},
-            }),
-          });
 
-          if (!createResponse.ok) {
-            const errorText = await createResponse.text();
-            console.error("Vast.ai API HTTP error:", createResponse.status, createResponse.statusText, errorText);
-            await storage.updateVastServer(server.id, { status: "error" });
-            return res.status(400).json({ 
-              error: `Failed to create instance on Vast.ai: ${createResponse.status} ${createResponse.statusText}` 
-            });
-          }
-
-          const createResult = await createResponse.json();
-          console.log("Vast.ai create response:", createResult);
-          
-          if (!createResult.success) {
-            console.error("Vast.ai API response error:", createResult);
-            await storage.updateVastServer(server.id, { status: "error" });
-            return res.status(400).json({ 
-              error: createResult.msg || "Failed to create instance on Vast.ai platform" 
-            });
-          }
-
-          // Get instance details
-          const instanceId = createResult.new_contract;
-          const instanceResponse = await fetch(`${vastApiUrl}/instances/`, {
-            headers: {
-              'Authorization': `Bearer ${vastApiKey.keyValue}`,
-            },
-          });
-
-          let instanceData = null;
-          if (instanceResponse.ok) {
-            const instances = await instanceResponse.json();
-            instanceData = instances.instances?.find((inst: any) => inst.id === instanceId);
-          }
-
-          // Update server with real instance information
-          const launchedServer = await storage.updateVastServer(server.id, {
-            status: instanceData?.actual_status === 'running' ? "running" : "launching",
-            isLaunched: true,
-            launchedAt: new Date(),
-            serverUrl: instanceData?.ssh_host ? `${instanceData.ssh_host}:${instanceData.ssh_port || 22}` : null,
-            sshConnection: instanceData?.ssh_host ? `ssh root@${instanceData.ssh_host} -p ${instanceData.ssh_port || 22}` : null,
-            metadata: {
-              vastInstanceId: instanceId,
-              vastStatus: instanceData?.actual_status || 'unknown'
-            }
-          });
-
-          res.json(launchedServer);
-
-        } catch (error) {
-          console.error("Vast.ai API error:", error);
+        if (!createResponse.ok) {
+          const errorText = await createResponse.text();
+          console.error("Vast.ai API HTTP error:", createResponse.status, createResponse.statusText, errorText);
           await storage.updateVastServer(server.id, { status: "error" });
-          res.status(500).json({ 
-            error: "Failed to communicate with Vast.ai platform. Please check your API key." 
+          return res.status(400).json({ 
+            error: `Failed to create instance on Vast.ai: ${createResponse.status} ${createResponse.statusText}` 
           });
         }
+
+        const createResult = await createResponse.json();
+        console.log("Vast.ai create response:", createResult);
+        
+        if (!createResult.success) {
+          console.error("Vast.ai API response error:", createResult);
+          await storage.updateVastServer(server.id, { status: "error" });
+          return res.status(400).json({ 
+            error: createResult.msg || "Failed to create instance on Vast.ai platform" 
+          });
+        }
+
+        // Get instance details
+        const instanceId = createResult.new_contract;
+        const instanceResponse = await fetch(`${vastApiUrl}/instances/`, {
+          headers: {
+            'Authorization': `Bearer ${vastApiKey.keyValue}`,
+          },
+        });
+
+        let instanceData = null;
+        if (instanceResponse.ok) {
+          const instances = await instanceResponse.json();
+          instanceData = instances.instances?.find((inst: any) => inst.id === instanceId);
+        }
+
+        // Update server with real instance information
+        const launchedServer = await storage.updateVastServer(server.id, {
+          status: instanceData?.actual_status === 'running' ? "running" : "launching",
+          isLaunched: true,
+          launchedAt: new Date(),
+          serverUrl: instanceData?.ssh_host ? `${instanceData.ssh_host}:${instanceData.ssh_port || 22}` : null,
+          sshConnection: instanceData?.ssh_host ? `ssh root@${instanceData.ssh_host} -p ${instanceData.ssh_port || 22}` : null,
+          metadata: {
+            vastInstanceId: instanceId,
+            vastStatus: instanceData?.actual_status || 'unknown'
+          }
+        });
+
+        res.json(launchedServer);
+
+      } catch (error) {
+        console.error("Vast.ai API error:", error);
+        await storage.updateVastServer(server.id, { status: "error" });
+        res.status(500).json({ 
+          error: "Failed to communicate with Vast.ai platform. Please check your API key." 
+        });
       }
     } catch (error) {
       console.error("Launch server error:", error);
@@ -1060,13 +924,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Import only specific handlers from vast-ai that don't conflict
+  // Import real Vast.ai handlers for full API integration
   const { 
     getVastServers, 
     getAvailableServers
   } = await import('./vast-ai');
 
-  // Vast.ai routes - using custom handlers for launch/delete/restart
+  // Use real Vast.ai API handlers
   app.get("/api/vast-servers", getVastServers);
   app.get("/api/vast-servers/available", getAvailableServers);
 

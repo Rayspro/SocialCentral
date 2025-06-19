@@ -113,6 +113,8 @@ Changelog:
 - June 19, 2025. Fixed Vast.ai API integration to use database-stored API keys instead of environment variables, enabling real server launches on Vast.ai platform
 - June 19, 2025. Fixed "Failed to create instance" error by implementing proper demo mode for server launches with fallback to real API integration
 - June 19, 2025. Resolved duplicate route handler conflicts that were preventing demo server launches from working correctly
+- June 19, 2025. Implemented full real Vast.ai API integration - app now fetches live server offers and creates actual instances on Vast.ai platform
+- June 19, 2025. Replaced mock data system with authentic Vast.ai marketplace data - servers launched will appear in user's Vast.ai console
 ```
 
 ## User Preferences

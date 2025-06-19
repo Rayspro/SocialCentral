@@ -315,17 +315,7 @@ export async function getVastServers(req: Request, res: Response) {
 export async function getAvailableServers(req: Request, res: Response) {
   try {
     const { storage } = await import('./storage');
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = parseInt(req.query.limit as string) || 20;
-    const filters = {
-      gpu_name: req.query.gpu_name as string,
-      num_gpus: req.query.num_gpus ? parseInt(req.query.num_gpus as string) : undefined,
-      max_price: req.query.max_price ? parseFloat(req.query.max_price as string) : undefined,
-      min_cpu_cores: req.query.min_cpu_cores ? parseInt(req.query.min_cpu_cores as string) : undefined,
-      min_ram: req.query.min_ram ? parseInt(req.query.min_ram as string) : undefined,
-      verified_only: req.query.verified_only === 'true'
-    };
-
+    
     // Get Vast.ai API key from database
     const vastApiKey = await storage.getApiKeyByService('vast');
     if (!vastApiKey || !vastApiKey.keyValue) {
@@ -335,22 +325,36 @@ export async function getAvailableServers(req: Request, res: Response) {
     }
 
     const vastService = new VastAIService(vastApiKey.keyValue);
-    const result = await vastService.getAvailableOffers(page, limit, filters);
+    const result = await vastService.getAvailableOffers(1, 20);
     
-    res.json({
-      success: true,
-      data: result.offers,
-      pagination: {
-        page,
-        limit,
-        total: result.total,
-        pages: result.pages
+    // Transform Vast.ai offers to our expected format
+    const availableServers = result.offers.map(offer => ({
+      vastId: offer.id.toString(),
+      name: `${offer.gpu_name} Server`,
+      gpu: offer.gpu_name,
+      gpuCount: offer.num_gpus,
+      cpuCores: offer.cpu_cores,
+      ram: Math.round(offer.cpu_ram / 1024), // Convert MB to GB
+      disk: Math.round(offer.disk_space),
+      pricePerHour: offer.dph_total.toFixed(3),
+      location: `${offer.country} (${offer.region})`,
+      isAvailable: offer.rentable,
+      metadata: {
+        reliability: offer.reliability2,
+        dlperf: offer.dlperf,
+        bandwidth: `${offer.inet_up}/${offer.inet_down} Mbps`,
+        cuda: offer.cuda_max_good,
+        verification: offer.verification,
+        machineId: offer.machine_id,
+        hostname: offer.hostname
       }
-    });
+    }));
+    
+    res.json(availableServers);
   } catch (error: any) {
     console.error('Get available servers error:', error);
     res.status(500).json({ 
-      error: error.message || "Failed to fetch available servers" 
+      error: error.message || "Failed to fetch available servers from Vast.ai" 
     });
   }
 }

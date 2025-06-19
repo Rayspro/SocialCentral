@@ -8,8 +8,270 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, BarChart3, Settings, Cpu, Bot } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { LoadingSpinner, LoadingCard } from "@/components/ui/loading-spinner";
+import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, BarChart3, Settings, Cpu, Bot, Download, Eye, Trash2, Plus, Loader2 } from "lucide-react";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
+
+// Model Management Modal Component
+function ModelManagementModal({ serverId }: { serverId: number }) {
+  const [newModelUrl, setNewModelUrl] = useState('');
+  const [newModelFolder, setNewModelFolder] = useState('');
+  const [newModelName, setNewModelName] = useState('');
+  const [activeTab, setActiveTab] = useState('download');
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  // Fetch models for this server
+  const { data: models, isLoading: modelsLoading } = useQuery({
+    queryKey: [`/api/comfy/${serverId}/models`],
+    retry: false,
+  });
+
+  // Fetch available models
+  const { data: availableModels, isLoading: availableModelsLoading } = useQuery({
+    queryKey: [`/api/comfy/${serverId}/available-models`],
+    retry: false,
+  });
+
+  // Add model mutation
+  const addModelMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/comfy/${serverId}/models`, {
+        method: 'POST',
+        body: JSON.stringify({
+          url: newModelUrl,
+          folder: newModelFolder,
+          name: newModelName || undefined,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/comfy/${serverId}/models`] });
+      setNewModelUrl('');
+      setNewModelFolder('');
+      setNewModelName('');
+      toast({
+        title: "Model download started",
+        description: "The model is being downloaded in the background.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to start download",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete model mutation
+  const deleteModelMutation = useMutation({
+    mutationFn: async (modelId: number) => {
+      return apiRequest(`/api/comfy/${serverId}/models/${modelId}`, {
+        method: 'DELETE',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/comfy/${serverId}/models`] });
+      toast({
+        title: "Model deleted",
+        description: "The model has been removed from the server.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete model",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAddModel = () => {
+    if (!newModelUrl || !newModelFolder) return;
+    addModelMutation.mutate();
+  };
+
+  const handleDeleteModel = (modelId: number) => {
+    deleteModelMutation.mutate(modelId);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'downloading': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  };
+
+  const formatProgress = (progress: number) => {
+    return `${Math.round(progress || 0)}%`;
+  };
+
+  return (
+    <div className="flex-1 overflow-hidden">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="download">Download Models</TabsTrigger>
+          <TabsTrigger value="installed">Installed Models</TabsTrigger>
+          <TabsTrigger value="available">Available Models</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="download" className="flex-1 space-y-4 overflow-auto">
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="model-url">Model URL</Label>
+              <Input
+                id="model-url"
+                value={newModelUrl}
+                onChange={(e) => setNewModelUrl(e.target.value)}
+                placeholder="https://huggingface.co/model/file.safetensors"
+              />
+            </div>
+            <div>
+              <Label htmlFor="model-folder">Folder</Label>
+              <Select value={newModelFolder} onValueChange={setNewModelFolder}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select folder" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="checkpoints">Checkpoints</SelectItem>
+                  <SelectItem value="loras">LoRAs</SelectItem>
+                  <SelectItem value="vae">VAE</SelectItem>
+                  <SelectItem value="controlnet">ControlNet</SelectItem>
+                  <SelectItem value="embeddings">Embeddings</SelectItem>
+                  <SelectItem value="upscale_models">Upscale Models</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="model-name">Custom Name (Optional)</Label>
+              <Input
+                id="model-name"
+                value={newModelName}
+                onChange={(e) => setNewModelName(e.target.value)}
+                placeholder="Leave empty to use filename"
+              />
+            </div>
+            <Button 
+              onClick={handleAddModel} 
+              disabled={addModelMutation.isPending || !newModelUrl || !newModelFolder}
+              className="w-full"
+            >
+              {addModelMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Adding Model...
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 mr-2" />
+                  Add Model
+                </>
+              )}
+            </Button>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="installed" className="flex-1 overflow-auto">
+          <div className="space-y-4">
+            {modelsLoading ? (
+              <LoadingCard />
+            ) : models && Array.isArray(models) && models.length > 0 ? (
+              <div className="space-y-3">
+                {models.map((model: any) => (
+                  <div key={model.id} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{model.name}</h4>
+                        <div className="text-sm text-muted-foreground">
+                          {model.folder} • {model.fileSize ? `${(model.fileSize / 1024 / 1024 / 1024).toFixed(2)} GB` : 'Size unknown'}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(model.status)}>
+                          {model.status}
+                        </Badge>
+                        {(model.status === 'completed' || model.status === 'failed') && (
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteModel(model.id)}
+                            className="h-7 px-2"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {model.status === 'downloading' && (
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div 
+                          className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                          style={{ width: formatProgress(model.downloadProgress) }}
+                        ></div>
+                      </div>
+                    )}
+                    {model.errorMessage && (
+                      <div className="text-sm text-red-500 mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                        <strong>Error:</strong> {model.errorMessage}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                <Download className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No models downloaded yet</p>
+                <p className="text-sm">Use the Download Models tab to add models</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="available" className="flex-1 overflow-auto">
+          <div className="space-y-4">
+            {availableModelsLoading ? (
+              <LoadingCard />
+            ) : availableModels?.models ? (
+              <div className="space-y-4">
+                {Object.entries(availableModels.models).map(([category, modelList]) => (
+                  <div key={category} className="space-y-2">
+                    <h4 className="font-semibold capitalize text-sm text-muted-foreground border-b pb-1">
+                      {category} ({Array.isArray(modelList) ? modelList.length : 0})
+                    </h4>
+                    <div className="grid gap-2">
+                      {Array.isArray(modelList) ? modelList.map((model, index) => (
+                        <div key={index} className="text-sm p-2 bg-muted rounded">
+                          {model}
+                        </div>
+                      )) : (
+                        <div className="text-sm text-muted-foreground">No models in this category</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-muted-foreground py-8">
+                <AlertCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>Unable to load available models</p>
+                <p className="text-sm">ComfyUI server may not be running</p>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
 interface Server {
   id: number;
@@ -563,14 +825,26 @@ export default function ServerDetail() {
               </p>
             </div>
             <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setLocation(`/servers/${id}/comfyui`)}
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Manage Models
-              </Button>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    Manage Models
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+                  <DialogHeader>
+                    <DialogTitle>Model Management - {server.name}</DialogTitle>
+                    <DialogDescription>
+                      Download and manage ComfyUI models for this server
+                    </DialogDescription>
+                  </DialogHeader>
+                  <ModelManagementModal serverId={parseInt(id)} />
+                </DialogContent>
+              </Dialog>
               <Button onClick={() => setLocation(`/servers/${id}/comfyui`)}>
                 <Bot className="h-4 w-4 mr-2" />
                 Open ComfyUI

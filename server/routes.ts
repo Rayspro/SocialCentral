@@ -583,7 +583,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pricePerHour: "0.85",
           location: "US-East",
           isAvailable: true,
-          metadata: { bandwidth: "1Gbps", ssd: true }
+          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 520 }
         },
         {
           vastId: "vast_002", 
@@ -596,7 +596,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pricePerHour: "0.45",
           location: "US-West",
           isAvailable: true,
-          metadata: { bandwidth: "500Mbps", ssd: true }
+          metadata: { bandwidth: "500Mbps", ssd: true, dlperf: 380 }
         },
         {
           vastId: "vast_003",
@@ -609,7 +609,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
           pricePerHour: "1.25",
           location: "Europe",
           isAvailable: true,
-          metadata: { bandwidth: "1Gbps", ssd: true, raid: true }
+          metadata: { bandwidth: "1Gbps", ssd: true, raid: true, dlperf: 460 }
+        },
+        {
+          vastId: "vast_004",
+          name: "RTX 4070 Ti Entry",
+          gpu: "RTX 4070 Ti",
+          gpuCount: 1,
+          cpuCores: 8,
+          ram: 24,
+          disk: 256,
+          pricePerHour: "0.32",
+          location: "US-Central",
+          isAvailable: true,
+          metadata: { bandwidth: "500Mbps", ssd: true, dlperf: 285 }
+        },
+        {
+          vastId: "vast_005",
+          name: "Quad RTX 3090 Workstation",
+          gpu: "RTX 3090",
+          gpuCount: 4,
+          cpuCores: 32,
+          ram: 256,
+          disk: 4000,
+          pricePerHour: "2.40",
+          location: "US-East",
+          isAvailable: true,
+          metadata: { bandwidth: "10Gbps", ssd: true, raid: true, dlperf: 850 }
+        },
+        {
+          vastId: "vast_006",
+          name: "RTX A6000 Professional",
+          gpu: "RTX A6000",
+          gpuCount: 1,
+          cpuCores: 20,
+          ram: 96,
+          disk: 1500,
+          pricePerHour: "1.15",
+          location: "Europe",
+          isAvailable: true,
+          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 495, pro: true }
+        },
+        {
+          vastId: "vast_007",
+          name: "RTX 3060 Ti Basic",
+          gpu: "RTX 3060 Ti",
+          gpuCount: 1,
+          cpuCores: 6,
+          ram: 16,
+          disk: 200,
+          pricePerHour: "0.18",
+          location: "Asia-Pacific",
+          isAvailable: true,
+          metadata: { bandwidth: "200Mbps", ssd: false, dlperf: 185 }
+        },
+        {
+          vastId: "vast_008",
+          name: "Dual RTX 4090 Beast",
+          gpu: "RTX 4090",
+          gpuCount: 2,
+          cpuCores: 32,
+          ram: 128,
+          disk: 2000,
+          pricePerHour: "1.65",
+          location: "US-West",
+          isAvailable: true,
+          metadata: { bandwidth: "10Gbps", ssd: true, raid: true, dlperf: 1040 }
+        },
+        {
+          vastId: "vast_009",
+          name: "RTX 4080 Standard",
+          gpu: "RTX 4080",
+          gpuCount: 1,
+          cpuCores: 14,
+          ram: 48,
+          disk: 800,
+          pricePerHour: "0.68",
+          location: "Canada",
+          isAvailable: true,
+          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 395 }
+        },
+        {
+          vastId: "vast_010",
+          name: "Tesla V100 Research",
+          gpu: "Tesla V100",
+          gpuCount: 1,
+          cpuCores: 16,
+          ram: 64,
+          disk: 1000,
+          pricePerHour: "0.75",
+          location: "US-East",
+          isAvailable: true,
+          metadata: { bandwidth: "1Gbps", ssd: true, dlperf: 312, research: true }
+        },
+        {
+          vastId: "vast_011",
+          name: "RTX 3070 Starter",
+          gpu: "RTX 3070",
+          gpuCount: 1,
+          cpuCores: 8,
+          ram: 20,
+          disk: 400,
+          pricePerHour: "0.28",
+          location: "Europe",
+          isAvailable: true,
+          metadata: { bandwidth: "500Mbps", ssd: true, dlperf: 220 }
+        },
+        {
+          vastId: "vast_012",
+          name: "Triple RTX 4080 Cluster",
+          gpu: "RTX 4080",
+          gpuCount: 3,
+          cpuCores: 36,
+          ram: 192,
+          disk: 3000,
+          pricePerHour: "1.95",
+          location: "US-Central",
+          isAvailable: true,
+          metadata: { bandwidth: "10Gbps", ssd: true, raid: true, dlperf: 1185 }
         }
       ];
 

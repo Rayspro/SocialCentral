@@ -1,12 +1,15 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Server, Play, Square, Trash2 } from "lucide-react";
+import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { VastServer } from "@shared/schema";
 
@@ -29,6 +32,14 @@ export default function VastServers() {
   const queryClient = useQueryClient();
   const [selectedServer, setSelectedServer] = useState<AvailableServer | null>(null);
   const [showLaunchDialog, setShowLaunchDialog] = useState(false);
+  
+  // Filter and sort states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [gpuFilter, setGpuFilter] = useState("all");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [priceRange, setPriceRange] = useState("all");
+  const [sortBy, setSortBy] = useState("price");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
   // Fetch launched servers
   const { data: launchedServers, isLoading: isLoadingLaunched } = useQuery<VastServer[]>({
@@ -145,6 +156,87 @@ export default function VastServers() {
     return `$${parseFloat(price).toFixed(2)}/hour`;
   };
 
+  // Filter and sort available servers
+  const filteredServers = useMemo(() => {
+    if (!availableServers) return [];
+    
+    let filtered = availableServers.filter(server => {
+      // Search filter
+      if (searchTerm && !server.name.toLowerCase().includes(searchTerm.toLowerCase()) && 
+          !server.gpu.toLowerCase().includes(searchTerm.toLowerCase())) {
+        return false;
+      }
+      
+      // GPU filter
+      if (gpuFilter !== "all" && !server.gpu.toLowerCase().includes(gpuFilter.toLowerCase())) {
+        return false;
+      }
+      
+      // Location filter
+      if (locationFilter !== "all" && server.location !== locationFilter) {
+        return false;
+      }
+      
+      // Price range filter
+      const price = parseFloat(server.pricePerHour);
+      if (priceRange === "budget" && price > 0.5) return false;
+      if (priceRange === "mid" && (price <= 0.5 || price > 1.0)) return false;
+      if (priceRange === "high" && price <= 1.0) return false;
+      
+      return true;
+    });
+    
+    // Sort servers
+    filtered.sort((a, b) => {
+      let valueA, valueB;
+      
+      switch (sortBy) {
+        case "price":
+          valueA = parseFloat(a.pricePerHour);
+          valueB = parseFloat(b.pricePerHour);
+          break;
+        case "gpu":
+          valueA = a.gpu;
+          valueB = b.gpu;
+          break;
+        case "ram":
+          valueA = a.ram;
+          valueB = b.ram;
+          break;
+        case "performance":
+          valueA = a.metadata?.dlperf || 0;
+          valueB = b.metadata?.dlperf || 0;
+          break;
+        default:
+          valueA = a.name;
+          valueB = b.name;
+      }
+      
+      if (typeof valueA === "string") {
+        return sortOrder === "asc" ? valueA.localeCompare(valueB) : valueB.localeCompare(valueA);
+      }
+      
+      return sortOrder === "asc" ? valueA - valueB : valueB - valueA;
+    });
+    
+    return filtered;
+  }, [availableServers, searchTerm, gpuFilter, locationFilter, priceRange, sortBy, sortOrder]);
+
+  // Get unique values for filters
+  const uniqueGpus = useMemo(() => {
+    if (!availableServers) return [];
+    const gpuSet = new Set<string>();
+    availableServers.forEach(s => gpuSet.add(s.gpu));
+    return Array.from(gpuSet);
+  }, [availableServers]);
+
+  const uniqueLocations = useMemo(() => {
+    if (!availableServers) return [];
+    const locationSet = new Set<string>();
+    availableServers.forEach(s => locationSet.add(s.location));
+    return Array.from(locationSet);
+  }, [availableServers]);
+
   return (
     <div className="container mx-auto py-6">
       <div className="flex items-center justify-between mb-6">
@@ -256,69 +348,210 @@ export default function VastServers() {
         </TabsContent>
 
         <TabsContent value="available" className="space-y-4">
+          {/* Filters and Search */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Filter className="h-5 w-5" />
+                Filter & Search Servers
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Search</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search servers..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">GPU Type</label>
+                  <Select value={gpuFilter} onValueChange={setGpuFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All GPUs</SelectItem>
+                      {uniqueGpus.map(gpu => (
+                        <SelectItem key={gpu} value={gpu}>{gpu}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Location</label>
+                  <Select value={locationFilter} onValueChange={setLocationFilter}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Locations</SelectItem>
+                      {uniqueLocations.map(location => (
+                        <SelectItem key={location} value={location}>{location}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-medium">Price Range</label>
+                  <Select value={priceRange} onValueChange={setPriceRange}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Prices</SelectItem>
+                      <SelectItem value="budget">Budget (≤$0.50/hr)</SelectItem>
+                      <SelectItem value="mid">Mid-range ($0.50-$1.00/hr)</SelectItem>
+                      <SelectItem value="high">High-end ($1.00+/hr)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4 mt-4 pt-4 border-t">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium">Sort by:</label>
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="price">Price</SelectItem>
+                      <SelectItem value="gpu">GPU</SelectItem>
+                      <SelectItem value="ram">RAM</SelectItem>
+                      <SelectItem value="performance">Performance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+                  >
+                    <ArrowUpDown className="h-4 w-4" />
+                    {sortOrder === "asc" ? "↑" : "↓"}
+                  </Button>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Showing {filteredServers.length} of {availableServers?.length || 0} servers
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Servers Table */}
           {isLoadingAvailable ? (
             <div className="flex items-center justify-center h-32">
               <Loader2 className="h-8 w-8 animate-spin" />
             </div>
-          ) : availableServers && availableServers.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {availableServers.map((server) => (
-                <Card key={server.vastId}>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{server.name}</CardTitle>
-                      <Badge variant="outline">Available</Badge>
-                    </div>
-                    <CardDescription>
-                      {server.gpu} × {server.gpuCount} | {server.location}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>CPU Cores:</span>
-                        <span>{server.cpuCores}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>RAM:</span>
-                        <span>{server.ram} GB</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Storage:</span>
-                        <span>{server.disk} GB</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Cost:</span>
-                        <span className="font-semibold text-green-600">{formatPrice(server.pricePerHour)}</span>
-                      </div>
-                      {server.metadata && (
-                        <div className="flex justify-between">
-                          <span>Bandwidth:</span>
-                          <span>{server.metadata.bandwidth}</span>
-                        </div>
-                      )}
-                    </div>
-                    <Button
-                      className="w-full mt-4"
-                      onClick={() => handleLaunchServer(server)}
-                      disabled={launchMutation.isPending}
-                    >
-                      <Play className="h-4 w-4 mr-2" />
-                      Launch Server
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+          ) : filteredServers.length > 0 ? (
+            <Card>
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Server</TableHead>
+                      <TableHead>GPU</TableHead>
+                      <TableHead>CPU/RAM</TableHead>
+                      <TableHead>Storage</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Performance</TableHead>
+                      <TableHead>Price/Hour</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredServers.map((server) => (
+                      <TableRow key={server.vastId}>
+                        <TableCell>
+                          <div>
+                            <div className="font-medium">{server.name}</div>
+                            <div className="text-sm text-muted-foreground">ID: {server.vastId}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <Badge variant="secondary">{server.gpu}</Badge>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {server.gpuCount}x GPU{server.gpuCount > 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{server.cpuCores} cores</div>
+                            <div>{server.ram} GB RAM</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{server.disk} GB</div>
+                            <div className="text-muted-foreground">
+                              {server.metadata?.ssd ? 'SSD' : 'HDD'}
+                              {server.metadata?.raid && ' + RAID'}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{server.location}</Badge>
+                          <div className="text-sm text-muted-foreground mt-1">
+                            {server.metadata?.bandwidth}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {server.metadata?.dlperf ? (
+                              <>
+                                <div className="font-medium">{server.metadata.dlperf}</div>
+                                <div className="text-muted-foreground">DL Perf</div>
+                              </>
+                            ) : (
+                              <span className="text-muted-foreground">N/A</span>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="font-semibold text-green-600">
+                            {formatPrice(server.pricePerHour)}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            ~${(parseFloat(server.pricePerHour) * 24).toFixed(2)}/day
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="sm"
+                            onClick={() => handleLaunchServer(server)}
+                            disabled={launchMutation.isPending}
+                            className="w-full"
+                          >
+                            <Play className="h-4 w-4 mr-1" />
+                            Launch
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
           ) : (
             <Card>
               <CardContent className="flex items-center justify-center h-32">
                 <div className="text-center">
                   <p className="text-muted-foreground">
-                    No available servers found
+                    {availableServers?.length === 0 ? "No servers available" : "No servers match your filters"}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    Please check your Vast.ai API key in Settings
+                    {availableServers?.length === 0 ? "Please check your Vast.ai API key in Settings" : "Try adjusting your search criteria"}
                   </p>
                 </div>
               </CardContent>

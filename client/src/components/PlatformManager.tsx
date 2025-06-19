@@ -81,7 +81,7 @@ export function PlatformManager() {
       <Card className="lg:col-span-2 border border-gray-200 dark:border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-gray-900 dark:text-white">Connected Platforms</CardTitle>
+            <CardTitle className="text-base text-gray-900 dark:text-white">Connected Platforms</CardTitle>
             <div className="flex gap-2">
               <Button 
                 variant="outline"

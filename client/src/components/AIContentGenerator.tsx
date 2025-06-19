@@ -171,8 +171,8 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">AI Content Generator</h2>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">Create engaging content with AI assistance</p>
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">AI Content Generator</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">Create engaging content with AI assistance</p>
       </div>
 
       <Tabs defaultValue="text" className="w-full">
@@ -194,14 +194,14 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
         <TabsContent value="text" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-purple-600" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Sparkles className="h-4 w-4 text-purple-600" />
                 Generate Social Media Content
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="text-prompt">Content Prompt</Label>
+                <Label htmlFor="text-prompt" className="text-xs">Content Prompt</Label>
                 <Textarea
                   id="text-prompt"
                   placeholder="Describe what kind of content you want to create..."
@@ -213,7 +213,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label>Content Type</Label>
+                  <Label className="text-xs">Content Type</Label>
                   <Select value={textType} onValueChange={setTextType}>
                     <SelectTrigger>
                       <SelectValue />
@@ -229,7 +229,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Tone</Label>
+                  <Label className="text-xs">Tone</Label>
                   <Select value={textTone} onValueChange={setTextTone}>
                     <SelectTrigger>
                       <SelectValue />
@@ -246,7 +246,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Length</Label>
+                  <Label className="text-xs">Length</Label>
                   <Select value={textLength} onValueChange={setTextLength}>
                     <SelectTrigger>
                       <SelectValue />
@@ -303,14 +303,14 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
         <TabsContent value="enhance" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wand2 className="h-5 w-5 text-blue-600" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Wand2 className="h-4 w-4 text-blue-600" />
                 Enhance Existing Content
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="enhance-text">Content to Enhance</Label>
+                <Label htmlFor="enhance-text" className="text-xs">Content to Enhance</Label>
                 <Textarea
                   id="enhance-text"
                   placeholder="Paste your content here to improve it..."
@@ -322,7 +322,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Target Platform</Label>
+                  <Label className="text-xs">Target Platform</Label>
                   <Select value={enhancePlatform} onValueChange={setEnhancePlatform}>
                     <SelectTrigger>
                       <SelectValue />
@@ -339,7 +339,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Objective</Label>
+                  <Label className="text-xs">Objective</Label>
                   <Select value={enhanceObjective} onValueChange={setEnhanceObjective}>
                     <SelectTrigger>
                       <SelectValue />
@@ -398,14 +398,14 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
         <TabsContent value="image" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ImageIcon className="h-5 w-5 text-green-600" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <ImageIcon className="h-4 w-4 text-green-600" />
                 Generate AI Images
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="image-prompt">Image Description</Label>
+                <Label htmlFor="image-prompt" className="text-xs">Image Description</Label>
                 <Textarea
                   id="image-prompt"
                   placeholder="Describe the image you want to create..."
@@ -417,7 +417,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label>Style</Label>
+                  <Label className="text-xs">Style</Label>
                   <Select value={imageStyle} onValueChange={setImageStyle}>
                     <SelectTrigger>
                       <SelectValue />
@@ -434,7 +434,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Size</Label>
+                  <Label className="text-xs">Size</Label>
                   <Select value={imageSize} onValueChange={setImageSize}>
                     <SelectTrigger>
                       <SelectValue />

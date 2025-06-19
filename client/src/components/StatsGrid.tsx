@@ -68,14 +68,14 @@ export function StatsGrid() {
         const Icon = item.icon;
         return (
           <Card key={item.label} className="border border-gray-200 dark:border-slate-700">
-            <CardContent className="pt-6">
+            <CardContent className="pt-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm">{item.label}</p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{item.value}</p>
+                  <p className="text-gray-600 dark:text-gray-400 text-xs">{item.label}</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{item.value}</p>
                 </div>
-                <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${colorClasses[item.color as keyof typeof colorClasses]}`}>
-                  <Icon className="h-6 w-6" />
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[item.color as keyof typeof colorClasses]}`}>
+                  <Icon className="h-5 w-5" />
                 </div>
               </div>
             </CardContent>

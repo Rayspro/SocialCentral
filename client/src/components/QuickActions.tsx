@@ -95,7 +95,7 @@ export function QuickActions() {
       {/* Quick Actions Card */}
       <Card className="border border-gray-200 dark:border-slate-700">
         <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white">Quick Actions</CardTitle>
+          <CardTitle className="text-base text-gray-900 dark:text-white">Quick Actions</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <Link href="/create">
@@ -140,8 +140,8 @@ export function QuickActions() {
       <Card className="border border-gray-200 dark:border-slate-700">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle className="text-gray-900 dark:text-white">Pending Approvals</CardTitle>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
+            <CardTitle className="text-base text-gray-900 dark:text-white">Pending Approvals</CardTitle>
+            <span className="text-xs text-gray-600 dark:text-gray-400">
               {pendingContent?.length || 0} items
             </span>
           </div>
@@ -156,7 +156,7 @@ export function QuickActions() {
                     {content.title}
                   </p>
                   <p className="text-xs text-gray-600 dark:text-gray-400">
-                    {getPlatformName(content.platformId)} • {getTimeAgo(content.createdAt)}
+                    {getPlatformName(content.platformId)} • {getTimeAgo(content.createdAt.toString())}
                   </p>
                 </div>
                 <div className="flex gap-2">

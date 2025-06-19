@@ -367,10 +367,10 @@ export default function VastServers() {
               <Server className="h-7 w-7 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-4xl font-bold text-slate-900 dark:text-slate-100">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
                 Vast.ai Servers
               </h1>
-              <p className="text-lg text-slate-600 dark:text-slate-400">
+              <p className="text-sm text-slate-600 dark:text-slate-400">
                 Deploy and manage high-performance GPU instances for AI workloads
               </p>
             </div>
@@ -385,7 +385,7 @@ export default function VastServers() {
 
         <TabsContent value="launched" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Launched Servers</h2>
+            <h2 className="text-base font-semibold">Launched Servers</h2>
             <Button
               variant="outline"
               size="sm"
@@ -406,7 +406,7 @@ export default function VastServers() {
                 <Card key={server.id}>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">{server.name}</CardTitle>
+                      <CardTitle className="text-base">{server.name}</CardTitle>
                       <div className="flex items-center gap-2">
                         <Badge className={getStatusColor(server.status)}>
                           {server.status}
@@ -421,7 +421,7 @@ export default function VastServers() {
                         </Button>
                       </div>
                     </div>
-                    <CardDescription>
+                    <CardDescription className="text-xs">
                       {server.gpu} × {server.gpuCount} | {server.location}
                     </CardDescription>
                     {server.setupStatus && server.setupStatus !== 'pending' && (
@@ -566,15 +566,15 @@ export default function VastServers() {
           {/* Filters and Search */}
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Filter className="h-5 w-5" />
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Filter className="h-4 w-4" />
                 Filter & Search Servers
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Search</label>
+                  <label className="text-xs font-medium">Search</label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     <Input
@@ -587,7 +587,7 @@ export default function VastServers() {
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">GPU Type</label>
+                  <label className="text-xs font-medium">GPU Type</label>
                   <Select value={gpuFilter} onValueChange={setGpuFilter}>
                     <SelectTrigger>
                       <SelectValue />
@@ -602,7 +602,7 @@ export default function VastServers() {
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Location</label>
+                  <label className="text-xs font-medium">Location</label>
                   <Select value={locationFilter} onValueChange={setLocationFilter}>
                     <SelectTrigger>
                       <SelectValue />
@@ -617,7 +617,7 @@ export default function VastServers() {
                 </div>
                 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Price Range</label>
+                  <label className="text-xs font-medium">Price Range</label>
                   <Select value={priceRange} onValueChange={setPriceRange}>
                     <SelectTrigger>
                       <SelectValue />
@@ -634,7 +634,7 @@ export default function VastServers() {
               
               <div className="flex items-center gap-4 mt-4 pt-4 border-t">
                 <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium">Sort by:</label>
+                  <label className="text-xs font-medium">Sort by:</label>
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="w-32">
                       <SelectValue />

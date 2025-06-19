@@ -18,6 +18,7 @@ import Settings from "@/pages/Settings";
 import VastServers from "@/pages/VastServers";
 import ServerDetails from "@/pages/ServerDetails";
 import ComfyUI from "@/pages/ComfyUI";
+import PerformanceStory from "@/pages/PerformanceStory";
 import SignIn from "@/pages/SignIn";
 import SignUp from "@/pages/SignUp";
 import NotFound from "@/pages/not-found";
@@ -34,6 +35,7 @@ function Router() {
       <Route path="/vast-servers" component={VastServers} />
       <Route path="/vast-servers/:id" component={ServerDetails} />
       <Route path="/comfy-ui" component={ComfyUI} />
+      <Route path="/performance-story" component={PerformanceStory} />
       <Route path="/settings" component={Settings} />
       <Route path="/signin" component={SignIn} />
       <Route path="/signup" component={SignUp} />

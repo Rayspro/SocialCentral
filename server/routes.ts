@@ -560,6 +560,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/vast-servers/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const server = await storage.getVastServer(id);
+      
+      if (!server) {
+        return res.status(404).json({ error: "Server not found" });
+      }
+
+      res.json(server);
+    } catch (error) {
+      console.error("Get server error:", error);
+      res.status(500).json({ error: "Failed to fetch server details" });
+    }
+  });
+
   app.get("/api/vast-servers/available", async (req, res) => {
     try {
       const vastApiKey = await storage.getApiKeyByService('vast');

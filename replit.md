@@ -119,6 +119,8 @@ Changelog:
 - June 19, 2025. Implemented proper contract ID tracking for bidirectional sync between app and Vast.ai console status
 - June 19, 2025. Fixed UI issues - added refresh button for server status updates, corrected stop button visibility, and improved status display with accurate color coding
 - June 19, 2025. Enhanced server cards with individual refresh icons and proper setupStatus display in headers with color-coded badges
+- June 19, 2025. Added comprehensive server analytics page with real-time metrics, performance monitoring, and detailed server information
+- June 19, 2025. Implemented animated status indicators, loading states, and enhanced server cards with all status types and connection details
 ```
 
 ## User Preferences

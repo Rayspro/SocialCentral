@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw } from "lucide-react";
+import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import type { VastServer } from "@shared/schema";
 
@@ -239,6 +239,22 @@ export default function VastServers() {
     }
   };
 
+  const getStatusIndicator = (status: string) => {
+    switch (status) {
+      case 'running': return 'bg-green-500 animate-pulse';
+      case 'launching': return 'bg-blue-500 animate-ping';
+      case 'configuring': return 'bg-purple-500 animate-pulse';
+      case 'stopping': return 'bg-orange-500 animate-ping';
+      case 'stopped': return 'bg-red-500';
+      case 'ready': return 'bg-green-500';
+      case 'installing': return 'bg-blue-500 animate-pulse';
+      case 'failed': return 'bg-red-500';
+      case 'pending': return 'bg-gray-400';
+      case 'available': return 'bg-gray-500';
+      default: return 'bg-gray-400';
+    }
+  };
+
   const formatPrice = (price: string) => {
     return `$${parseFloat(price).toFixed(2)}/hour`;
   };
@@ -391,39 +407,83 @@ export default function VastServers() {
                     )}
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>CPU Cores:</span>
-                        <span>{server.cpuCores}</span>
+                    <div className="space-y-3">
+                      {/* Server Status Indicators */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800">
+                          <div className={`w-2 h-2 rounded-full ${getStatusIndicator(server.status)}`}></div>
+                          <span className="font-medium">Server: {server.status}</span>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800">
+                          <div className={`w-2 h-2 rounded-full ${getStatusIndicator(server.setupStatus || 'pending')}`}></div>
+                          <span className="font-medium">Setup: {server.setupStatus || 'pending'}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>RAM:</span>
-                        <span>{server.ram} GB</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Storage:</span>
-                        <span>{server.disk} GB</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Cost:</span>
-                        <span className="font-semibold">{formatPrice(server.pricePerHour)}</span>
-                      </div>
-                      {server.serverUrl && (
+
+                      {/* Server Specs */}
+                      <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span>URL:</span>
-                          <a 
-                            href={server.serverUrl} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:underline text-xs"
-                          >
-                            Access Server
-                          </a>
+                          <span>CPU Cores:</span>
+                          <span>{server.cpuCores}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>RAM:</span>
+                          <span>{server.ram} GB</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Storage:</span>
+                          <span>{server.disk} GB</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Cost:</span>
+                          <span className="font-semibold">{formatPrice(server.pricePerHour)}</span>
+                        </div>
+                        {server.launchedAt && (
+                          <div className="flex justify-between">
+                            <span>Launched:</span>
+                            <span className="text-xs">{new Date(server.launchedAt).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {server.serverUrl && (
+                          <div className="flex justify-between">
+                            <span>SSH:</span>
+                            <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                              {server.sshConnection?.replace('ssh ', '') || server.serverUrl}
+                            </code>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Loading Animation for Active States */}
+                      {['launching', 'configuring', 'stopping'].includes(server.status) && (
+                        <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded animate-pulse">
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                          <span className="text-sm text-blue-600 dark:text-blue-400">
+                            {server.status === 'launching' && 'Launching server instance...'}
+                            {server.status === 'configuring' && 'Configuring server environment...'}
+                            {server.status === 'stopping' && 'Stopping server instance...'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Setup Status Animation */}
+                      {server.setupStatus === 'installing' && (
+                        <div className="flex items-center gap-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded animate-pulse">
+                          <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                          <span className="text-sm text-purple-600 dark:text-purple-400">Installing ComfyUI...</span>
                         </div>
                       )}
                     </div>
 
                     <div className="flex gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.location.href = `/vast-servers/${server.id}`}
+                      >
+                        <BarChart3 className="h-4 w-4 mr-1" />
+                        Details
+                      </Button>
                       {server.isLaunched && ['launching', 'running', 'configuring'].includes(server.status) && (
                         <>
                           {server.status === 'running' && (

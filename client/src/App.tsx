@@ -13,6 +13,7 @@ import MediaLibrary from "@/pages/MediaLibrary";
 import Schedule from "@/pages/Schedule";
 import Settings from "@/pages/Settings";
 import VastServers from "@/pages/VastServers";
+import ServerDetails from "@/pages/ServerDetails";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -25,6 +26,7 @@ function Router() {
       <Route path="/media" component={MediaLibrary} />
       <Route path="/schedule" component={Schedule} />
       <Route path="/vast-servers" component={VastServers} />
+      <Route path="/vast-servers/:id" component={ServerDetails} />
       <Route path="/settings" component={Settings} />
       {/* Fallback to 404 */}
       <Route component={NotFound} />

@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3, Home, ChevronRight, User, LogOut, Bell } from "lucide-react";
+import { LoadingSpinner, LoadingCard, LoadingPage } from "@/components/ui/loading-spinner";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import type { VastServer } from "@shared/schema";
@@ -447,13 +448,23 @@ export default function VastServers() {
               onClick={() => refetchServers()}
               disabled={isLoadingLaunched}
             >
-              <RefreshCw className={`h-4 w-4 mr-1 ${isLoadingLaunched ? 'animate-spin' : ''}`} />
-              Refresh
+              {isLoadingLaunched ? (
+                <LoadingSpinner size="sm" text="Refreshing..." />
+              ) : (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-1" />
+                  Refresh
+                </>
+              )}
             </Button>
           </div>
           {isLoadingLaunched ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="border rounded-lg p-6">
+                  <LoadingCard />
+                </div>
+              ))}
             </div>
           ) : launchedServers && launchedServers.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -719,8 +730,12 @@ export default function VastServers() {
 
           {/* Servers Table */}
           {isLoadingAvailable ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 className="h-8 w-8 animate-spin" />
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="border rounded-lg p-4">
+                  <LoadingCard />
+                </div>
+              ))}
             </div>
           ) : filteredServers.length > 0 ? (
             <Card>

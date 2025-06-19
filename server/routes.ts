@@ -709,8 +709,69 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/vast-servers", async (req, res) => {
     try {
-      const servers = await storage.getVastServers();
-      res.json(servers);
+      // Get stored servers
+      const storedServers = await storage.getVastServers();
+      
+      // Try to sync with Vast.ai if we have API key
+      const vastApiKey = await storage.getApiKeyByService("vast");
+      if (vastApiKey?.keyValue) {
+        try {
+          const response = await fetch('https://console.vast.ai/api/v0/instances?owner=me', {
+            headers: {
+              'Authorization': `Bearer ${vastApiKey.keyValue}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const instances = data.instances || [];
+            
+            // Update each stored server with real Vast.ai data
+            for (const storedServer of storedServers) {
+              if (storedServer.vastId) {
+                const vastInstance = instances.find((instance: any) => instance.id.toString() === storedServer.vastId);
+                if (vastInstance) {
+                  // Update server with real data from Vast.ai
+                  await storage.updateVastServer(storedServer.id, {
+                    status: vastInstance.actual_status === 'running' ? 'running' : 'stopped',
+                    serverUrl: vastInstance.ssh_host ? `http://${vastInstance.ssh_host}:${vastInstance.direct_port_start || 8188}` : storedServer.serverUrl,
+                    sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
+                      ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
+                      : storedServer.sshConnection,
+                    metadata: {
+                      ...storedServer.metadata as any,
+                      vastData: {
+                        machine_id: vastInstance.machine_id,
+                        hostname: vastInstance.hostname,
+                        created_on: vastInstance.start_date,
+                        ssh_host: vastInstance.ssh_host,
+                        ssh_port: vastInstance.ssh_port,
+                        direct_port_start: vastInstance.direct_port_start,
+                        direct_port_end: vastInstance.direct_port_end,
+                        last_synced: new Date().toISOString()
+                      }
+                    }
+                  });
+                }
+              }
+            }
+            
+            // Get updated servers after sync
+            const updatedServers = await storage.getVastServers();
+            res.json(updatedServers);
+          } else {
+            console.error("Failed to sync with Vast.ai, returning stored data");
+            res.json(storedServers);
+          }
+        } catch (vastError) {
+          console.error("Failed to sync with Vast.ai, returning stored data:", vastError);
+          res.json(storedServers);
+        }
+      } else {
+        // No API key, return stored data
+        res.json(storedServers);
+      }
     } catch (error) {
       console.error("Get Vast servers error:", error);
       res.status(500).json({ error: "Failed to fetch Vast.ai servers" });
@@ -730,48 +791,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Server not found" });
       }
 
-      // Sync status with Vast.ai if server is launched
-      if (server.vastId && server.isLaunched) {
-        const vastApiKey = await storage.getApiKeyByService('vast');
-        if (vastApiKey && vastApiKey.keyValue) {
-          try {
-            const response = await fetch(`https://console.vast.ai/api/v0/instances/`, {
-              headers: {
-                'Authorization': `Bearer ${vastApiKey.keyValue}`,
-              },
-            });
-
-            if (response.ok) {
-              const data = await response.json();
-              const vastInstance = data.instances?.find((inst: any) => 
-                inst.id.toString() === server.vastId || 
-                inst.label === server.vastId
-              );
-
-              if (vastInstance) {
-                let updatedStatus = server.status;
-                if (vastInstance.actual_status === 'running') {
-                  updatedStatus = 'running';
-                } else if (vastInstance.actual_status === 'stopped') {
-                  updatedStatus = 'stopped';
-                } else if (vastInstance.actual_status === 'loading') {
-                  updatedStatus = 'loading';
+      // Try to sync this specific server with Vast.ai for fresh data
+      const vastApiKey = await storage.getApiKeyByService("vast");
+      if (vastApiKey?.keyValue && server.vastId) {
+        try {
+          const response = await fetch('https://console.vast.ai/api/v0/instances?owner=me', {
+            headers: {
+              'Authorization': `Bearer ${vastApiKey.keyValue}`,
+              'Content-Type': 'application/json',
+            },
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            const instances = data.instances || [];
+            const vastInstance = instances.find((instance: any) => instance.id.toString() === server.vastId);
+            
+            if (vastInstance) {
+              // Update server with real-time data
+              const updatedServer = await storage.updateVastServer(id, {
+                status: vastInstance.actual_status === 'running' ? 'running' : 'stopped',
+                serverUrl: vastInstance.ssh_host ? `http://${vastInstance.ssh_host}:${vastInstance.direct_port_start || 8188}` : server.serverUrl,
+                sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
+                  ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
+                  : server.sshConnection,
+                setupStatus: vastInstance.actual_status === 'running' ? 'ready' : server.setupStatus,
+                metadata: {
+                  ...server.metadata as any,
+                  vastData: {
+                    machine_id: vastInstance.machine_id,
+                    hostname: vastInstance.hostname,
+                    created_on: vastInstance.start_date,
+                    ssh_host: vastInstance.ssh_host,
+                    ssh_port: vastInstance.ssh_port,
+                    direct_port_start: vastInstance.direct_port_start,
+                    direct_port_end: vastInstance.direct_port_end,
+                    last_synced: new Date().toISOString()
+                  }
                 }
-
-                if (updatedStatus !== server.status) {
-                  await storage.updateVastServer(server.id, { 
-                    status: updatedStatus
-                  });
-                  server.status = updatedStatus;
-                }
-              }
+              });
+              
+              return res.json(updatedServer);
             }
-          } catch (syncError) {
-            console.log("Failed to sync status with Vast.ai:", syncError);
           }
+        } catch (vastError) {
+          console.error("Failed to sync server with Vast.ai:", vastError);
         }
       }
-
+      
       res.json(server);
     } catch (error) {
       console.error("Get server error:", error);
@@ -1186,9 +1253,66 @@ echo "CUDA environment configured!"`,
     res.json(setupScripts);
   });
 
-  // Server Analytics routes
+  // Sync all servers with Vast.ai
+  app.post("/api/vast-servers/sync", async (req, res) => {
+    try {
+      const vastApiKey = await storage.getApiKeyByService("vast");
+      if (!vastApiKey?.keyValue) {
+        return res.status(400).json({ error: "Vast.ai API key not configured" });
+      }
+
+      const vastService = new VastAIService(vastApiKey.keyValue);
+      const { instances } = await vastService.getInstances();
+      
+      const storedServers = await storage.getVastServers();
+      let syncedCount = 0;
+
+      // Update existing servers with Vast.ai data
+      for (const server of storedServers) {
+        if (server.vastId) {
+          const vastInstance = instances.find(instance => instance.id.toString() === server.vastId);
+          if (vastInstance) {
+            await storage.updateVastServer(server.id, {
+              status: vastInstance.status,
+              serverUrl: vastInstance.serverUrl || server.serverUrl,
+              sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
+                ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
+                : server.sshConnection,
+              setupStatus: vastInstance.status === 'running' ? 'ready' : server.setupStatus,
+              metadata: {
+                ...server.metadata as any,
+                vastData: {
+                  machine_id: vastInstance.machine_id,
+                  hostname: vastInstance.hostname,
+                  created_on: vastInstance.created_on,
+                  ssh_host: vastInstance.ssh_host,
+                  ssh_port: vastInstance.ssh_port,
+                  direct_port_start: vastInstance.direct_port_start,
+                  direct_port_end: vastInstance.direct_port_end,
+                  last_synced: new Date().toISOString()
+                }
+              }
+            });
+            syncedCount++;
+          }
+        }
+      }
+
+      res.json({ 
+        message: `Synced ${syncedCount} servers with Vast.ai`,
+        syncedCount,
+        totalInstances: instances.length
+      });
+    } catch (error) {
+      console.error("Failed to sync servers:", error);
+      res.status(500).json({ error: "Failed to sync with Vast.ai" });
+    }
+  });
+
+  // Server Analytics routes  
   app.get("/api/server-analytics", async (req, res) => {
     try {
+      // Get synced servers for analytics
       const servers = await storage.getVastServers();
       const today = new Date();
       const last7Days = [];

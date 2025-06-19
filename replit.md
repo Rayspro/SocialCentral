@@ -131,6 +131,7 @@ Changelog:
 - June 19, 2025. Added profile and logout options to all page headers with breadcrumb navigation - profile dropdown now appears on opposite side from breadcrumbs with consistent styling and functionality across all pages
 - June 19, 2025. Implemented complete authentication system with real credential validation - replaced mock authentication with secure bcrypt password hashing, proper route protection, and API validation that prevents unauthorized access with random credentials
 - June 19, 2025. Enhanced chart tooltips with proper formatting and readable information display - tooltips now show formatted currency, percentages, and detailed server information with proper styling and dark mode support
+- June 19, 2025. Implemented real-time server synchronization with Vast.ai API - servers now automatically sync status, connection details, and metadata from live Vast.ai instances with database updates for accurate server tracking
 ```
 
 ## User Preferences

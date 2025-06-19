@@ -562,67 +562,183 @@ export default function ServerDetail() {
                 Manage ComfyUI installation and configuration
               </p>
             </div>
-            <Button onClick={() => setLocation(`/servers/${id}/comfyui`)}>
-              <Bot className="h-4 w-4 mr-2" />
-              Open ComfyUI
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setLocation(`/servers/${id}/comfyui`)}
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Manage Models
+              </Button>
+              <Button onClick={() => setLocation(`/servers/${id}/comfyui`)}>
+                <Bot className="h-4 w-4 mr-2" />
+                Open ComfyUI
+              </Button>
+            </div>
           </div>
           
-          <Card>
-            <CardHeader>
-              <CardTitle>Setup Status</CardTitle>
-              <CardDescription>Current ComfyUI installation status</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className={`w-3 h-3 rounded-full ${getSetupStatusColor(server.setupStatus)}`}></div>
-                <span className="font-medium">{server.setupStatus}</span>
-              </div>
-              
-              {server.setupStatus === 'not-started' && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <AlertCircle className="h-5 w-5 text-blue-600" />
-                    <span className="font-medium text-blue-900 dark:text-blue-100">Ready to Setup</span>
-                  </div>
-                  <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
-                    ComfyUI is not yet installed on this server. You can start the automated setup process.
-                  </p>
-                  <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                    Start Automated Setup
-                  </Button>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Setup Status</CardTitle>
+                <CardDescription>Current ComfyUI installation status</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${getSetupStatusColor(server.setupStatus)}`}></div>
+                  <span className="font-medium">{server.setupStatus}</span>
                 </div>
-              )}
-              
-              {server.setupStatus === 'installing' && (
-                <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <RefreshCw className="h-5 w-5 text-yellow-600 animate-spin" />
-                    <span className="font-medium text-yellow-900 dark:text-yellow-100">Installation in Progress</span>
+                
+                {server.setupStatus === 'not-started' && (
+                  <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <AlertCircle className="h-5 w-5 text-blue-600" />
+                      <span className="font-medium text-blue-900 dark:text-blue-100">Ready to Setup</span>
+                    </div>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 mb-3">
+                      ComfyUI is not yet installed on this server. You can start the automated setup process.
+                    </p>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
+                      Start Automated Setup
+                    </Button>
                   </div>
-                  <p className="text-sm text-yellow-800 dark:text-yellow-200">
-                    ComfyUI is currently being installed. This may take several minutes.
-                  </p>
-                </div>
-              )}
-              
-              {server.setupStatus === 'completed' && (
-                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="font-medium text-green-900 dark:text-green-100">Setup Complete</span>
+                )}
+                
+                {server.setupStatus === 'installing' && (
+                  <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <RefreshCw className="h-5 w-5 text-yellow-600 animate-spin" />
+                      <span className="font-medium text-yellow-900 dark:text-yellow-100">Installation in Progress</span>
+                    </div>
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                      ComfyUI is currently being installed. This may take several minutes.
+                    </p>
                   </div>
-                  <p className="text-sm text-green-800 dark:text-green-200 mb-3">
-                    ComfyUI has been successfully installed and is ready to use.
-                  </p>
-                  <Button size="sm" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
-                    <Bot className="h-4 w-4 mr-2" />
-                    Launch ComfyUI
-                  </Button>
+                )}
+                
+                {server.setupStatus === 'completed' && (
+                  <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <span className="font-medium text-green-900 dark:text-green-100">Setup Complete</span>
+                    </div>
+                    <p className="text-sm text-green-800 dark:text-green-200 mb-3">
+                      ComfyUI has been successfully installed and is ready to use.
+                    </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
+                        <Settings className="h-4 w-4 mr-2" />
+                        Manage Models
+                      </Button>
+                      <Button size="sm" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
+                        <Bot className="h-4 w-4 mr-2" />
+                        Launch ComfyUI
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Real-time Progress</CardTitle>
+                <CardDescription>Live status and progress monitoring</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {server.schedulerActive && activeScheduler ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        <Clock className="h-3 w-3 mr-1" />
+                        Active Monitoring
+                      </Badge>
+                      <span className="text-sm text-muted-foreground">
+                        {activeScheduler.checkCount}/40 checks
+                      </span>
+                    </div>
+                    
+                    <Progress value={getSchedulerProgress()} className="h-2" />
+                    
+                    <div className="space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Last Status:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {activeScheduler.lastStatus}
+                        </Badge>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Last Check:</span>
+                        <span>{format(new Date(activeScheduler.lastCheckedAt), 'HH:mm:ss')}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Started:</span>
+                        <span>{format(new Date(activeScheduler.createdAt), 'HH:mm:ss')}</span>
+                      </div>
+                    </div>
+
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => stopSchedulerMutation.mutate()}
+                      disabled={stopSchedulerMutation.isPending}
+                      className="w-full"
+                    >
+                      <Square className="h-4 w-4 mr-1" />
+                      Stop Monitoring
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="text-center py-6">
+                      <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                      <h4 className="font-medium mb-2">No Active Monitoring</h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Start automatic monitoring to track ComfyUI setup progress in real-time.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => startSchedulerMutation.mutate()}
+                        disabled={startSchedulerMutation.isPending}
+                      >
+                        <Play className="h-4 w-4 mr-1" />
+                        Start Monitoring
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Recent Activity Summary */}
+                <Separator />
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium">Recent Activity</h4>
+                  {executions && executions.length > 0 ? (
+                    <div className="space-y-2 max-h-32 overflow-y-auto">
+                      {executions.slice(0, 3).map((execution: any) => (
+                        <div key={execution.id} className="flex items-center gap-2 text-sm">
+                          {execution.status === 'completed' ? (
+                            <CheckCircle className="h-3 w-3 text-green-500 flex-shrink-0" />
+                          ) : execution.status === 'failed' ? (
+                            <AlertCircle className="h-3 w-3 text-red-500 flex-shrink-0" />
+                          ) : (
+                            <Clock className="h-3 w-3 text-yellow-500 flex-shrink-0 animate-spin" />
+                          )}
+                          <span className="flex-1 truncate">{execution.status}</span>
+                          <span className="text-muted-foreground text-xs">
+                            {format(new Date(execution.createdAt), 'HH:mm')}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No recent activity</p>
+                  )}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="logs" className="space-y-6">

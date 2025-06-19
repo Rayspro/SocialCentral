@@ -105,6 +105,25 @@ export async function initializeDatabase() {
         },
       ]);
 
+      // Add sample API keys for development
+      const existingApiKeys = await db.select().from(apiKeys);
+      if (existingApiKeys.length === 0) {
+        await db.insert(apiKeys).values([
+          {
+            service: "openai",
+            keyName: "OPENAI_API_KEY",
+            keyValue: "sk-demo-key-replace-with-real-key",
+            isActive: false,
+          },
+          {
+            service: "vast",
+            keyName: "VAST_API_KEY", 
+            keyValue: "vast-demo-key-replace-with-real-key",
+            isActive: true,
+          }
+        ]);
+      }
+
       console.log("Database initialized with default data");
     }
   } catch (error) {

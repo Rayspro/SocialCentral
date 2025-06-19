@@ -13,9 +13,244 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LoadingSpinner, LoadingCard } from "@/components/ui/loading-spinner";
-import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, BarChart3, Settings, Cpu, Bot, Download, Eye, Trash2, Plus, Loader2 } from "lucide-react";
+import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, BarChart3, Settings, Cpu, Bot, Download, Eye, Trash2, Plus, Loader2, Brain, FileText, Zap } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { Textarea } from "@/components/ui/textarea";
+
+// Workflow Analyzer Component
+function WorkflowAnalyzer({ serverId }: { serverId: number }) {
+  const [workflowJson, setWorkflowJson] = useState('');
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Analyze workflow mutation
+  const analyzeWorkflowMutation = useMutation({
+    mutationFn: async (workflowData: any) => {
+      return apiRequest('/api/comfy/analyze-workflow', {
+        method: 'POST',
+        body: JSON.stringify({ workflowJson: workflowData }),
+      });
+    },
+    onSuccess: (data) => {
+      setAnalysisResult(data);
+      setIsAnalyzing(false);
+      toast({
+        title: "Workflow analyzed",
+        description: `Found ${data.models?.length || 0} models and ${data.nodes?.length || 0} custom nodes`,
+      });
+    },
+    onError: (error: any) => {
+      setIsAnalyzing(false);
+      toast({
+        title: "Analysis failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Download requirements mutation
+  const downloadRequirementsMutation = useMutation({
+    mutationFn: async (analysis: any) => {
+      return apiRequest(`/api/comfy/${serverId}/download-requirements`, {
+        method: 'POST',
+        body: JSON.stringify({ analysis }),
+      });
+    },
+    onSuccess: () => {
+      setIsDownloading(false);
+      queryClient.invalidateQueries({ queryKey: [`/api/comfy/${serverId}/models`] });
+      toast({
+        title: "Downloads started",
+        description: "Required models and nodes are being downloaded",
+      });
+    },
+    onError: (error: any) => {
+      setIsDownloading(false);
+      toast({
+        title: "Download failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleAnalyze = () => {
+    if (!workflowJson.trim()) return;
+    
+    try {
+      const parsed = JSON.parse(workflowJson);
+      setIsAnalyzing(true);
+      analyzeWorkflowMutation.mutate(parsed);
+    } catch (error) {
+      toast({
+        title: "Invalid JSON",
+        description: "Please check your workflow JSON format",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDownloadRequirements = () => {
+    if (!analysisResult) return;
+    setIsDownloading(true);
+    downloadRequirementsMutation.mutate(analysisResult);
+  };
+
+  const getComplexityColor = (complexity: string) => {
+    switch (complexity) {
+      case 'simple': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'medium': return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+      case 'complex': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Input Section */}
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="workflow-json">Workflow JSON</Label>
+          <Textarea
+            id="workflow-json"
+            value={workflowJson}
+            onChange={(e) => setWorkflowJson(e.target.value)}
+            placeholder="Paste your ComfyUI workflow JSON here..."
+            className="min-h-[200px] font-mono text-sm"
+          />
+        </div>
+        <Button 
+          onClick={handleAnalyze}
+          disabled={isAnalyzing || !workflowJson.trim()}
+          className="w-full"
+        >
+          {isAnalyzing ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Analyzing with AI...
+            </>
+          ) : (
+            <>
+              <Brain className="h-4 w-4 mr-2" />
+              Analyze Workflow
+            </>
+          )}
+        </Button>
+      </div>
+
+      {/* Analysis Results */}
+      {analysisResult && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h4 className="font-semibold">Analysis Results</h4>
+            <Button
+              onClick={handleDownloadRequirements}
+              disabled={isDownloading}
+              variant="outline"
+              size="sm"
+            >
+              {isDownloading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Downloading...
+                </>
+              ) : (
+                <>
+                  <Zap className="h-4 w-4 mr-2" />
+                  Auto-Download All
+                </>
+              )}
+            </Button>
+          </div>
+
+          {/* Summary */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h5 className="font-medium">Workflow Summary</h5>
+              <Badge className={getComplexityColor(analysisResult.complexity)}>
+                {analysisResult.complexity}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
+            {analysisResult.estimatedDownloadSize && (
+              <p className="text-sm">
+                <strong>Estimated Download:</strong> {analysisResult.estimatedDownloadSize}
+              </p>
+            )}
+          </div>
+
+          {/* Required Models */}
+          {analysisResult.models && analysisResult.models.length > 0 && (
+            <div className="border rounded-lg p-4 space-y-3">
+              <h5 className="font-medium flex items-center gap-2">
+                <Download className="h-4 w-4" />
+                Required Models ({analysisResult.models.length})
+              </h5>
+              <div className="space-y-2">
+                {analysisResult.models.map((model: any, index: number) => (
+                  <div key={index} className="border rounded p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{model.name}</span>
+                        <Badge variant="outline">{model.type}</Badge>
+                        {model.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                      </div>
+                      <span className="text-xs text-muted-foreground">{model.folder}</span>
+                    </div>
+                    {model.description && (
+                      <p className="text-sm text-muted-foreground">{model.description}</p>
+                    )}
+                    {model.url && (
+                      <div className="text-xs text-blue-600 dark:text-blue-400 truncate">
+                        {model.url}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Custom Nodes */}
+          {analysisResult.nodes && analysisResult.nodes.length > 0 && (
+            <div className="border rounded-lg p-4 space-y-3">
+              <h5 className="font-medium flex items-center gap-2">
+                <Settings className="h-4 w-4" />
+                Custom Nodes ({analysisResult.nodes.length})
+              </h5>
+              <div className="space-y-2">
+                {analysisResult.nodes.map((node: any, index: number) => (
+                  <div key={index} className="border rounded p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">{node.name}</span>
+                        <Badge variant="outline">{node.type}</Badge>
+                        {node.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                      </div>
+                    </div>
+                    {node.description && (
+                      <p className="text-sm text-muted-foreground">{node.description}</p>
+                    )}
+                    {node.installCommand && (
+                      <div className="text-xs font-mono bg-muted p-2 rounded">
+                        {node.installCommand}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Model Management Modal Component
 function ModelManagementModal({ serverId }: { serverId: number }) {
@@ -901,10 +1136,23 @@ export default function ServerDetail() {
                       ComfyUI has been successfully installed and is ready to use.
                     </p>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
-                        <Settings className="h-4 w-4 mr-2" />
-                        Manage Models
-                      </Button>
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button size="sm" variant="outline">
+                            <Settings className="h-4 w-4 mr-2" />
+                            Manage Models
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                          <DialogHeader>
+                            <DialogTitle>Model Management</DialogTitle>
+                            <DialogDescription>
+                              Download, manage, and view models for this server
+                            </DialogDescription>
+                          </DialogHeader>
+                          <ModelManagementModal serverId={parseInt(id)} />
+                        </DialogContent>
+                      </Dialog>
                       <Button size="sm" onClick={() => setLocation(`/servers/${id}/comfyui`)}>
                         <Bot className="h-4 w-4 mr-2" />
                         Launch ComfyUI
@@ -1010,6 +1258,22 @@ export default function ServerDetail() {
                     <p className="text-sm text-muted-foreground">No recent activity</p>
                   )}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Workflow Analyzer */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Brain className="h-5 w-5" />
+                  Workflow Analyzer
+                </CardTitle>
+                <CardDescription>
+                  AI-powered analysis of ComfyUI workflows to identify required models and custom nodes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <WorkflowAnalyzer serverId={parseInt(id)} />
               </CardContent>
             </Card>
           </div>

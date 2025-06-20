@@ -257,7 +257,8 @@ class VastAIService {
 
   async startInstance(instanceId: number): Promise<boolean> {
     try {
-      const response = await this.makeRequest(`/instances/${instanceId}/start/`, {
+      // For stopped instances, we need to restart them using the reboot endpoint
+      const response = await this.makeRequest(`/instances/${instanceId}/reboot/`, {
         method: 'PUT',
       });
 

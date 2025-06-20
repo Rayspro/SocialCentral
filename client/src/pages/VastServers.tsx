@@ -166,6 +166,31 @@ export default function VastServers() {
     },
   });
 
+  // Start server mutation
+  const startMutation = useMutation({
+    mutationFn: async (serverId: number) => {
+      const response = await fetch(`/api/vast-servers/start/${serverId}`, {
+        method: 'POST',
+      });
+      if (!response.ok) throw new Error('Failed to start server');
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] });
+      toast({
+        title: "Server Starting",
+        description: "Your server is being started.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Start Failed",
+        description: error.message || "Failed to start server",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Delete server mutation
   const deleteMutation = useMutation({
     mutationFn: async (serverId: number) => {
@@ -634,18 +659,38 @@ export default function VastServers() {
                         </div>
                       )}
                       
-                      {/* Delete button for non-running servers */}
+                      {/* Start and Delete buttons for stopped servers */}
                       {(!server.isLaunched || !['launching', 'running', 'configuring'].includes(server.status)) && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          onClick={() => deleteMutation.mutate(server.id)}
-                          disabled={deleteMutation.isPending}
-                          className="w-full"
-                        >
-                          <Trash2 className="h-4 w-4 mr-1" />
-                          Delete
-                        </Button>
+                        <div className="flex gap-2">
+                          {server.status === 'stopped' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startMutation.mutate(server.id);
+                              }}
+                              disabled={startMutation.isPending}
+                              className="flex-1"
+                            >
+                              <Play className="h-4 w-4 mr-1" />
+                              {startMutation.isPending ? 'Starting...' : 'Start'}
+                            </Button>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMutation.mutate(server.id);
+                            }}
+                            disabled={deleteMutation.isPending}
+                            className={server.status === 'stopped' ? 'flex-1' : 'w-full'}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
                       )}
                     </div>
                   </CardContent>

@@ -1329,6 +1329,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Use real Vast.ai API handlers
   app.get("/api/vast-servers", getVastServers);
   app.get("/api/vast-servers/available", getAvailableServers);
+  
+  // Start server route
+  app.post('/api/vast-servers/start/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const server = await storage.getVastServer(serverId);
+      
+      if (!server) {
+        return res.status(404).json({ error: 'Server not found' });
+      }
+
+      if (!server.vastId) {
+        return res.status(400).json({ error: 'Server does not have a valid Vast.ai instance ID' });
+      }
+
+      const vastApiKey = await storage.getApiKeyByService('vast');
+      if (!vastApiKey?.keyValue) {
+        return res.status(400).json({ error: 'Vast.ai API key not configured' });
+      }
+
+      const { VastAIService } = await import('./vast-ai');
+      const vastService = new VastAIService(vastApiKey.keyValue);
+      
+      const success = await vastService.startInstance(parseInt(server.vastId));
+      
+      if (success) {
+        await storage.updateVastServer(serverId, { 
+          status: 'loading',
+          setupStatus: 'pending'
+        });
+        
+        res.json({ 
+          success: true, 
+          message: 'Server start command sent successfully' 
+        });
+      } else {
+        res.status(500).json({ 
+          error: 'Failed to start server instance' 
+        });
+      }
+    } catch (error) {
+      console.error('Error starting server:', error);
+      res.status(500).json({ error: 'Failed to start server' });
+    }
+  });
 
   // Setup scripts endpoint
   app.get("/api/setup-scripts", async (req, res) => {

@@ -255,6 +255,19 @@ class VastAIService {
     }
   }
 
+  async startInstance(instanceId: number): Promise<boolean> {
+    try {
+      const response = await this.makeRequest(`/instances/${instanceId}/start/`, {
+        method: 'PUT',
+      });
+
+      return response.success || false;
+    } catch (error) {
+      console.error('Failed to start instance:', error);
+      return false;
+    }
+  }
+
   private mapStatus(status: string): 'running' | 'stopped' | 'loading' | 'error' {
     switch (status?.toLowerCase()) {
       case 'running':
@@ -275,6 +288,9 @@ class VastAIService {
     }
   }
 }
+
+// Export the service for use in routes
+export { VastAIService };
 
 // Route handlers
 export async function getVastServers(req: Request, res: Response) {

@@ -48,6 +48,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import type { VastServer, ComfyModel, ComfyWorkflow, ComfyGeneration } from "@shared/schema";
 
 interface GenerationParams {
   seed: number;
@@ -58,149 +59,237 @@ interface GenerationParams {
   model?: string;
 }
 
-interface VastServer {
-  id: number;
-  vastId: string;
-  name: string;
-  gpu: string;
-  gpuCount: number;
-  cpuCores: number;
-  ram: number;
-  disk: number;
-  pricePerHour: string;
-  location: string;
-  status: string;
-  isLaunched: boolean;
-  setupStatus?: string;
-  contractId?: string;
-  sshConnection?: string;
-  publicIp?: string;
-  sshPort?: number;
-  directSshPort?: number;
-  comfyUIUrl?: string;
-  comfyUIStatus?: string;
-}
-
-interface ComfyWorkflow {
-  id: number;
-  name: string;
-  description?: string;
-  category?: string;
-  workflowJson: string;
-  isTemplate: boolean;
-}
-
-interface ComfyGeneration {
-  id: number;
-  status: string;
-  prompt?: string;
-  negativePrompt?: string;
-  parameters?: string;
-  imageUrls?: string[];
-  errorMessage?: string;
-  createdAt: string;
-  completedAt?: string;
-  serverId: number;
-}
-
 export default function ComfyUI() {
+  const [, setLocation] = useLocation();
   const { logout } = useAuth();
-  const [location, navigate] = useLocation();
-  const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   // State
   const [selectedServer, setSelectedServer] = useState<VastServer | null>(null);
   const [prompt, setPrompt] = useState("");
   const [negativePrompt, setNegativePrompt] = useState("");
+  const [selectedWorkflow, setSelectedWorkflow] = useState<number | null>(null);
   const [params, setParams] = useState<GenerationParams>({
     seed: Math.floor(Math.random() * 1000000),
     steps: 20,
-    cfg: 7,
+    cfg: 8,
     width: 512,
-    height: 512
+    height: 512,
   });
-  
-  // Workflow state
+
+  // Model management state
+  const [newModelName, setNewModelName] = useState("");
+  const [newModelUrl, setNewModelUrl] = useState("");
+  const [newModelFolder, setNewModelFolder] = useState("checkpoints");
+  const [newModelDescription, setNewModelDescription] = useState("");
+
+  // Workflow management state
   const [showWorkflowDialog, setShowWorkflowDialog] = useState(false);
   const [newWorkflowName, setNewWorkflowName] = useState("");
   const [newWorkflowDescription, setNewWorkflowDescription] = useState("");
   const [newWorkflowCategory, setNewWorkflowCategory] = useState("text-to-image");
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
+  const [newWorkflowJson, setNewWorkflowJson] = useState("");
 
-  // Queries
+  // Workflow analyzer state
+  const [analyzeWorkflowJson, setAnalyzeWorkflowJson] = useState("");
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [logs, setLogs] = useState<any[]>([]);
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
+  
+  // Setup progress tracking
+  const [setupProgress, setSetupProgress] = useState<any>(null);
+  const [isAutoSetupRunning, setIsAutoSetupRunning] = useState(false);
+
+  // Get running servers
   const { data: servers, isLoading: serversLoading } = useQuery({
     queryKey: ["/api/vast-servers"],
-    refetchInterval: 5000,
   });
 
-  const { data: workflows, isLoading: workflowsLoading } = useQuery({
+  const runningServers = Array.isArray(servers) ? servers.filter((server: VastServer) => 
+    server.isLaunched && server.status === 'running'
+  ) : [];
+
+  // Get models for selected server
+  const { data: models, isLoading: modelsLoading, refetch: refetchModels } = useQuery({
+    queryKey: [`/api/comfy/${selectedServer?.id}/models`],
+    enabled: !!selectedServer,
+  });
+
+  // Get available models from ComfyUI
+  const { data: availableModels, isLoading: availableModelsLoading, error: availableModelsError, refetch: refetchAvailableModels } = useQuery({
+    queryKey: [`/api/comfy/${selectedServer?.id}/available-models`],
+    enabled: !!selectedServer,
+  });
+
+  // Get workflows
+  const { data: workflows, isLoading: workflowsLoading, refetch: refetchWorkflows } = useQuery({
     queryKey: ["/api/comfy/workflows"],
   });
 
-  const { data: generations, isLoading: generationsLoading } = useQuery({
-    queryKey: ["/api/comfy/generations", selectedServer?.id],
+  // Get generations for selected server
+  const { data: generations, isLoading: generationsLoading, refetch: refetchGenerations } = useQuery({
+    queryKey: [`/api/comfy/${selectedServer?.id}/generations`],
     enabled: !!selectedServer,
   });
 
-  const { data: availableModels, isLoading: availableModelsLoading, error: availableModelsError } = useQuery({
-    queryKey: ["/api/comfy/available-models", selectedServer?.id],
+  // Get execution progress for selected server
+  const { data: executions, refetch: refetchExecutions } = useQuery({
+    queryKey: [`/api/server-executions/${selectedServer?.id}`],
     enabled: !!selectedServer,
-    retry: 1,
+    refetchInterval: 2000, // Poll every 2 seconds for real-time updates
   });
+
+  // Auto-select first running server
+  useEffect(() => {
+    if (runningServers.length > 0 && !selectedServer) {
+      setSelectedServer(runningServers[0]);
+    }
+  }, [runningServers, selectedServer]);
+
+  // WebSocket connection for real-time logs
+  useEffect(() => {
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${window.location.host}/ws/workflow-logs`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected for workflow logs');
+      setWsConnection(ws);
+    };
+    
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      
+      if (data.type === 'workflow_log') {
+        setLogs(prev => [...prev, data.log]);
+      } else if (data.type === 'workflow_logs_history') {
+        setLogs(data.logs);
+      } else if (data.type === 'workflow_logs_cleared') {
+        setLogs([]);
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+      setWsConnection(null);
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, []);
 
   // Mutations
-  const generateMutation = useMutation({
-    mutationFn: async (data: { prompt: string; negativePrompt: string; params: GenerationParams; workflowId?: number }) => {
-      return apiRequest(`/api/comfy/generate`, {
-        method: "POST",
-        body: JSON.stringify({
-          serverId: selectedServer?.id,
-          ...data
-        }),
+  const addModelMutation = useMutation({
+    mutationFn: async (modelData: any) => {
+      const response = await fetch(`/api/comfy/${selectedServer?.id}/models`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(modelData),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/comfy/generations"] });
+      refetchModels();
+      setNewModelName("");
+      setNewModelUrl("");
+      setNewModelDescription("");
+    },
+  });
+
+  const generateMutation = useMutation({
+    mutationFn: async (generationData: any) => {
+      const response = await fetch(`/api/comfy/${selectedServer?.id}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(generationData),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchGenerations();
       toast({
-        title: "Generation Started",
-        description: "Your image is being generated",
+        title: "Success",
+        description: "Image generation started successfully",
       });
     },
     onError: (error: any) => {
       toast({
         title: "Generation Failed",
-        description: error.message || "Failed to start generation",
+        description: error.message || "Failed to start image generation",
         variant: "destructive",
       });
     },
   });
 
   const createWorkflowMutation = useMutation({
-    mutationFn: async (data: { name: string; description: string; category: string; workflowJson: string }) => {
-      return apiRequest(`/api/comfy/workflows`, {
-        method: "POST",
-        body: JSON.stringify({
-          serverId: selectedServer?.id,
-          ...data
-        }),
+    mutationFn: async (workflowData: any) => {
+      const response = await fetch('/api/comfy/workflows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(workflowData),
       });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/comfy/workflows"] });
+      refetchWorkflows();
       setShowWorkflowDialog(false);
       setNewWorkflowName("");
       setNewWorkflowDescription("");
       setNewWorkflowCategory("text-to-image");
+      setNewWorkflowJson("");
+    },
+  });
+
+  const deleteModelMutation = useMutation({
+    mutationFn: async (modelId: number) => {
+      const response = await fetch(`/api/comfy/models/${modelId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      refetchModels();
       toast({
-        title: "Workflow Created",
-        description: "New workflow has been saved",
+        title: "Success",
+        description: "Model deleted successfully",
       });
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to Create Workflow",
-        description: error.message || "Please try again",
+        title: "Error",
+        description: error.message || "Failed to delete model",
         variant: "destructive",
       });
     },
@@ -208,17 +297,31 @@ export default function ComfyUI() {
 
   const autoSetupMutation = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/comfy/auto-setup`, {
-        method: "POST",
-        body: JSON.stringify({ serverId: selectedServer?.id }),
+      if (!selectedServer) throw new Error('No server selected');
+      
+      const response = await fetch(`/api/comfy/${selectedServer.id}/auto-setup`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to setup ComfyUI');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/vast-servers"] });
       toast({
-        title: "ComfyUI Setup Started",
-        description: "ComfyUI is being installed automatically",
+        title: "Setup Started",
+        description: "ComfyUI installation has begun. This may take a few minutes.",
       });
+      // Refetch available models after a delay
+      setTimeout(() => {
+        refetchAvailableModels();
+      }, 5000);
     },
     onError: (error: any) => {
       toast({
@@ -229,105 +332,254 @@ export default function ComfyUI() {
     },
   });
 
-  // Functions
-  const handleGenerate = () => {
-    if (!prompt.trim()) {
+  const analyzeWorkflowMutation = useMutation({
+    mutationFn: async (workflowJson: any) => {
+      const response = await fetch('/api/comfy/analyze-workflow', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ workflowJson }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setAnalysisResult(data);
+      setIsAnalyzing(false);
+    },
+    onError: () => {
+      setIsAnalyzing(false);
+    },
+  });
+
+  const downloadRequirementsMutation = useMutation({
+    mutationFn: async ({ serverId, analysis }: { serverId: number; analysis: any }) => {
+      const response = await fetch(`/api/comfy/${serverId}/download-requirements`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ analysis }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      setIsDownloading(false);
+      refetchModels();
+    },
+    onError: () => {
+      setIsDownloading(false);
+    },
+  });
+
+  const handleAddModel = () => {
+    if (!newModelName || !newModelUrl || !selectedServer) return;
+    
+    // Check for duplicates
+    if (checkDuplicateModel(newModelName, newModelUrl)) {
       toast({
-        title: "Prompt Required",
-        description: "Please enter a prompt for image generation",
+        title: "Duplicate Model",
+        description: "A model with this name or URL already exists",
         variant: "destructive",
       });
       return;
     }
+    
+    addModelMutation.mutate({
+      name: newModelName,
+      url: newModelUrl,
+      folder: newModelFolder,
+      description: newModelDescription,
+    });
+  };
+
+  const handleGenerate = () => {
+    if (!selectedServer || !prompt) return;
 
     generateMutation.mutate({
       prompt,
       negativePrompt,
-      params,
-      workflowId: selectedWorkflow ? parseInt(selectedWorkflow) : undefined,
+      workflowId: selectedWorkflow,
+      parameters: params,
     });
   };
 
   const handleCreateWorkflow = () => {
-    if (!newWorkflowName.trim()) {
-      toast({
-        title: "Name Required",
-        description: "Please enter a workflow name",
-        variant: "destructive",
-      });
+    if (!newWorkflowName || !newWorkflowJson) return;
+
+    let parsedWorkflow;
+    try {
+      parsedWorkflow = JSON.parse(newWorkflowJson);
+    } catch (error) {
+      alert("Invalid JSON format in workflow definition");
       return;
     }
-
-    const workflowJson = JSON.stringify({
-      prompt,
-      negativePrompt,
-      parameters: params,
-    });
 
     createWorkflowMutation.mutate({
       name: newWorkflowName,
       description: newWorkflowDescription,
+      workflowJson: parsedWorkflow,
       category: newWorkflowCategory,
-      workflowJson,
+      serverId: selectedServer?.id,
+      isTemplate: false,
     });
   };
 
   const handleAutoSetupComfyUI = () => {
-    if (!selectedServer) {
-      toast({
-        title: "No Server Selected",
-        description: "Please select a server first",
-        variant: "destructive",
-      });
-      return;
-    }
     autoSetupMutation.mutate();
   };
 
-  const runningServers = Array.isArray(servers) ? servers.filter((server: VastServer) => 
-    server.isLaunched && (server.status === 'running' || server.status === 'loaded')
-  ) : [];
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
-      case 'failed': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
-      case 'downloading': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300';
-      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300';
+      case 'ready': return 'bg-green-500';
+      case 'downloading': return 'bg-blue-500';
+      case 'pending': return 'bg-yellow-500';
+      case 'failed': return 'bg-red-500';
+      case 'completed': return 'bg-green-500';
+      case 'running': return 'bg-blue-500';
+      default: return 'bg-gray-500';
     }
   };
 
+  const formatProgress = (progress: number | null) => {
+    if (!progress) return '0%';
+    return `${progress}%`;
+  };
+
+  const handleDeleteModel = (modelId: number) => {
+    deleteModelMutation.mutate(modelId);
+  };
+
+  const checkDuplicateModel = (name: string, url: string): boolean => {
+    if (!models || !Array.isArray(models)) return false;
+    return models.some((model: ComfyModel) => 
+      model.name === name || model.url === url
+    );
+  };
+
+  if (serversLoading) {
+    return <LoadingCard />;
+  }
+
+  if (runningServers.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+        <div className="container mx-auto px-6 py-4 space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <nav className="flex items-center space-x-2 text-sm">
+              <span className="text-slate-600 dark:text-slate-400">
+                <Home className="h-4 w-4" />
+              </span>
+              <ChevronRight className="h-4 w-4 text-slate-400" />
+              <span className="text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1">
+                <Wand2 className="h-4 w-4" />
+                ComfyUI
+              </span>
+            </nav>
+            
+            <div className="flex items-center gap-3">
+              <ThemeSwitcher />
+              <Button variant="ghost" size="sm" className="p-1.5">
+                <Bell className="h-3.5 w-3.5" />
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="p-0 w-7 h-7 rounded-full">
+                    <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                      <span className="text-white text-xs font-medium">JD</span>
+                    </div>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setLocation('/settings')}>
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setLocation('/settings')}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Settings
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={logout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+
+          {/* No servers message */}
+          <Card>
+            <CardContent className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <Server className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-lg font-semibold mb-2">No Running Servers</h3>
+                <p className="text-muted-foreground mb-4">
+                  You need a running server to use ComfyUI. Launch a server first.
+                </p>
+                <Button onClick={() => setLocation('/vast-servers')}>
+                  <Server className="h-4 w-4 mr-2" />
+                  Launch Server
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card/50 backdrop-blur supports-[backdrop-filter]:bg-card/50">
-        <div className="flex h-14 items-center px-6">
-          <nav className="flex items-center space-x-1 text-sm text-muted-foreground">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/")}
-              className="h-auto p-1 text-muted-foreground hover:text-foreground"
-            >
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-6 py-4 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <nav className="flex items-center space-x-2 text-sm">
+            <span className="text-slate-600 dark:text-slate-400">
               <Home className="h-4 w-4" />
-            </Button>
-            <ChevronRight className="h-4 w-4" />
-            <span className="text-foreground font-medium">ComfyUI</span>
+            </span>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <span className="text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1">
+              <Wand2 className="h-4 w-4" />
+              ComfyUI
+            </span>
           </nav>
           
-          <div className="ml-auto flex items-center space-x-2">
+          <div className="flex items-center gap-3">
             <ThemeSwitcher />
+            <Button variant="ghost" size="sm" className="p-1.5">
+              <Bell className="h-3.5 w-3.5" />
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <User className="h-4 w-4" />
-                  Profile
+                <Button variant="ghost" className="p-0 w-7 h-7 rounded-full">
+                  <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs font-medium">JD</span>
+                  </div>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end">
                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => navigate("/settings")}>
+                <DropdownMenuItem onClick={() => setLocation('/settings')}>
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setLocation('/settings')}>
                   <Settings className="mr-2 h-4 w-4" />
                   Settings
                 </DropdownMenuItem>
@@ -340,15 +592,6 @@ export default function ComfyUI() {
             </DropdownMenu>
           </div>
         </div>
-      </div>
-
-      <div className="p-6 space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold mb-2">ComfyUI - AI Image Generation</h1>
-          <p className="text-muted-foreground">
-            Generate stunning images using ComfyUI on your Vast.ai servers
-          </p>
-        </div>
 
         {/* Server Selection */}
         <Card>
@@ -357,131 +600,61 @@ export default function ComfyUI() {
             <CardDescription>Choose a running server for ComfyUI operations</CardDescription>
           </CardHeader>
           <CardContent>
-            {serversLoading ? (
-              <LoadingCard />
-            ) : runningServers.length === 0 ? (
-              <div className="text-center py-8">
-                <Server className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                <p className="text-gray-600 dark:text-gray-400">No running servers available</p>
-                <p className="text-sm text-gray-500 mt-1">Launch a server from the Vast Servers page</p>
-                <Button 
-                  onClick={() => navigate("/vast-servers")} 
-                  className="mt-3"
-                  variant="outline"
-                >
-                  Go to Servers
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {runningServers.map((server: VastServer) => (
-                  <div
-                    key={server.id}
-                    className={`p-4 border rounded-lg cursor-pointer transition-all ${
-                      selectedServer?.id === server.id
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                    onClick={() => setSelectedServer(server)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium">{server.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {server.gpu} • {server.ram}GB RAM • {server.location}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant={server.status === 'running' ? 'default' : 'secondary'}>
-                          {server.status}
-                        </Badge>
-                        {server.setupStatus && (
-                          <Badge variant={
-                            server.setupStatus === 'completed' ? 'default' :
-                            server.setupStatus === 'failed' ? 'destructive' : 'secondary'
-                          }>
-                            {server.setupStatus}
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+            <Select 
+              value={selectedServer?.id.toString() || ""} 
+              onValueChange={(value) => {
+                const server = runningServers.find(s => s.id.toString() === value);
+                setSelectedServer(server || null);
+              }}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a server" />
+              </SelectTrigger>
+              <SelectContent>
+                {runningServers.map((server) => (
+                  <SelectItem key={server.id} value={server.id.toString()}>
+                    {server.name} - {server.gpu} ({server.location})
+                  </SelectItem>
                 ))}
-              </div>
-            )}
+              </SelectContent>
+            </Select>
           </CardContent>
         </Card>
 
-        {/* ComfyUI Auto Setup */}
-        {selectedServer && !selectedServer.comfyUIStatus && (
-          <Card>
+        {/* Real-time setup progress display */}
+        {selectedServer && Array.isArray(executions) && executions.length > 0 && (
+          <Card className="border-orange-200 dark:border-orange-800">
             <CardHeader>
-              <CardTitle className="text-lg">ComfyUI Setup Required</CardTitle>
-              <CardDescription>Install ComfyUI automatically on your server</CardDescription>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                ComfyUI Setup in Progress
+                <Badge variant="secondary">{executions[0]?.status}</Badge>
+              </CardTitle>
+              <CardDescription>
+                Automatically installing ComfyUI on server {selectedServer.name}
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              {selectedServer.setupStatus === 'in_progress' ? (
-                <div className="text-center py-6">
-                  <MascotPresets.ComfySetup 
-                    status="loading"
-                    size="lg"
-                    className="mx-auto mb-4"
-                  />
-                  <h3 className="text-lg font-medium mb-2">Setting up ComfyUI...</h3>
-                  <p className="text-muted-foreground">This may take several minutes</p>
-                </div>
-              ) : (
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-                  <h3 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-                    Automatic ComfyUI Installation
-                  </h3>
-                  <p className="text-sm text-blue-700 dark:text-blue-300 mb-4">
-                    This will install ComfyUI, download essential models, and configure everything automatically.
-                  </p>
-                  <Button 
-                    onClick={() => handleAutoSetupComfyUI()}
-                    disabled={autoSetupMutation.isPending}
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                  >
-                    {autoSetupMutation.isPending ? (
-                      <>
-                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                        Setting up ComfyUI...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="h-4 w-4 mr-2" />
-                        Auto-Install ComfyUI
-                      </>
-                    )}
-                  </Button>
-                  
-                  <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
-                    <p className="text-xs text-blue-600 dark:text-blue-400">
-                      This will install ComfyUI, download basic models, and start the server automatically.
-                    </p>
-                  </div>
-                  
-                  {/* Show mascot during ComfyUI setup */}
-                  {autoSetupMutation.isPending && (
-                    <div className="mt-4">
-                      <MascotPresets.ComfySetup 
-                        status="loading"
-                        size="md"
-                        className="w-full"
-                      />
-                    </div>
-                  )}
-                </div>
-              )}
+            <CardContent className="space-y-4">
+              <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 max-h-64 overflow-y-auto">
+                <pre className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                  {executions[0]?.output || "Initializing setup..."}
+                </pre>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                <span>Progress automatically tracked when server becomes ready</span>
+                <Badge variant="outline" className="text-xs">
+                  {executions[0]?.status === 'completed' ? 'Ready' : 'Installing'}
+                </Badge>
+              </div>
             </CardContent>
           </Card>
         )}
 
         {selectedServer && (
           <Tabs defaultValue="generate" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
               <TabsTrigger value="generate">Generate</TabsTrigger>
+              <TabsTrigger value="models">Models</TabsTrigger>
               <TabsTrigger value="workflows">Workflows</TabsTrigger>
               <TabsTrigger value="analyzer">Analyzer</TabsTrigger>
               <TabsTrigger value="gallery">Gallery</TabsTrigger>
@@ -525,51 +698,48 @@ export default function ComfyUI() {
                               {selectedServer.sshConnection}
                             </code>
                             
-                            <p><strong>2. Start ComfyUI:</strong></p>
+                            <p><strong>2. Navigate to ComfyUI:</strong></p>
                             <code className="bg-background p-1 rounded text-xs block">
-                              cd ComfyUI && python main.py --listen 0.0.0.0 --port 8188
+                              cd /workspace/ComfyUI
                             </code>
                             
-                            <p><strong>3. ComfyUI will be available at:</strong></p>
+                            <p><strong>3. Start ComfyUI server:</strong></p>
                             <code className="bg-background p-1 rounded text-xs block">
-                              {selectedServer.comfyUIUrl || `http://${selectedServer.publicIp}:8188`}
+                              python main.py --listen 0.0.0.0 --port 8188
+                            </code>
+                            
+                            <p><strong>4. ComfyUI will be accessible at:</strong></p>
+                            <code className="bg-background p-1 rounded text-xs block">
+                              http://{selectedServer.serverUrl?.replace('http://', '').split(':')[0]}:8188
                             </code>
                           </div>
                           
-                          <p className="text-sm">
-                            For model management, visit the server detail page where you can download and manage AI models.
+                          <p className="text-xs text-muted-foreground">
+                            Once ComfyUI is running, this page will automatically detect the connection.
                           </p>
-                          
-                          <Button
-                            onClick={() => navigate(`/server-detail/${selectedServer.id}`)}
-                            variant="outline"
-                            size="sm"
-                            className="w-full"
-                          >
-                            Go to Server Detail Page
-                          </Button>
                         </AlertDescription>
                       </Alert>
                     )}
-
+                    
                     <div>
                       <Label htmlFor="prompt">Prompt</Label>
                       <Textarea
                         id="prompt"
+                        placeholder="Describe the image you want to generate..."
                         value={prompt}
                         onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Describe the image you want to generate..."
                         rows={3}
+                        disabled={!!availableModelsError && !availableModels?.status}
                       />
                     </div>
 
                     <div>
-                      <Label htmlFor="negative-prompt">Negative Prompt (Optional)</Label>
+                      <Label htmlFor="negative-prompt">Negative Prompt</Label>
                       <Textarea
                         id="negative-prompt"
+                        placeholder="What you don't want in the image..."
                         value={negativePrompt}
                         onChange={(e) => setNegativePrompt(e.target.value)}
-                        placeholder="What you don't want in the image..."
                         rows={2}
                       />
                     </div>
@@ -579,22 +749,20 @@ export default function ComfyUI() {
                         <Label>Width: {params.width}</Label>
                         <Slider
                           value={[params.width]}
-                          onValueChange={(value) => setParams({...params, width: value[0]})}
-                          max={1024}
+                          onValueChange={([value]) => setParams({...params, width: value})}
                           min={256}
+                          max={1024}
                           step={64}
-                          className="mt-2"
                         />
                       </div>
                       <div>
                         <Label>Height: {params.height}</Label>
                         <Slider
                           value={[params.height]}
-                          onValueChange={(value) => setParams({...params, height: value[0]})}
-                          max={1024}
+                          onValueChange={([value]) => setParams({...params, height: value})}
                           min={256}
+                          max={1024}
                           step={64}
-                          className="mt-2"
                         />
                       </div>
                     </div>
@@ -604,31 +772,29 @@ export default function ComfyUI() {
                         <Label>Steps: {params.steps}</Label>
                         <Slider
                           value={[params.steps]}
-                          onValueChange={(value) => setParams({...params, steps: value[0]})}
-                          max={50}
+                          onValueChange={([value]) => setParams({...params, steps: value})}
                           min={1}
+                          max={50}
                           step={1}
-                          className="mt-2"
                         />
                       </div>
                       <div>
                         <Label>CFG: {params.cfg}</Label>
                         <Slider
                           value={[params.cfg]}
-                          onValueChange={(value) => setParams({...params, cfg: value[0]})}
-                          max={20}
+                          onValueChange={([value]) => setParams({...params, cfg: value})}
                           min={1}
+                          max={20}
                           step={0.5}
-                          className="mt-2"
                         />
                       </div>
                       <div>
-                        <Label>Seed</Label>
+                        <Label htmlFor="seed">Seed</Label>
                         <Input
+                          id="seed"
                           type="number"
                           value={params.seed}
                           onChange={(e) => setParams({...params, seed: parseInt(e.target.value) || 0})}
-                          className="mt-2"
                         />
                       </div>
                     </div>
@@ -636,13 +802,16 @@ export default function ComfyUI() {
                     {workflows && Array.isArray(workflows) && workflows.length > 0 && (
                       <div>
                         <Label>Workflow (Optional)</Label>
-                        <Select value={selectedWorkflow} onValueChange={setSelectedWorkflow}>
-                          <SelectTrigger className="mt-2">
-                            <SelectValue placeholder="Choose a workflow" />
+                        <Select 
+                          value={selectedWorkflow?.toString() || "default"} 
+                          onValueChange={(value) => setSelectedWorkflow(value === "default" ? null : parseInt(value))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Use default workflow" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Default</SelectItem>
-                            {workflows.map((workflow: ComfyWorkflow) => (
+                            <SelectItem value="default">Default Text-to-Image</SelectItem>
+                            {(workflows as any[]).map((workflow: any) => (
                               <SelectItem key={workflow.id} value={workflow.id.toString()}>
                                 {workflow.name}
                               </SelectItem>
@@ -652,9 +821,9 @@ export default function ComfyUI() {
                       </div>
                     )}
 
-                    <Button
-                      onClick={handleGenerate}
-                      disabled={generateMutation.isPending || !prompt.trim()}
+                    <Button 
+                      onClick={handleGenerate} 
+                      disabled={generateMutation.isPending || !prompt || (availableModelsLoading && !availableModels?.status)}
                       className="w-full"
                     >
                       {generateMutation.isPending ? (
@@ -664,34 +833,523 @@ export default function ComfyUI() {
                         </>
                       ) : (
                         <>
-                          <Wand2 className="h-4 w-4 mr-2" />
+                          <Play className="h-4 w-4 mr-2" />
                           Generate Image
+                        </>
+                      )}
+                    </Button>
+                    
+                    {!availableModelsLoading && (
+                      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 text-sm">
+                        <h4 className="font-medium text-blue-800 dark:text-blue-200 mb-2 flex items-center gap-2">
+                          <Settings className="h-4 w-4" />
+                          Auto-Setup ComfyUI
+                        </h4>
+                        <p className="text-blue-700 dark:text-blue-300 mb-3">
+                          ComfyUI server is not running. Click below to automatically install and start ComfyUI on your server:
+                        </p>
+                        <Button 
+                          onClick={() => handleAutoSetupComfyUI()}
+                          disabled={autoSetupMutation.isPending}
+                          className="w-full bg-blue-600 hover:bg-blue-700"
+                        >
+                          {autoSetupMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Setting up ComfyUI...
+                            </>
+                          ) : (
+                            <>
+                              <Download className="h-4 w-4 mr-2" />
+                              Auto-Install ComfyUI
+                            </>
+                          )}
+                        </Button>
+                        
+                        <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+                          <p className="text-xs text-blue-600 dark:text-blue-400">
+                            This will install ComfyUI, download basic models, and start the server automatically.
+                          </p>
+                        </div>
+                        
+                        {/* Show mascot during ComfyUI setup */}
+                        {autoSetupMutation.isPending && (
+                          <div className="mt-4">
+                            <MascotPresets.ComfySetup 
+                              status="loading"
+                              size="md"
+                              className="w-full"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Model Management */}
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">Model Management</CardTitle>
+                        <CardDescription>Manage your ComfyUI models</CardDescription>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-2" />
+                              View All Models
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-2xl">
+                            <DialogHeader>
+                              <DialogTitle>All Available Models</DialogTitle>
+                              <DialogDescription>
+                                Complete list of models in your ComfyUI installation
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="max-h-96 overflow-y-auto">
+                              {availableModelsLoading ? (
+                                <LoadingCard />
+                              ) : availableModels?.models ? (
+                                <div className="space-y-4">
+                                  {Object.entries(availableModels.models).map(([category, modelList]) => (
+                                    <div key={category} className="space-y-2">
+                                      <h4 className="font-semibold capitalize text-sm text-muted-foreground border-b pb-1">
+                                        {category} ({Array.isArray(modelList) ? modelList.length : 0})
+                                      </h4>
+                                      <div className="grid gap-2">
+                                        {Array.isArray(modelList) ? modelList.map((model, index) => (
+                                          <div key={index} className="flex items-center justify-between p-2 bg-muted/50 rounded">
+                                            <span className="text-sm font-mono">{model}</span>
+                                            <Badge variant="secondary" className="text-xs">
+                                              {category.slice(0, -1)}
+                                            </Badge>
+                                          </div>
+                                        )) : (
+                                          <div className="text-sm text-muted-foreground">No models in this category</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-center text-muted-foreground py-8">
+                                  No models available
+                                </div>
+                              )}
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Settings className="h-4 w-4 mr-2" />
+                              Manage Library
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="sm:max-w-3xl">
+                            <DialogHeader>
+                              <DialogTitle>Model Library Management</DialogTitle>
+                              <DialogDescription>
+                                Download, delete, and organize your ComfyUI models
+                              </DialogDescription>
+                            </DialogHeader>
+                            <Tabs defaultValue="download" className="w-full">
+                              <TabsList className="grid w-full grid-cols-3">
+                                <TabsTrigger value="download">Download Models</TabsTrigger>
+                                <TabsTrigger value="installed">Installed Models</TabsTrigger>
+                                <TabsTrigger value="cleanup">Cleanup & Tools</TabsTrigger>
+                              </TabsList>
+                              
+                              <TabsContent value="download" className="space-y-4">
+                                <div className="space-y-4">
+                                  <div>
+                                    <Label htmlFor="model-url">Model URL</Label>
+                                    <Input
+                                      id="model-url"
+                                      value={newModelUrl}
+                                      onChange={(e) => setNewModelUrl(e.target.value)}
+                                      placeholder="https://huggingface.co/model/file.safetensors"
+                                    />
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="model-folder">Folder</Label>
+                                    <Select value={newModelFolder} onValueChange={setNewModelFolder}>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select folder" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="checkpoints">Checkpoints</SelectItem>
+                                        <SelectItem value="loras">LoRAs</SelectItem>
+                                        <SelectItem value="vae">VAE</SelectItem>
+                                        <SelectItem value="controlnet">ControlNet</SelectItem>
+                                        <SelectItem value="embeddings">Embeddings</SelectItem>
+                                        <SelectItem value="upscale_models">Upscale Models</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label htmlFor="model-name">Custom Name (Optional)</Label>
+                                    <Input
+                                      id="model-name"
+                                      value={newModelName}
+                                      onChange={(e) => setNewModelName(e.target.value)}
+                                      placeholder="Leave empty to use filename"
+                                    />
+                                  </div>
+                                  <Button 
+                                    onClick={handleAddModel} 
+                                    disabled={addModelMutation.isPending || !newModelUrl || !newModelFolder}
+                                    className="w-full"
+                                  >
+                                    {addModelMutation.isPending ? (
+                                      <>
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                        Adding Model...
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Download className="h-4 w-4 mr-2" />
+                                        Add Model
+                                      </>
+                                    )}
+                                  </Button>
+                                </div>
+                              </TabsContent>
+                              
+                              <TabsContent value="installed" className="space-y-4">
+                                <div className="max-h-96 overflow-y-auto">
+                                  {modelsLoading ? (
+                                    <LoadingCard />
+                                  ) : models && Array.isArray(models) && models.length > 0 ? (
+                                    <div className="space-y-3">
+                                      {models.map((model: any) => (
+                                        <div key={model.id} className="border rounded-lg p-3">
+                                          <div className="flex items-center justify-between mb-2">
+                                            <div className="flex-1">
+                                              <h4 className="font-medium">{model.name}</h4>
+                                              <div className="text-sm text-muted-foreground">
+                                                {model.folder} • {model.fileSize ? `${(model.fileSize / 1024 / 1024 / 1024).toFixed(2)} GB` : 'Size unknown'}
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                              <Badge className={getStatusColor(model.status)}>
+                                                {model.status}
+                                              </Badge>
+                                              {(model.status === 'completed' || model.status === 'failed') && (
+                                                <Button
+                                                  variant="destructive"
+                                                  size="sm"
+                                                  onClick={() => handleDeleteModel(model.id)}
+                                                  className="h-7 px-2"
+                                                >
+                                                  <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                              )}
+                                            </div>
+                                          </div>
+                                          {model.status === 'downloading' && (
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                              <div 
+                                                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                                style={{ width: formatProgress(model.downloadProgress) }}
+                                              ></div>
+                                            </div>
+                                          )}
+                                          {model.errorMessage && (
+                                            <div className="text-sm text-red-500 mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded">
+                                              <strong>Error:</strong> {model.errorMessage}
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-center text-muted-foreground py-8">
+                                      <Download className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                                      <p>No models downloaded yet</p>
+                                      <p className="text-sm">Use the Download Models tab to add models</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </TabsContent>
+                              
+                              <TabsContent value="cleanup" className="space-y-4">
+                                <div className="space-y-4">
+                                  <div className="p-4 border rounded-lg">
+                                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                                      <Trash2 className="h-4 w-4" />
+                                      Cleanup Failed Downloads
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-3">
+                                      Remove failed model downloads to free up space and clean your library
+                                    </p>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        if (models && Array.isArray(models)) {
+                                          const failedModels = models.filter((m: any) => m.status === 'failed');
+                                          failedModels.forEach((model: any) => handleDeleteModel(model.id));
+                                        }
+                                      }}
+                                      disabled={!models || !Array.isArray(models) || !models.some((m: any) => m.status === 'failed')}
+                                    >
+                                      Clean Failed Downloads
+                                    </Button>
+                                  </div>
+                                  
+                                  <div className="p-4 border rounded-lg">
+                                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                                      <RefreshCw className="h-4 w-4" />
+                                      Refresh Model Library
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-3">
+                                      Scan ComfyUI installation for manually added models
+                                    </p>
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm"
+                                      onClick={() => {
+                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/models`] });
+                                        queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/available-models`] });
+                                      }}
+                                    >
+                                      <RefreshCw className="h-4 w-4 mr-2" />
+                                      Refresh Library
+                                    </Button>
+                                  </div>
+                                  
+                                  <div className="p-4 border rounded-lg">
+                                    <h4 className="font-medium mb-2 flex items-center gap-2">
+                                      <Eye className="h-4 w-4" />
+                                      Storage Usage
+                                    </h4>
+                                    <p className="text-sm text-muted-foreground mb-2">
+                                      Total models: {models && Array.isArray(models) ? models.length : 0}
+                                    </p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Estimated size: {
+                                        models && Array.isArray(models) ? 
+                                        `${(models.reduce((total: number, model: any) => total + (model.fileSize || 0), 0) / 1024 / 1024 / 1024).toFixed(2)} GB` :
+                                        'Unknown'
+                                      }
+                                    </p>
+                                  </div>
+                                </div>
+                              </TabsContent>
+                            </Tabs>
+                          </DialogContent>
+                        </Dialog>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => refetchAvailableModels()}
+                          disabled={availableModelsLoading}
+                        >
+                          <RefreshCw className={`h-4 w-4 ${availableModelsLoading ? 'animate-spin' : ''}`} />
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {availableModelsLoading ? (
+                      <LoadingCard />
+                    ) : availableModels && typeof availableModels === 'object' ? (
+                      <div className="space-y-4">
+                        {(availableModels as any).checkpoints && Array.isArray((availableModels as any).checkpoints) && (
+                          <div>
+                            <h4 className="font-medium mb-2">Checkpoints</h4>
+                            <div className="space-y-1">
+                              {(availableModels as any).checkpoints.map((model: string, index: number) => (
+                                <div key={index} className="text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                  {model}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {(availableModels as any).loras && Array.isArray((availableModels as any).loras) && (
+                          <div>
+                            <h4 className="font-medium mb-2">LoRAs</h4>
+                            <div className="space-y-1">
+                              {(availableModels as any).loras.map((model: string, index: number) => (
+                                <div key={index} className="text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                  {model}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {(availableModels as any).vae && Array.isArray((availableModels as any).vae) && (
+                          <div>
+                            <h4 className="font-medium mb-2">VAE</h4>
+                            <div className="space-y-1">
+                              {(availableModels as any).vae.map((model: string, index: number) => (
+                                <div key={index} className="text-sm p-2 bg-gray-50 dark:bg-gray-800 rounded">
+                                  {model}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center text-muted-foreground">
+                        ComfyUI server not accessible
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </TabsContent>
+
+            {/* Models Tab */}
+            <TabsContent value="models" className="space-y-6">
+              <div className="grid gap-6 lg:grid-cols-2">
+                {/* Add Model */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Add New Model</CardTitle>
+                    <CardDescription>Download a model from URL</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label htmlFor="model-name">Model Name</Label>
+                      <Input
+                        id="model-name"
+                        placeholder="e.g., Stable Diffusion 1.5"
+                        value={newModelName}
+                        onChange={(e) => setNewModelName(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="model-url">Download URL</Label>
+                      <Input
+                        id="model-url"
+                        placeholder="https://..."
+                        value={newModelUrl}
+                        onChange={(e) => setNewModelUrl(e.target.value)}
+                      />
+                    </div>
+
+                    <div>
+                      <Label>Folder</Label>
+                      <Select value={newModelFolder} onValueChange={setNewModelFolder}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="checkpoints">Checkpoints</SelectItem>
+                          <SelectItem value="loras">LoRAs</SelectItem>
+                          <SelectItem value="vae">VAE</SelectItem>
+                          <SelectItem value="embeddings">Embeddings</SelectItem>
+                          <SelectItem value="controlnet">ControlNet</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="model-description">Description (Optional)</Label>
+                      <Textarea
+                        id="model-description"
+                        placeholder="Description of the model..."
+                        value={newModelDescription}
+                        onChange={(e) => setNewModelDescription(e.target.value)}
+                      />
+                    </div>
+
+                    <Button 
+                      onClick={handleAddModel}
+                      disabled={addModelMutation.isPending || !newModelName || !newModelUrl}
+                      className="w-full"
+                    >
+                      {addModelMutation.isPending ? (
+                        <LoadingSpinner size="sm" text="Adding..." />
+                      ) : (
+                        <>
+                          <Download className="h-4 w-4 mr-2" />
+                          Add Model
                         </>
                       )}
                     </Button>
                   </CardContent>
                 </Card>
 
-                {/* Generation Preview */}
+                {/* Downloaded Models */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="text-lg">Preview</CardTitle>
-                    <CardDescription>Generated image will appear here</CardDescription>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-lg">Downloaded Models</CardTitle>
+                        <CardDescription>Models downloaded for this server</CardDescription>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => refetchModels()}
+                        disabled={modelsLoading}
+                      >
+                        <RefreshCw className={`h-4 w-4 ${modelsLoading ? 'animate-spin' : ''}`} />
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
-                    {generateMutation.isPending ? (
-                      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                        <div className="text-center">
-                          <LoadingSpinner size="lg" className="mx-auto mb-4" />
-                          <p className="text-sm text-muted-foreground">Generating image...</p>
-                        </div>
+                    {modelsLoading ? (
+                      <LoadingCard />
+                    ) : models && Array.isArray(models) && models.length > 0 ? (
+                      <div className="space-y-3">
+                        {models.map((model: ComfyModel) => (
+                          <div key={model.id} className="border rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-medium">{model.name}</h4>
+                              <div className="flex items-center gap-2">
+                                <Badge className={getStatusColor(model.status)}>
+                                  {model.status}
+                                </Badge>
+                                {(model.status === 'completed' || model.status === 'failed') && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteModel(model.id)}
+                                    className="h-7 px-2"
+                                  >
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                            <div className="text-sm text-muted-foreground mb-2">
+                              Folder: {model.folder}
+                            </div>
+                            {model.description && (
+                              <div className="text-sm text-muted-foreground mb-2">
+                                {model.description}
+                              </div>
+                            )}
+                            {model.status === 'downloading' && (
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-blue-600 h-2 rounded-full" 
+                                  style={{ width: formatProgress(model.downloadProgress) }}
+                                ></div>
+                              </div>
+                            )}
+                            {model.errorMessage && (
+                              <div className="text-sm text-red-500 mt-2">
+                                Error: {model.errorMessage}
+                              </div>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ) : (
-                      <div className="aspect-square bg-muted rounded-lg flex items-center justify-center">
-                        <div className="text-center">
-                          <ImageIcon className="h-12 w-12 text-muted-foreground mx-auto mb-2" />
-                          <p className="text-sm text-muted-foreground">Generated image will appear here</p>
-                        </div>
+                      <div className="text-center text-muted-foreground">
+                        No models downloaded yet
                       </div>
                     )}
                   </CardContent>
@@ -750,17 +1408,33 @@ export default function ComfyUI() {
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="text-to-image">Text to Image</SelectItem>
-                                <SelectItem value="image-to-image">Image to Image</SelectItem>
-                                <SelectItem value="upscaling">Upscaling</SelectItem>
+                                <SelectItem value="img2img">Image to Image</SelectItem>
                                 <SelectItem value="inpainting">Inpainting</SelectItem>
+                                <SelectItem value="upscaling">Upscaling</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
+                          <div>
+                            <Label htmlFor="workflow-json">Workflow JSON</Label>
+                            <Textarea
+                              id="workflow-json"
+                              value={newWorkflowJson}
+                              onChange={(e) => setNewWorkflowJson(e.target.value)}
+                              placeholder="Paste your ComfyUI workflow JSON here"
+                              rows={5}
+                            />
+                          </div>
                           <div className="flex justify-end gap-2">
-                            <Button variant="outline" onClick={() => setShowWorkflowDialog(false)}>
+                            <Button 
+                              variant="outline" 
+                              onClick={() => setShowWorkflowDialog(false)}
+                            >
                               Cancel
                             </Button>
-                            <Button onClick={handleCreateWorkflow} disabled={createWorkflowMutation.isPending}>
+                            <Button 
+                              onClick={handleCreateWorkflow}
+                              disabled={!newWorkflowName || !newWorkflowJson || createWorkflowMutation.isPending}
+                            >
                               {createWorkflowMutation.isPending ? "Creating..." : "Create Workflow"}
                             </Button>
                           </div>
@@ -773,36 +1447,34 @@ export default function ComfyUI() {
                   {workflowsLoading ? (
                     <LoadingCard />
                   ) : workflows && Array.isArray(workflows) && workflows.length > 0 ? (
-                    <div className="grid gap-4">
+                    <div className="grid gap-4 md:grid-cols-2">
                       {workflows.map((workflow: ComfyWorkflow) => (
                         <div key={workflow.id} className="border rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h3 className="font-medium">{workflow.name}</h3>
-                              <p className="text-sm text-muted-foreground mt-1">
-                                {workflow.description}
-                              </p>
-                              <Badge variant="outline" className="mt-2">
-                                {workflow.category}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Button variant="outline" size="sm">
-                                <Play className="h-4 w-4" />
-                              </Button>
-                              <Button variant="outline" size="sm">
-                                <Settings className="h-4 w-4" />
-                              </Button>
-                            </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-medium">{workflow.name}</h4>
+                            <Badge variant="outline">{workflow.category}</Badge>
+                          </div>
+                          {workflow.description && (
+                            <p className="text-sm text-muted-foreground mb-3">
+                              {workflow.description}
+                            </p>
+                          )}
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Save className="h-4 w-4 mr-1" />
+                              Use
+                            </Button>
                           </div>
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <Palette className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-600 dark:text-gray-400">No workflows created yet</p>
-                      <p className="text-sm text-gray-500 mt-1">Create custom workflows for repeated use</p>
+                    <div className="text-center text-muted-foreground">
+                      No workflows saved yet
                     </div>
                   )}
                 </CardContent>
@@ -813,25 +1485,201 @@ export default function ComfyUI() {
             <TabsContent value="analyzer" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    <Brain className="h-5 w-5" />
-                    Workflow Analyzer
-                  </CardTitle>
-                  <CardDescription>
-                    Analyze ComfyUI workflows and get optimization suggestions
-                  </CardDescription>
+                  <CardTitle className="text-lg">Workflow Analyzer</CardTitle>
+                  <CardDescription>AI-powered workflow analysis with automatic dependency detection</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Workflow JSON</label>
+                    <Textarea
+                      placeholder="Paste your ComfyUI workflow JSON here..."
+                      value={analyzeWorkflowJson}
+                      onChange={(e) => setAnalyzeWorkflowJson(e.target.value)}
+                      className="min-h-[200px] font-mono text-sm"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => {
+                        if (!analyzeWorkflowJson.trim()) return;
+                        setIsAnalyzing(true);
+                        setAnalysisResult(null);
+                        try {
+                          const parsedJson = JSON.parse(analyzeWorkflowJson);
+                          analyzeWorkflowMutation.mutate(parsedJson);
+                        } catch (error) {
+                          console.error('Invalid JSON:', error);
+                          setIsAnalyzing(false);
+                        }
+                      }}
+                      disabled={isAnalyzing || !analyzeWorkflowJson.trim()}
+                    >
+                      {isAnalyzing ? (
+                        <>
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Analyzing...
+                        </>
+                      ) : (
+                        <>
+                          <Brain className="h-4 w-4 mr-2" />
+                          Analyze Workflow
+                        </>
+                      )}
+                    </Button>
+                    
+                    {analysisResult && selectedServer && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setIsDownloading(true);
+                          downloadRequirementsMutation.mutate({
+                            serverId: selectedServer.id,
+                            analysis: analysisResult
+                          });
+                        }}
+                        disabled={isDownloading}
+                      >
+                        {isDownloading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Downloading...
+                          </>
+                        ) : (
+                          <>
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Requirements
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setLogs([])}
+                      disabled={logs.length === 0}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Clear Logs
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Analysis Results */}
+              {analysisResult && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Analysis Results</CardTitle>
+                    <CardDescription>
+                      Complexity: <Badge variant="outline">{analysisResult.complexity}</Badge>
+                      Download Size: <Badge variant="outline">{analysisResult.estimatedDownloadSize}</Badge>
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h4 className="font-medium mb-2">Summary</h4>
+                      <p className="text-sm text-muted-foreground">{analysisResult.summary}</p>
+                    </div>
+                    
+                    {/* Required Models */}
+                    {analysisResult.models && analysisResult.models.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-3">Required Models ({analysisResult.models.length})</h4>
+                        <div className="space-y-2">
+                          {analysisResult.models.map((model: any, index: number) => (
+                            <div key={index} className="border rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-sm">{model.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    Type: {model.type} • Folder: {model.folder}
+                                  </div>
+                                  {model.description && (
+                                    <div className="text-xs text-muted-foreground mt-1">{model.description}</div>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {model.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                                  {model.url && <Badge variant="outline" className="text-xs">URL Available</Badge>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Custom Nodes */}
+                    {analysisResult.nodes && analysisResult.nodes.length > 0 && (
+                      <div>
+                        <h4 className="font-medium mb-3">Custom Nodes ({analysisResult.nodes.length})</h4>
+                        <div className="space-y-2">
+                          {analysisResult.nodes.map((node: any, index: number) => (
+                            <div key={index} className="border rounded-lg p-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="font-medium text-sm">{node.name}</div>
+                                  <div className="text-xs text-muted-foreground">Type: {node.type}</div>
+                                  {node.description && (
+                                    <div className="text-xs text-muted-foreground mt-1">{node.description}</div>
+                                  )}
+                                  {node.installCommand && (
+                                    <code className="text-xs bg-muted px-1 rounded mt-1 block">{node.installCommand}</code>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  {node.required && <Badge variant="destructive" className="text-xs">Required</Badge>}
+                                  {node.gitUrl && <Badge variant="outline" className="text-xs">Git Available</Badge>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Real-time Logs */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Real-time Logs</CardTitle>
+                      <CardDescription>Live progress updates during analysis and downloads</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2 h-2 rounded-full ${wsConnection ? 'bg-green-500' : 'bg-red-500'}`} />
+                      <span className="text-xs text-muted-foreground">
+                        {wsConnection ? 'Connected' : 'Disconnected'}
+                      </span>
+                    </div>
+                  </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-8">
-                    <Brain className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-medium mb-2">AI Workflow Analysis</h3>
-                    <p className="text-muted-foreground mb-4">
-                      Upload ComfyUI workflows to get intelligent analysis and optimization suggestions powered by AI.
-                    </p>
-                    <Button disabled>
-                      <Brain className="h-4 w-4 mr-2" />
-                      Coming Soon
-                    </Button>
+                  <div className="bg-black text-green-400 p-4 rounded-lg font-mono text-sm max-h-96 overflow-y-auto">
+                    {logs.length > 0 ? (
+                      logs.map((log, index) => (
+                        <div key={index} className="flex gap-2 mb-1">
+                          <span className="text-gray-500 shrink-0">
+                            {new Date(log.timestamp).toLocaleTimeString()}
+                          </span>
+                          <span className={`shrink-0 ${
+                            log.level === 'error' ? 'text-red-400' :
+                            log.level === 'warning' ? 'text-yellow-400' :
+                            log.level === 'success' ? 'text-green-400' :
+                            'text-blue-400'
+                          }`}>
+                            [{log.level.toUpperCase()}]
+                          </span>
+                          <span>{log.message}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-gray-500">No logs yet. Start analyzing a workflow to see real-time progress...</div>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -841,56 +1689,67 @@ export default function ComfyUI() {
             <TabsContent value="gallery" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Generation Gallery</CardTitle>
-                  <CardDescription>View your generated images</CardDescription>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">Generated Images</CardTitle>
+                      <CardDescription>Your AI generated images</CardDescription>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => refetchGenerations()}
+                      disabled={generationsLoading}
+                    >
+                      <RefreshCw className={`h-4 w-4 ${generationsLoading ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {generationsLoading ? (
                     <LoadingCard />
                   ) : generations && Array.isArray(generations) && generations.length > 0 ? (
-                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="space-y-4">
                       {generations.map((generation: ComfyGeneration) => (
                         <div key={generation.id} className="border rounded-lg p-4">
-                          <div className="aspect-square bg-muted rounded-lg mb-3 flex items-center justify-center">
-                            {generation.imageUrls && generation.imageUrls.length > 0 ? (
-                              <img
-                                src={generation.imageUrls[0]}
-                                alt="Generated"
-                                className="w-full h-full object-cover rounded-lg"
-                              />
-                            ) : (
-                              <ImageIcon className="h-8 w-8 text-muted-foreground" />
-                            )}
+                          <div className="flex items-center justify-between mb-2">
+                            <Badge className={getStatusColor(generation.status)}>
+                              {generation.status}
+                            </Badge>
+                            <span className="text-sm text-muted-foreground">
+                              {generation.createdAt ? new Date(generation.createdAt).toLocaleString() : 'Unknown'}
+                            </span>
                           </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <Badge variant={generation.status === 'completed' ? 'default' : 
-                                           generation.status === 'failed' ? 'destructive' : 'secondary'}>
-                                {generation.status}
-                              </Badge>
-                              <span className="text-xs text-muted-foreground">
-                                {new Date(generation.createdAt).toLocaleDateString()}
-                              </span>
+                          
+                          {generation.prompt && (
+                            <div className="mb-2">
+                              <strong>Prompt:</strong> {generation.prompt}
                             </div>
-                            {generation.prompt && (
-                              <p className="text-sm text-muted-foreground line-clamp-2">
-                                {generation.prompt}
-                              </p>
-                            )}
-                            {generation.errorMessage && (
-                              <p className="text-sm text-red-500">
-                                {generation.errorMessage}
-                              </p>
-                            )}
-                          </div>
+                          )}
+                          
+                          {generation.imageUrls && Array.isArray(generation.imageUrls) && generation.imageUrls.length > 0 && (
+                            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                              {generation.imageUrls.map((url: string, index: number) => (
+                                <img 
+                                  key={index} 
+                                  src={url} 
+                                  alt={`Generated image ${index + 1}`}
+                                  className="w-full h-48 object-cover rounded"
+                                />
+                              ))}
+                            </div>
+                          )}
+                          
+                          {generation.errorMessage && (
+                            <div className="text-sm text-red-500 mt-2">
+                              Error: {generation.errorMessage}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   ) : (
-                    <div className="text-center py-8">
-                      <ImageIcon className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-gray-600 dark:text-gray-400">No generations yet</p>
-                      <p className="text-sm text-gray-500 mt-1">Generated images will appear here</p>
+                    <div className="text-center text-muted-foreground">
+                      No generations yet
                     </div>
                   )}
                 </CardContent>

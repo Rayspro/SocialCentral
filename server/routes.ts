@@ -1353,38 +1353,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      if (!server.vastId) {
+        return res.status(400).json({ error: 'Server does not have a valid Vast.ai instance ID' });
+      }
+
+      const vastApiKey = await storage.getApiKeyByService('vast');
+      if (!vastApiKey?.keyValue) {
+        return res.status(400).json({ error: 'Vast.ai API key not configured' });
+      }
+
+      // Try to start the instance using real Vast.ai API
+      const { VastAIService } = await import('./vast-ai');
+      const vastService = new VastAIService(vastApiKey.keyValue);
+      
       // Update server to loading state immediately
       await storage.updateVastServer(serverId, { 
         status: 'loading',
         setupStatus: 'pending'
       });
 
-      // Simulate the start process with a delay (demo mode)
-      setTimeout(async () => {
-        try {
-          await storage.updateVastServer(serverId, { 
-            status: 'running',
-            setupStatus: 'completed'
+      try {
+        const success = await vastService.startInstance(parseInt(server.vastId));
+        
+        if (success) {
+          // Real API call succeeded - the instance is starting in Vast.ai console
+          res.json({ 
+            success: true, 
+            message: 'Server start command sent to Vast.ai. Check your Vast.ai console to monitor startup progress.' 
           });
-          console.log(`Server ${serverId} successfully started and is now running`);
-        } catch (error) {
-          console.error('Error updating server status after start:', error);
-          // If start fails, set back to stopped
-          try {
-            await storage.updateVastServer(serverId, { 
-              status: 'stopped',
-              setupStatus: 'failed'
-            });
-          } catch (rollbackError) {
-            console.error('Error rolling back server status:', rollbackError);
-          }
-        }
-      }, 3000 + Math.random() * 2000); // 3-5 second delay
 
-      res.json({ 
-        success: true, 
-        message: 'Server start command sent successfully. Starting server...' 
-      });
+          // Monitor and sync status from Vast.ai
+          setTimeout(async () => {
+            try {
+              // Get updated status from Vast.ai
+              const instances = await vastService.getInstances(1, 100);
+              const vastInstance = instances.instances.find(inst => inst.id.toString() === server.vastId);
+              
+              if (vastInstance) {
+                await storage.updateVastServer(serverId, { 
+                  status: vastInstance.status,
+                  setupStatus: vastInstance.status === 'running' ? 'completed' : 'pending'
+                });
+              }
+            } catch (error) {
+              console.error('Error syncing server status:', error);
+            }
+          }, 10000); // Check status after 10 seconds
+
+        } else {
+          // Real API call failed - rollback to stopped
+          await storage.updateVastServer(serverId, { 
+            status: 'stopped',
+            setupStatus: 'failed'
+          });
+          
+          res.status(500).json({ 
+            error: 'Failed to start server instance via Vast.ai API' 
+          });
+        }
+      } catch (error) {
+        console.error('Error starting server via Vast.ai API:', error);
+        
+        // Rollback to stopped state
+        await storage.updateVastServer(serverId, { 
+          status: 'stopped',
+          setupStatus: 'failed'
+        });
+        
+        res.status(500).json({ 
+          error: 'Failed to communicate with Vast.ai API' 
+        });
+      }
     } catch (error) {
       console.error('Error starting server:', error);
       res.status(500).json({ error: 'Failed to start server' });

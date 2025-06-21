@@ -47,13 +47,24 @@ function generateDemoImageUrls(promptKeywords: string, generationId: number): st
       'photo-1519904981063-b0cf448d479e', // color gradients
       'photo-1578662996442-48f60103fc96', // digital abstract
       'photo-1514041181368-bca62cceffcd'  // colorful abstract
+    ],
+    animals: [
+      'photo-1552053831-71594a27632d', // golden retriever
+      'photo-1583337130417-3346a1be7dee', // husky dog
+      'photo-1534361960057-19889db9621e', // cute puppy
+      'photo-1587300003388-59208cc962cb', // dog portrait
+      'photo-1518717758536-85ae29035b6d'  // dog in nature
     ]
   };
 
   // Determine category based on prompt keywords
   let category = 'landscape'; // default
   
-  if (promptKeywords.includes('portrait') || promptKeywords.includes('person') || 
+  if (promptKeywords.includes('dog') || promptKeywords.includes('puppy') || 
+      promptKeywords.includes('cat') || promptKeywords.includes('animal') ||
+      promptKeywords.includes('pet') || promptKeywords.includes('kitten')) {
+    category = 'animals';
+  } else if (promptKeywords.includes('portrait') || promptKeywords.includes('person') || 
       promptKeywords.includes('face') || promptKeywords.includes('character')) {
     category = 'portrait';
   } else if (promptKeywords.includes('anime') || promptKeywords.includes('manga') || 

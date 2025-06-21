@@ -155,6 +155,7 @@ Changelog:
 - June 21, 2025. Implemented comprehensive Intuitive Drag-and-Drop Workflow Composer with visual node editor, allowing users to create ComfyUI workflows through an interactive interface. Features include node library with categorized components (loaders, conditioning, sampling, latent, VAE, image), drag-and-drop canvas with real-time connections, input validation, workflow export/import, and seamless integration into Server Detail pages alongside existing workflow analyzer functionality
 - June 21, 2025. Enhanced ComfyUI Workflow Analyzer with file upload functionality - users can now either paste JSON directly or upload .json files containing ComfyUI workflows. Added upload method selection buttons, file validation with error handling, automatic workflow name extraction from filenames, and visual feedback for successful file loading
 - June 21, 2025. Converted workflows page from card layout to professional table format with organized columns (Workflow, Category, Server, Models, Created, Actions) for better data scanning and comparison. Removed ComfyUI and Workflow Composer from sidebar navigation for cleaner interface design
+- June 21, 2025. Fixed workflow selection system in image generation - system now properly uses selected workflow instead of defaulting to workflow ID 1, added workflow-specific image generation for demo mode, enhanced prompt recognition for animal keywords (dog, puppy, cat, pet), and improved generation response messages to show which workflow is being used
 ```
 
 ## User Preferences

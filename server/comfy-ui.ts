@@ -103,6 +103,37 @@ function generateDemoImageUrls(promptKeywords: string, generationId: number): st
   return selectedImages;
 }
 
+// Generate workflow-specific demo images
+function generateWorkflowBasedImages(workflow: any, promptKeywords: string, generationId: number): string[] {
+  const workflowName = workflow.name.toLowerCase();
+  
+  // Map workflow names to specific image categories
+  if (workflowName.includes('portrait') || workflowName.includes('face')) {
+    return [
+      `https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=512&h=512&fit=crop&crop=face`,
+      `https://images.unsplash.com/photo-1494790108755-2616c997252c?w=512&h=512&fit=crop&crop=face`
+    ];
+  } else if (workflowName.includes('anime') || workflowName.includes('cartoon')) {
+    return [
+      `https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=512&h=512&fit=crop`,
+      `https://images.unsplash.com/photo-1514041181368-bca62cceffcd?w=512&h=512&fit=crop`
+    ];
+  } else if (workflowName.includes('landscape') || workflowName.includes('nature')) {
+    return [
+      `https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=512&h=512&fit=crop`,
+      `https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=512&h=512&fit=crop`
+    ];
+  } else if (workflowName.includes('abstract') || workflowName.includes('art')) {
+    return [
+      `https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=512&h=512&fit=crop`,
+      `https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=512&h=512&fit=crop`
+    ];
+  } else {
+    // Fall back to prompt-based generation
+    return generateDemoImageUrls(promptKeywords, generationId);
+  }
+}
+
 // ComfyUI API client class
 class ComfyUIClient {
   private baseUrl: string;
@@ -524,10 +555,16 @@ export async function generateImage(req: Request, res: Response) {
     });
 
     if (isDemoReady) {
+      // Get the selected workflow for demo generation
+      let selectedWorkflow = null;
+      if (workflowId) {
+        selectedWorkflow = await storage.getComfyWorkflow(parseInt(workflowId));
+      }
+
       // Handle demo generation for ready servers with varied outputs
       const generationData: InsertComfyGeneration = {
         serverId,
-        workflowId: workflowId || null,
+        workflowId: workflowId ? parseInt(workflowId) : null,
         prompt: prompt || 'beautiful scenery nature glass bottle landscape',
         negativePrompt: negativePrompt || '',
         parameters: JSON.stringify(parameters || {}),
@@ -537,9 +574,17 @@ export async function generateImage(req: Request, res: Response) {
 
       const generation = await storage.createComfyGeneration(generationData);
       
-      // Generate varied demo images based on prompt keywords
+      // Generate varied demo images based on prompt keywords and selected workflow
       const promptKeywords = (prompt || '').toLowerCase();
-      const imageUrls = generateDemoImageUrls(promptKeywords, generation.id);
+      let imageUrls;
+      
+      if (selectedWorkflow) {
+        // Use workflow-specific image generation
+        imageUrls = generateWorkflowBasedImages(selectedWorkflow, promptKeywords, generation.id);
+      } else {
+        // Use general prompt-based image generation
+        imageUrls = generateDemoImageUrls(promptKeywords, generation.id);
+      }
       
       // Simulate generation process with realistic timing
       setTimeout(async () => {
@@ -553,9 +598,10 @@ export async function generateImage(req: Request, res: Response) {
       return res.json({
         success: true,
         generationId: generation.id,
-        message: 'Image generation started (Demo mode)',
+        message: `Image generation started using ${selectedWorkflow ? selectedWorkflow.name : 'default workflow'} (Demo mode)`,
         estimatedTime: '2-4 seconds',
-        queueId: generation.queueId
+        queueId: generation.queueId,
+        workflow: selectedWorkflow ? selectedWorkflow.name : 'Default'
       });
     }
 

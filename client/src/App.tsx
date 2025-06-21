@@ -21,6 +21,7 @@ import ServerDetail from "@/pages/ServerDetail";
 import { ServerDetailPage } from "@/pages/ServerDetailPage";
 import ComfyUI from "@/pages/ComfyUI";
 import WorkflowsPage from "@/pages/WorkflowsPage";
+import WorkflowComposer from "@/pages/WorkflowComposer";
 import PerformanceStory from "@/pages/PerformanceStory";
 import AuditLog from "@/pages/AuditLog";
 import SignIn from "@/pages/SignIn";
@@ -42,6 +43,7 @@ function Router() {
       <Route path="/server/:id" component={ServerDetailPage} />
       <Route path="/comfy-ui" component={ComfyUI} />
       <Route path="/workflows" component={WorkflowsPage} />
+      <Route path="/workflow-composer" component={WorkflowComposer} />
       <Route path="/performance-story" component={PerformanceStory} />
       <Route path="/audit-log" component={AuditLog} />
       <Route path="/settings" component={Settings} />

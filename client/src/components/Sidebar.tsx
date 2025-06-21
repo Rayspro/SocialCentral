@@ -12,7 +12,8 @@ import {
   Wand2,
   BookOpen,
   Shield,
-  Workflow
+  Workflow,
+  Layers
 } from "lucide-react";
 
 const navigationItems = [
@@ -25,6 +26,7 @@ const navigationItems = [
   { path: "/vast-servers", label: "Vast.ai Servers", icon: Server },
   { path: "/comfy-ui", label: "ComfyUI", icon: Wand2 },
   { path: "/workflows", label: "Workflows", icon: Workflow },
+  { path: "/workflow-composer", label: "Workflow Composer", icon: Layers },
   { path: "/performance-story", label: "Performance Story", icon: BookOpen },
   { path: "/audit-log", label: "Audit Log", icon: Shield },
   { path: "/settings", label: "Settings", icon: Settings },

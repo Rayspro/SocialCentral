@@ -68,6 +68,7 @@ export interface IStorage {
 
   // API Key operations
   getApiKeys(): Promise<ApiKey[]>;
+  getApiKeyByService(service: string): Promise<ApiKey | undefined>;
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   updateApiKey(id: number, apiKey: Partial<InsertApiKey>): Promise<ApiKey>;
   deleteApiKey(id: number): Promise<void>;
@@ -165,7 +166,17 @@ export class MemStorage implements IStorage {
   private accounts: Account[] = [];
   private content: Content[] = [];
   private schedules: Schedule[] = [];
-  private apiKeys: ApiKey[] = [];
+  private apiKeys: ApiKey[] = [
+    {
+      id: 1,
+      service: "vast",
+      keyName: "Vast.ai API Key",
+      keyValue: "389db1a7f1956dac59fa3efb9eebdd485eceea118e6119efb64cc08a50f5d92b",
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
+  ];
   private vastServers: VastServer[] = [];
   private setupScripts: SetupScript[] = [];
   private comfyModels: ComfyModel[] = [];
@@ -334,10 +345,17 @@ export class MemStorage implements IStorage {
     return this.apiKeys;
   }
 
+  async getApiKeyByService(service: string): Promise<ApiKey | undefined> {
+    return this.apiKeys.find(key => key.service === service && key.isActive);
+  }
+
   async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {
     const newApiKey: ApiKey = {
       id: this.apiKeys.length + 1,
-      ...apiKey,
+      service: apiKey.service,
+      keyName: apiKey.keyName,
+      keyValue: apiKey.keyValue,
+      isActive: apiKey.isActive ?? true,
       createdAt: new Date(),
       updatedAt: new Date(),
     };

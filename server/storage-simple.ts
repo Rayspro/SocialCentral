@@ -68,6 +68,7 @@ export interface IStorage {
 
   // API Key operations
   getApiKeys(): Promise<ApiKey[]>;
+  getApiKeyByService(service: string): Promise<ApiKey | undefined>;
   createApiKey(apiKey: InsertApiKey): Promise<ApiKey>;
   updateApiKey(id: number, apiKey: Partial<InsertApiKey>): Promise<ApiKey>;
   deleteApiKey(id: number): Promise<void>;
@@ -332,6 +333,10 @@ export class MemStorage implements IStorage {
   // API Key operations
   async getApiKeys(): Promise<ApiKey[]> {
     return this.apiKeys;
+  }
+
+  async getApiKeyByService(service: string): Promise<ApiKey | undefined> {
+    return this.apiKeys.find(key => key.service === service && key.isActive);
   }
 
   async createApiKey(apiKey: InsertApiKey): Promise<ApiKey> {

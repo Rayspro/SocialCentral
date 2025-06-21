@@ -389,6 +389,98 @@ export class WorkflowAnalyzer {
     
     return deletedCount;
   }
+
+  // WebSocket connection management
+  private wsConnections: Set<any> = new Set();
+
+  addWebSocketConnection(ws: any): void {
+    this.wsConnections.add(ws);
+    
+    ws.on('close', () => {
+      this.wsConnections.delete(ws);
+    });
+  }
+
+  // Download models and nodes based on analysis
+  async downloadModelsAndNodes(analysisId: number): Promise<void> {
+    const analysis = await storage.getWorkflowAnalysis(analysisId);
+    if (!analysis) {
+      throw new Error('Analysis not found');
+    }
+
+    const missingModels = Array.isArray(analysis.missingModels) 
+      ? analysis.missingModels 
+      : JSON.parse(analysis.missingModels as string || '[]');
+
+    // Start downloads for missing models
+    for (const model of missingModels) {
+      if (model.url) {
+        const modelData: InsertComfyModel = {
+          name: model.name,
+          serverId: analysis.serverId,
+          folder: model.type || 'checkpoints',
+          url: model.url,
+          description: model.description || '',
+          status: 'downloading',
+          fileSize: 0
+        };
+        
+        await storage.createComfyModel(modelData);
+      }
+    }
+
+    // Update analysis status
+    await storage.updateWorkflowAnalysis(analysisId, {
+      downloadStatus: 'in_progress'
+    });
+  }
+
+  // Logging system
+  private logs: Array<{ timestamp: Date; message: string; level: string }> = [];
+
+  addLog(message: string, level: string = 'info'): void {
+    this.logs.push({
+      timestamp: new Date(),
+      message,
+      level
+    });
+
+    // Broadcast to WebSocket connections
+    const logEntry = {
+      type: 'log',
+      timestamp: new Date().toISOString(),
+      message,
+      level
+    };
+
+    this.wsConnections.forEach(ws => {
+      if (ws.readyState === 1) { // WebSocket.OPEN
+        ws.send(JSON.stringify(logEntry));
+      }
+    });
+
+    // Keep only last 1000 logs
+    if (this.logs.length > 1000) {
+      this.logs = this.logs.slice(-1000);
+    }
+  }
+
+  getLogs(): Array<{ timestamp: Date; message: string; level: string }> {
+    return this.logs;
+  }
+
+  clearLogs(): void {
+    this.logs = [];
+  }
+
+  // Additional storage helper methods
+  async getWorkflowAnalysis(analysisId: number): Promise<any> {
+    return await storage.getWorkflowAnalysisById(analysisId);
+  }
+
+  async updateWorkflowAnalysis(analysisId: number, data: any): Promise<void> {
+    await storage.updateWorkflowAnalysis(analysisId, data);
+  }
 }
 
 export const workflowAnalyzer = new WorkflowAnalyzer();

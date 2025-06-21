@@ -88,9 +88,13 @@ export function ModelManager({ serverId, trigger }: ModelManagerProps) {
   // Delete model mutation
   const deleteModelMutation = useMutation({
     mutationFn: async (modelId: number) => {
-      await apiRequest(`/api/comfy/models/${modelId}`, {
+      const response = await fetch(`/api/comfy/models/${modelId}`, {
         method: "DELETE",
       });
+      if (!response.ok) {
+        throw new Error(`Failed to delete model: ${response.statusText}`);
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/comfy/models/${serverId}`] });
@@ -112,17 +116,20 @@ export function ModelManager({ serverId, trigger }: ModelManagerProps) {
   // Cleanup failed downloads mutation
   const cleanupMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest(`/api/comfy/models/${serverId}/cleanup-failed`, {
+      const response = await fetch(`/api/comfy/models/${serverId}/cleanup-failed`, {
         method: "POST",
       });
-      return response;
+      if (!response.ok) {
+        throw new Error(`Failed to cleanup models: ${response.statusText}`);
+      }
+      return response.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: [`/api/comfy/models/${serverId}`] });
       queryClient.invalidateQueries({ queryKey: [`/api/comfy/models/${serverId}/library-status`] });
       toast({
         title: "Cleanup Complete",
-        description: `Removed ${data.deletedCount} failed downloads`,
+        description: `Removed ${data.deletedCount || 0} failed downloads`,
       });
     },
   });
@@ -391,11 +398,15 @@ function AddModelDialog({ serverId, onClose, onSuccess }: AddModelDialogProps) {
 
   const addModelMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      await apiRequest(`/api/comfy/models/${serverId}/download`, {
+      const response = await fetch(`/api/comfy/models/${serverId}/download`, {
         method: "POST",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
       });
+      if (!response.ok) {
+        throw new Error(`Failed to start model download: ${response.statusText}`);
+      }
+      return response.json();
     },
     onSuccess: () => {
       toast({

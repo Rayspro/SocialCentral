@@ -523,7 +523,7 @@ export function ServerDetailPage() {
             </div>
             <div className="flex gap-2">
               <ModelManager 
-                serverId={parseInt(serverId)}
+                serverId={serverId}
                 trigger={
                   <Button variant="outline" size="sm">
                     <FolderOpen className="h-4 w-4 mr-1" />
@@ -533,7 +533,7 @@ export function ServerDetailPage() {
               />
               
               <WorkflowAnalyzer 
-                serverId={parseInt(serverId)}
+                serverId={serverId}
                 trigger={
                   <Button variant="outline" size="sm">
                     <Brain className="h-4 w-4 mr-1" />

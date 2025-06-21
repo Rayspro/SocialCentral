@@ -65,9 +65,13 @@ export function WorkflowAnalyzer({ serverId, trigger }: WorkflowAnalyzerProps) {
   // Delete analysis mutation
   const deleteAnalysisMutation = useMutation({
     mutationFn: async (analysisId: number) => {
-      await apiRequest(`/api/comfy/workflow-analysis/${analysisId}`, {
+      const response = await fetch(`/api/comfy/workflow-analysis/${analysisId}`, {
         method: "DELETE",
       });
+      if (!response.ok) {
+        throw new Error(`Failed to delete analysis: ${response.statusText}`);
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/comfy/workflow-analysis/${serverId}`] });
@@ -305,12 +309,15 @@ function AnalyzeWorkflowDialog({ serverId, onClose, onSuccess }: AnalyzeWorkflow
 
   const analyzeMutation = useMutation({
     mutationFn: async (data: typeof formData) => {
-      const response = await apiRequest(`/api/comfy/analyze-workflow/${serverId}`, {
+      const response = await fetch(`/api/comfy/analyze-workflow/${serverId}`, {
         method: "POST",
         body: JSON.stringify(data),
         headers: { "Content-Type": "application/json" },
       });
-      return response;
+      if (!response.ok) {
+        throw new Error(`Failed to analyze workflow: ${response.statusText}`);
+      }
+      return response.json();
     },
     onSuccess: (data) => {
       const requiredModels = Array.isArray(data.requiredModels) ? data.requiredModels : [];

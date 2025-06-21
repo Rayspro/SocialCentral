@@ -46,11 +46,13 @@ import { format } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { ModelManager } from "@/components/ModelManager";
 import { WorkflowAnalyzer } from "@/components/WorkflowAnalyzer";
+import { WorkflowAnalyzerModal } from "@/components/WorkflowAnalyzerModal";
 
 export function ServerDetailPage() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
+  const [showWorkflowAnalyzer, setShowWorkflowAnalyzer] = useState(false);
   const queryClient = useQueryClient();
   const serverId = parseInt(params.id || "0");
 
@@ -279,6 +281,15 @@ export function ServerDetailPage() {
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshMutation.isPending ? 'animate-spin' : ''}`} />
             Refresh
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowWorkflowAnalyzer(true)}
+          >
+            <Brain className="h-4 w-4 mr-2" />
+            Analyze Workflow
           </Button>
           
           {serverData?.status === 'running' && (
@@ -680,6 +691,13 @@ export function ServerDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Workflow Analyzer Modal */}
+      <WorkflowAnalyzerModal
+        open={showWorkflowAnalyzer}
+        onOpenChange={setShowWorkflowAnalyzer}
+        serverId={serverId}
+      />
       </div>
     </div>
   );

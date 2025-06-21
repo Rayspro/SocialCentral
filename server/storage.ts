@@ -100,6 +100,7 @@ export interface IStorage {
   getComfyModels(): Promise<ComfyModel[]>;
   getComfyModelsByServer(serverId: number): Promise<ComfyModel[]>;
   getComfyModel(id: number): Promise<ComfyModel | undefined>;
+  getComfyModelByNameAndServer(name: string, serverId: number): Promise<ComfyModel | undefined>;
   createComfyModel(model: InsertComfyModel): Promise<ComfyModel>;
   updateComfyModel(id: number, model: Partial<InsertComfyModel>): Promise<ComfyModel>;
   deleteComfyModel(id: number): Promise<void>;
@@ -136,10 +137,11 @@ export interface IStorage {
 
   // Workflow analysis operations
   getWorkflowAnalyses(serverId?: number): Promise<WorkflowAnalysis[]>;
+  getWorkflowAnalysesByServer(serverId: number): Promise<WorkflowAnalysis[]>;
   getWorkflowAnalysis(id: number): Promise<WorkflowAnalysis | undefined>;
   createWorkflowAnalysis(analysis: InsertWorkflowAnalysis): Promise<WorkflowAnalysis>;
   updateWorkflowAnalysis(id: number, analysis: Partial<InsertWorkflowAnalysis>): Promise<WorkflowAnalysis>;
-  deleteWorkflowAnalysis(id: number): Promise<void>;
+  deleteWorkflowAnalysis(id: number): Promise<boolean>;
 
   // Server execution operations
   getServerExecutions(serverId?: number): Promise<ServerExecution[]>;
@@ -488,6 +490,12 @@ export class MemStorage implements IStorage {
     return this.comfyModels[index];
   }
 
+  async getComfyModelByNameAndServer(name: string, serverId: number): Promise<ComfyModel | undefined> {
+    return this.comfyModels.find(model => 
+      (model.name === name || model.fileName === name) && model.serverId === serverId
+    );
+  }
+
   async deleteComfyModel(id: number): Promise<void> {
     const index = this.comfyModels.findIndex(m => m.id === id);
     if (index === -1) throw new Error("Model not found");
@@ -708,6 +716,50 @@ export class MemStorage implements IStorage {
     if (index === -1) throw new Error("Server execution not found");
     this.serverExecutions[index] = { ...this.serverExecutions[index], ...execution, updatedAt: new Date() };
     return this.serverExecutions[index];
+  }
+
+  // Workflow analysis operations
+  async getWorkflowAnalyses(serverId?: number): Promise<WorkflowAnalysis[]> {
+    if (serverId) {
+      return this.workflowAnalyses.filter(analysis => analysis.serverId === serverId);
+    }
+    return this.workflowAnalyses;
+  }
+
+  async getWorkflowAnalysesByServer(serverId: number): Promise<WorkflowAnalysis[]> {
+    return this.workflowAnalyses.filter(analysis => analysis.serverId === serverId);
+  }
+
+  async getWorkflowAnalysis(id: number): Promise<WorkflowAnalysis | undefined> {
+    return this.workflowAnalyses.find(analysis => analysis.id === id);
+  }
+
+  async createWorkflowAnalysis(analysis: InsertWorkflowAnalysis): Promise<WorkflowAnalysis> {
+    const id = this.workflowAnalyses.length + 1;
+    const newAnalysis: WorkflowAnalysis = {
+      id,
+      ...analysis,
+      analysisStatus: analysis.analysisStatus || 'pending',
+      downloadStatus: analysis.downloadStatus || 'idle',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.workflowAnalyses.push(newAnalysis);
+    return newAnalysis;
+  }
+
+  async updateWorkflowAnalysis(id: number, analysis: Partial<InsertWorkflowAnalysis>): Promise<WorkflowAnalysis> {
+    const index = this.workflowAnalyses.findIndex(a => a.id === id);
+    if (index === -1) throw new Error("Workflow analysis not found");
+    this.workflowAnalyses[index] = { ...this.workflowAnalyses[index], ...analysis, updatedAt: new Date() };
+    return this.workflowAnalyses[index];
+  }
+
+  async deleteWorkflowAnalysis(id: number): Promise<boolean> {
+    const index = this.workflowAnalyses.findIndex(a => a.id === id);
+    if (index === -1) return false;
+    this.workflowAnalyses.splice(index, 1);
+    return true;
   }
 }
 

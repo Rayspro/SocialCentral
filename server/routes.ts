@@ -1692,6 +1692,102 @@ echo "CUDA environment configured!"`,
   // Auto-setup ComfyUI
   app.post('/api/comfy/:serverId/auto-setup', autoSetupComfyUI);
   app.post('/api/comfy/:serverId/startup', startupComfyUI);
+
+  // Workflow Analysis API endpoints
+  app.post('/api/comfy/analyze-workflow/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const { workflowJson, workflowName } = req.body;
+
+      if (!workflowJson || !workflowName) {
+        return res.status(400).json({ message: "Workflow JSON and name are required" });
+      }
+
+      // Parse workflow JSON to analyze
+      let workflow;
+      try {
+        workflow = JSON.parse(workflowJson);
+      } catch (error) {
+        return res.status(400).json({ message: "Invalid workflow JSON format" });
+      }
+
+      // Analyze workflow to detect required models and missing nodes
+      const analysisResult = await workflowAnalyzer.analyzeWorkflow(serverId, workflow, workflowName);
+      
+      res.json(analysisResult);
+    } catch (error) {
+      console.error("Workflow analysis error:", error);
+      res.status(500).json({ message: "Failed to analyze workflow" });
+    }
+  });
+
+  app.post('/api/comfy/:serverId/download-requirements', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const { analysisId } = req.body;
+
+      if (!analysisId) {
+        return res.status(400).json({ message: "Analysis ID is required" });
+      }
+
+      // Get analysis result
+      const analysis = await storage.getWorkflowAnalysis(analysisId);
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+
+      // Start downloading missing models
+      const downloadResult = await workflowAnalyzer.downloadMissingModels(serverId, analysis);
+      
+      res.json(downloadResult);
+    } catch (error) {
+      console.error("Model download error:", error);
+      res.status(500).json({ message: "Failed to start model downloads" });
+    }
+  });
+
+  app.get('/api/comfy/workflow-analysis/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const analyses = await storage.getWorkflowAnalysesByServer(serverId);
+      res.json(analyses);
+    } catch (error) {
+      console.error("Get workflow analyses error:", error);
+      res.status(500).json({ message: "Failed to fetch workflow analyses" });
+    }
+  });
+
+  app.get('/api/comfy/workflow-analysis/details/:analysisId', async (req: Request, res: Response) => {
+    try {
+      const analysisId = parseInt(req.params.analysisId);
+      const analysis = await storage.getWorkflowAnalysis(analysisId);
+      
+      if (!analysis) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+
+      res.json(analysis);
+    } catch (error) {
+      console.error("Get workflow analysis details error:", error);
+      res.status(500).json({ message: "Failed to fetch analysis details" });
+    }
+  });
+
+  app.delete('/api/comfy/workflow-analysis/:analysisId', async (req: Request, res: Response) => {
+    try {
+      const analysisId = parseInt(req.params.analysisId);
+      const success = await storage.deleteWorkflowAnalysis(analysisId);
+      
+      if (!success) {
+        return res.status(404).json({ message: "Analysis not found" });
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete workflow analysis error:", error);
+      res.status(500).json({ message: "Failed to delete analysis" });
+    }
+  });
   
   // Audit Log API endpoints
   app.get('/api/audit-logs', async (req: Request, res: Response) => {

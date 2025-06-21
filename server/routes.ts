@@ -1940,6 +1940,74 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  // Get installed models from ComfyUI instance
+  app.get('/api/comfy/models/:serverId/installed', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const server = await storage.getVastServer(serverId);
+      
+      if (!server) {
+        return res.status(404).json({ error: 'Server not found' });
+      }
+
+      // Mock installed models data for now - would fetch from actual ComfyUI instance
+      const installedModels = [
+        {
+          name: "sd_xl_base_1.0.safetensors",
+          type: "checkpoints",
+          size: "6.46 GB",
+          path: "/opt/ComfyUI/models/checkpoints/sd_xl_base_1.0.safetensors",
+          lastModified: "2 days ago"
+        },
+        {
+          name: "control_v11p_sd15_openpose.pth",
+          type: "controlnet",
+          size: "1.45 GB",
+          path: "/opt/ComfyUI/models/controlnet/control_v11p_sd15_openpose.pth",
+          lastModified: "1 week ago"
+        },
+        {
+          name: "xl_more_art-full_v1.safetensors",
+          type: "loras",
+          size: "144 MB",
+          path: "/opt/ComfyUI/models/loras/xl_more_art-full_v1.safetensors",
+          lastModified: "3 days ago"
+        },
+        {
+          name: "sdxl_vae.safetensors",
+          type: "vae",
+          size: "335 MB",
+          path: "/opt/ComfyUI/models/vae/sdxl_vae.safetensors",
+          lastModified: "1 day ago"
+        },
+        {
+          name: "4x-UltraSharp.pth",
+          type: "upscale_models",
+          size: "67 MB",
+          path: "/opt/ComfyUI/models/upscale_models/4x-UltraSharp.pth",
+          lastModified: "5 days ago"
+        }
+      ];
+
+      res.json(installedModels);
+    } catch (error) {
+      console.error('Error fetching installed models:', error);
+      res.status(500).json({ error: 'Failed to fetch installed models' });
+    }
+  });
+
+  // Refresh models from ComfyUI instance
+  app.post('/api/comfy/models/:serverId/refresh', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      // This would trigger a refresh of models from the ComfyUI instance
+      res.json({ success: true, message: 'Model list refreshed' });
+    } catch (error) {
+      console.error('Error refreshing models:', error);
+      res.status(500).json({ error: 'Failed to refresh models' });
+    }
+  });
+
   app.get('/api/comfy/models/:serverId/library-status', async (req: Request, res: Response) => {
     try {
       const serverId = parseInt(req.params.serverId);

@@ -514,56 +514,7 @@ export function ServerDetailPage() {
         </TabsContent>
 
         <TabsContent value="models" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium">ComfyUI Models</h3>
-              <p className="text-sm text-gray-600 dark:text-gray-400">
-                Manage AI models for this server's ComfyUI instance
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <ModelManager 
-                serverId={serverId}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <FolderOpen className="h-4 w-4 mr-1" />
-                    Manage Models
-                  </Button>
-                }
-              />
-              
-              <WorkflowAnalyzer 
-                serverId={serverId}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <Brain className="h-4 w-4 mr-1" />
-                    Analyze Workflow
-                  </Button>
-                }
-              />
-            </div>
-          </div>
-
-          <div className="grid gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Model Library Overview
-                </CardTitle>
-                <CardDescription>
-                  Summary of models installed on this server
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8">
-                  <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600 dark:text-gray-400">Use the buttons above to manage models</p>
-                  <p className="text-sm text-gray-500 mt-1">Add models and analyze workflows for ComfyUI</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <ModelManager serverId={serverId} />
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">

@@ -153,6 +153,7 @@ Changelog:
 - June 21, 2025. Fixed critical application startup errors by resolving TypeScript interface mismatches and JSX structure issues in storage system and ServerDetailPage components. Replaced problematic database storage with stable memory storage implementation, ensuring all core functionality is operational
 - June 21, 2025. Successfully resolved Vast.ai API key integration issues by implementing proper getApiKeyByService storage method and fixing module import dependencies. Application now actively connects to live Vast.ai marketplace, imports existing user servers (server 21510135), and fetches real-time server availability data with 64+ marketplace offers
 - June 21, 2025. Implemented comprehensive Intuitive Drag-and-Drop Workflow Composer with visual node editor, allowing users to create ComfyUI workflows through an interactive interface. Features include node library with categorized components (loaders, conditioning, sampling, latent, VAE, image), drag-and-drop canvas with real-time connections, input validation, workflow export/import, and seamless integration into Server Detail pages alongside existing workflow analyzer functionality
+- June 21, 2025. Enhanced ComfyUI Workflow Analyzer with file upload functionality - users can now either paste JSON directly or upload .json files containing ComfyUI workflows. Added upload method selection buttons, file validation with error handling, automatic workflow name extraction from filenames, and visual feedback for successful file loading
 ```
 
 ## User Preferences

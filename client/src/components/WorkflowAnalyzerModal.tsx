@@ -60,6 +60,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
   const [workflowName, setWorkflowName] = useState("");
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [activeTab, setActiveTab] = useState("upload");
+  const [uploadMethod, setUploadMethod] = useState<"paste" | "file">("paste");
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -131,11 +132,46 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
     },
   });
 
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.json')) {
+      toast({
+        title: "Invalid File Type",
+        description: "Please upload a JSON file.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        JSON.parse(content); // Validate JSON
+        setWorkflowJson(content);
+        setWorkflowName(file.name.replace('.json', ''));
+        toast({
+          title: "File Loaded",
+          description: `Workflow "${file.name}" loaded successfully.`,
+        });
+      } catch (error) {
+        toast({
+          title: "Invalid JSON File",
+          description: "The uploaded file contains invalid JSON.",
+          variant: "destructive",
+        });
+      }
+    };
+    reader.readAsText(file);
+  };
+
   const handleAnalyze = () => {
     if (!workflowJson.trim()) {
       toast({
         title: "Validation Error",
-        description: "Please paste a workflow JSON.",
+        description: "Please paste or upload a workflow JSON.",
         variant: "destructive",
       });
       return;
@@ -213,17 +249,76 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                   className="w-full px-3 py-2 border rounded-md bg-background text-sm mt-1"
                 />
               </div>
-              
-              <div>
-                <Label htmlFor="workflow-json">Workflow JSON</Label>
-                <Textarea
-                  id="workflow-json"
-                  value={workflowJson}
-                  onChange={(e) => setWorkflowJson(e.target.value)}
-                  placeholder="Paste your ComfyUI workflow JSON here..."
-                  className="min-h-[200px] font-mono text-sm mt-1"
-                />
+
+              {/* Upload Method Selection */}
+              <div className="space-y-3">
+                <Label>Input Method</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={uploadMethod === "paste" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setUploadMethod("paste")}
+                    className="flex items-center gap-2"
+                  >
+                    <FileText className="h-4 w-4" />
+                    Paste JSON
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={uploadMethod === "file" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setUploadMethod("file")}
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload File
+                  </Button>
+                </div>
               </div>
+
+              {uploadMethod === "paste" ? (
+                <div>
+                  <Label htmlFor="workflow-json">Workflow JSON</Label>
+                  <Textarea
+                    id="workflow-json"
+                    value={workflowJson}
+                    onChange={(e) => setWorkflowJson(e.target.value)}
+                    placeholder="Paste your ComfyUI workflow JSON here..."
+                    className="min-h-[200px] font-mono text-sm mt-1"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <Label htmlFor="workflow-file">Upload Workflow File</Label>
+                  <div className="mt-1">
+                    <input
+                      id="workflow-file"
+                      type="file"
+                      accept=".json"
+                      onChange={handleFileUpload}
+                      className="w-full px-3 py-2 border rounded-md bg-background text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Upload a .json file containing your ComfyUI workflow
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {workflowJson && (
+                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-600" />
+                    <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                      Workflow loaded successfully
+                    </p>
+                  </div>
+                  <p className="text-xs text-green-600 dark:text-green-300 mt-1">
+                    {JSON.stringify(JSON.parse(workflowJson)).length} characters loaded
+                  </p>
+                </div>
+              )}
 
               <div className="bg-muted/50 p-4 rounded-lg">
                 <div className="flex items-start gap-3">
@@ -234,7 +329,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                       <li>• Open ComfyUI in your browser</li>
                       <li>• Load your workflow</li>
                       <li>• Click "Save (API Format)" button</li>
-                      <li>• Copy the JSON and paste it above</li>
+                      <li>• Copy the JSON and paste it above, or save as .json file and upload</li>
                     </ul>
                   </div>
                 </div>

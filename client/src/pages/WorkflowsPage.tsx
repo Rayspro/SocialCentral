@@ -245,168 +245,186 @@ export default function WorkflowsPage() {
           </div>
         </div>
 
-        {/* Workflows Grid */}
+        {/* Workflows List */}
         {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[...Array(6)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader>
-                  <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-1/2"></div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded"></div>
-                    <div className="h-3 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
+          <div className="space-y-4">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 animate-pulse">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="h-5 bg-gray-200 dark:bg-gray-700 rounded w-1/3 mb-2"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2 mb-2"></div>
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3"></div>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex gap-2">
+                    <div className="h-8 w-16 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              </div>
             ))}
           </div>
         ) : filteredWorkflows.length === 0 ? (
-          <Card className="text-center py-12">
-            <CardContent>
-              <Workflow className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
-                No workflows found
-              </h3>
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                {searchTerm || selectedCategory !== "all" 
-                  ? "Try adjusting your search or filters"
-                  : "Create your first workflow to get started"
-                }
-              </p>
-              <Button asChild>
-                <Link href="/workflow-composer">
-                  <Workflow className="h-4 w-4 mr-2" />
-                  Create Workflow
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="text-center py-12">
+            <Workflow className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              No workflows found
+            </h3>
+            <p className="text-gray-600 dark:text-gray-400 mb-4">
+              {searchTerm || selectedCategory !== "all" 
+                ? "Try adjusting your search or filters"
+                : "Create your first workflow to get started"
+              }
+            </p>
+            <Button asChild>
+              <Link href="/workflow-composer">
+                <Workflow className="h-4 w-4 mr-2" />
+                Create Workflow
+              </Link>
+            </Button>
+          </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="space-y-3">
             {filteredWorkflows.map((workflow: WorkflowWithModels) => (
-              <Card key={workflow.id} className="hover:shadow-lg transition-all duration-200 hover:scale-[1.02]">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg mb-1 line-clamp-1">
-                        {workflow.name}
-                      </CardTitle>
-                      {workflow.category && (
-                        <Badge variant="outline" className="text-xs">
-                          {workflow.category}
-                        </Badge>
-                      )}
-                    </div>
-                    {workflow.isTemplate && (
-                      <Badge variant="secondary" className="ml-2">
-                        Template
-                      </Badge>
-                    )}
-                  </div>
-                  {workflow.description && (
-                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2 mt-2">
-                      {workflow.description}
-                    </p>
-                  )}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Server Info */}
-                  {workflow.server && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <Server className="h-4 w-4 text-gray-400" />
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {workflow.server.name}
-                      </span>
-                      {getStatusBadge(workflow.server.status)}
-                    </div>
-                  )}
-
-                  {/* Model Instances Summary */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium text-gray-700 dark:text-gray-300">
-                        Model Dependencies
-                      </span>
-                      <span className="text-gray-500">
-                        {workflow.modelInstances.length} models
-                      </span>
-                    </div>
-                    
-                    {workflow.modelInstances.length > 0 && (
-                      <div className="grid grid-cols-2 gap-1">
-                        {workflow.modelInstances.slice(0, 4).map((model) => (
-                          <div key={model.id} className="flex items-center gap-1 text-xs">
-                            {getStatusBadge(model.status)}
-                            <span className="truncate">{model.name}</span>
+              <div key={workflow.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-2">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
+                          {workflow.name}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          {workflow.category && (
+                            <Badge variant="secondary" className="text-xs">
+                              {workflow.category}
+                            </Badge>
+                          )}
+                          {workflow.isTemplate && (
+                            <Badge variant="outline" className="text-xs">
+                              Template
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-2">
+                        <div className="flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {new Date(workflow.createdAt).toLocaleDateString()}
+                        </div>
+                        
+                        {workflow.server && (
+                          <div className="flex items-center gap-2">
+                            <Server className="h-3 w-3" />
+                            <span className="truncate">{workflow.server.name}</span>
+                            {getStatusBadge(workflow.server.status)}
                           </div>
-                        ))}
-                        {workflow.modelInstances.length > 4 && (
-                          <div className="text-xs text-gray-500 col-span-2">
-                            +{workflow.modelInstances.length - 4} more...
+                        )}
+                        
+                        {workflow.modelInstances && workflow.modelInstances.length > 0 && (
+                          <div className="flex items-center gap-1">
+                            <FileText className="h-3 w-3" />
+                            <span>{workflow.modelInstances.length} models</span>
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                      
+                      {workflow.description && (
+                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mb-2">
+                          {workflow.description}
+                        </p>
+                      )}
+                      
+                      {workflow.modelInstances && workflow.modelInstances.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          {workflow.modelInstances.slice(0, 4).map((model) => (
+                            <div key={model.id} className="flex items-center gap-1">
+                              {getStatusBadge(model.status)}
+                            </div>
+                          ))}
+                          {workflow.modelInstances.length > 4 && (
+                            <Badge variant="outline" className="text-xs">
+                              +{workflow.modelInstances.length - 4} more
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                    </div>
 
-                  {/* Actions */}
-                  <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <Dialog>
-                      <DialogTrigger asChild>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 ml-4">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSelectedWorkflow(workflow)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            View
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                          <DialogHeader>
+                            <DialogTitle>Workflow Details: {selectedWorkflow?.name}</DialogTitle>
+                          </DialogHeader>
+                          {selectedWorkflow && (
+                            <WorkflowDetailsModal 
+                              workflow={selectedWorkflow} 
+                              onSync={() => syncModelsMutation.mutate(selectedWorkflow.id)}
+                              syncPending={syncModelsMutation.isPending}
+                            />
+                          )}
+                        </DialogContent>
+                      </Dialog>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const blob = new Blob([workflow.workflowJson], { type: 'application/json' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `${workflow.name}.json`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+
+                      {workflow.modelInstances && workflow.modelInstances.length > 0 && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setSelectedWorkflow(workflow)}
+                          onClick={() => syncModelsMutation.mutate(workflow.id)}
+                          disabled={syncModelsMutation.isPending}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
+                          {syncModelsMutation.isPending ? (
+                            <RefreshCw className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <RefreshCw className="h-4 w-4" />
+                          )}
                         </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                        <DialogHeader>
-                          <DialogTitle>Workflow Details: {selectedWorkflow?.name}</DialogTitle>
-                        </DialogHeader>
-                        {selectedWorkflow && (
-                          <WorkflowDetailsModal 
-                            workflow={selectedWorkflow} 
-                            onSync={() => syncModelsMutation.mutate(selectedWorkflow.id)}
-                            syncPending={syncModelsMutation.isPending}
-                          />
-                        )}
-                      </DialogContent>
-                    </Dialog>
+                      )}
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => syncModelsMutation.mutate(workflow.id)}
-                      disabled={syncModelsMutation.isPending}
-                    >
-                      <RefreshCw className={`h-4 w-4 mr-1 ${syncModelsMutation.isPending ? 'animate-spin' : ''}`} />
-                      Sync
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => deleteWorkflowMutation.mutate(workflow.id)}
-                      disabled={deleteWorkflowMutation.isPending}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => deleteWorkflowMutation.mutate(workflow.id)}
+                        disabled={deleteWorkflowMutation.isPending}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-
-                  {/* Timestamps */}
-                  <div className="text-xs text-gray-500 flex items-center gap-2 pt-2">
-                    <Calendar className="h-3 w-3" />
-                    Created: {new Date(workflow.createdAt).toLocaleDateString()}
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             ))}
           </div>
         )}

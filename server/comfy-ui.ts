@@ -536,36 +536,60 @@ export async function generateImage(req: Request, res: Response) {
     const serverId = parseInt(req.params.serverId);
     const { prompt, negativePrompt, workflowId, parameters } = req.body;
 
+    console.log('🎨 [IMAGE GENERATION] Starting new generation request');
+    console.log(`📝 [PROMPT] Primary: "${prompt}"`);
+    console.log(`🚫 [PROMPT] Negative: "${negativePrompt || 'none'}"`);
+    console.log(`🔧 [WORKFLOW] ID: ${workflowId || 'default'}`);
+    console.log(`🖥️ [SERVER] ID: ${serverId}`);
+
     const server = await storage.getVastServer(serverId);
     if (!server || !server.serverUrl) {
+      console.log('❌ [ERROR] Server not found or not running');
       return res.status(404).json({ error: 'Server not found or not running' });
     }
+
+    console.log(`✅ [SERVER] Found: ${server.name}`);
+    console.log(`🌐 [SERVER] URL: ${server.serverUrl}`);
+    console.log(`📊 [SERVER] Status: ${server.status}`);
 
     // Extract hostname from server URL and use port 8188 for ComfyUI
     const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
     const comfyUrl = `http://${serverHost}:8188`;
     const client = new ComfyUIClient(comfyUrl);
 
+    console.log(`🔗 [COMFYUI] Target URL: ${comfyUrl}`);
+
     // Check if server is in demo mode or setup is completed
     const isDemoReady = server.setupStatus === 'demo-ready' || 
                        server.setupStatus === 'ready' ||
                        server.metadata?.comfyUIStatus === 'demo-ready';
 
-    console.log('Server status check:', {
-      serverId,
-      setupStatus: server.setupStatus,
-      metadata: server.metadata,
-      isDemoReady
-    });
+    console.log('🔍 [STATUS CHECK] Server readiness evaluation:');
+    console.log(`   Setup Status: ${server.setupStatus}`);
+    console.log(`   ComfyUI Status: ${server.metadata?.comfyUIStatus || 'unknown'}`);
+    console.log(`   Demo Ready: ${isDemoReady}`);
 
     if (isDemoReady) {
+      console.log('🎭 [DEMO MODE] Server is in demo mode - using enhanced generation');
+      
       // Get the selected workflow for demo generation
       let selectedWorkflow = null;
       if (workflowId) {
+        console.log(`🔍 [WORKFLOW] Loading workflow ID: ${workflowId}`);
         selectedWorkflow = await storage.getComfyWorkflow(parseInt(workflowId));
+        if (selectedWorkflow) {
+          console.log(`✅ [WORKFLOW] Found: ${selectedWorkflow.name}`);
+        } else {
+          console.log(`⚠️ [WORKFLOW] Not found, using default`);
+        }
+      } else {
+        console.log('🔧 [WORKFLOW] No workflow specified, using default');
       }
 
       // Handle demo generation for ready servers with varied outputs
+      const queueId = `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log(`🆔 [QUEUE] Generated queue ID: ${queueId}`);
+      
       const generationData: InsertComfyGeneration = {
         serverId,
         workflowId: workflowId ? parseInt(workflowId) : null,
@@ -573,51 +597,74 @@ export async function generateImage(req: Request, res: Response) {
         negativePrompt: negativePrompt || '',
         parameters: JSON.stringify(parameters || {}),
         status: 'processing',
-        queueId: `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+        queueId
       };
 
+      console.log('💾 [DATABASE] Creating generation record...');
       const generation = await storage.createComfyGeneration(generationData);
+      console.log(`✅ [DATABASE] Generation created with ID: ${generation.id}`);
       
       // Start WebSocket progress tracking
+      console.log('📡 [WEBSOCKET] Starting progress tracking with 5 nodes');
       comfyWebSocketManager.startTracking(generation.id, serverId, 5); // 5 total nodes for demo
       
       // Generate varied demo images based on prompt keywords and selected workflow
       const promptKeywords = (prompt || '').toLowerCase();
+      console.log(`🔤 [ANALYSIS] Extracted keywords: "${promptKeywords}"`);
+      
       let imageUrls;
       
       if (selectedWorkflow) {
-        // Use workflow-specific image generation
+        console.log('🎨 [GENERATION] Using workflow-specific image generation');
         imageUrls = generateWorkflowBasedImages(selectedWorkflow, promptKeywords, generation.id);
       } else {
-        // Use general prompt-based image generation
+        console.log('🖼️ [GENERATION] Using general prompt-based image generation');
         imageUrls = generateDemoImageUrls(promptKeywords, generation.id);
       }
       
+      console.log(`📸 [IMAGES] Generated ${imageUrls.length} image URLs:`);
+      imageUrls.forEach((url, index) => {
+        console.log(`   ${index + 1}. ${url}`);
+      });
+      
       // Simulate generation process with realistic timing and progress updates
+      const processingTime = Math.random() * 2000 + 2000; // 2-4 seconds
+      console.log(`⏱️ [TIMING] Simulating ${Math.round(processingTime)}ms processing time`);
+      
       setTimeout(async () => {
+        console.log('🔄 [COMPLETION] Finalizing generation...');
         await storage.updateComfyGeneration(generation.id, {
           status: 'completed',
           imageUrls,
           completedAt: new Date()
         });
+        console.log('💾 [DATABASE] Generation status updated to completed');
         
         // Complete progress tracking
+        console.log('📡 [WEBSOCKET] Completing progress tracking');
         comfyWebSocketManager.completeGeneration(generation.id, imageUrls);
-      }, Math.random() * 2000 + 2000); // 2-4 seconds random timing
+        console.log('✅ [DEMO] Generation process completed successfully');
+      }, processingTime);
+
+      const workflowName = selectedWorkflow ? selectedWorkflow.name : 'Default';
+      console.log(`🎉 [SUCCESS] Demo generation initiated using "${workflowName}" workflow`);
 
       return res.json({
         success: true,
         generationId: generation.id,
-        message: `Image generation started using ${selectedWorkflow ? selectedWorkflow.name : 'default workflow'} (Demo mode)`,
+        message: `Image generation started using ${workflowName} (Demo mode)`,
         estimatedTime: '2-4 seconds',
         queueId: generation.queueId,
-        workflow: selectedWorkflow ? selectedWorkflow.name : 'Default'
+        workflow: workflowName
       });
     }
 
     // Check if ComfyUI is accessible for real servers
+    console.log('🔌 [CONNECTION] Testing ComfyUI connectivity...');
     const isOnline = await client.checkStatus();
     if (!isOnline) {
+      console.log('❌ [CONNECTION] ComfyUI server is not accessible');
+      console.log(`🔗 [CONNECTION] Attempted URL: ${comfyUrl}`);
       return res.status(503).json({ 
         error: 'ComfyUI server is not accessible. Please ensure ComfyUI is running on the server.',
         details: `Attempted to connect to: ${comfyUrl}`,
@@ -628,6 +675,7 @@ export async function generateImage(req: Request, res: Response) {
         ]
       });
     }
+    console.log('✅ [CONNECTION] ComfyUI server is accessible');
 
     // Get workflow (use default if none specified)
     let workflow = DEFAULT_WORKFLOW;
@@ -973,9 +1021,14 @@ async function downloadModelInBackground(modelId: number, serverId: number, url:
 }
 
 async function monitorGeneration(generationId: number, serverId: number, queueId: string) {
+  console.log(`👁️ [MONITOR] Starting generation monitoring for ID ${generationId}`);
+  console.log(`🖥️ [MONITOR] Server ID: ${serverId}`);
+  console.log(`🆔 [MONITOR] Queue ID: ${queueId}`);
+  
   try {
     const server = await storage.getVastServer(serverId);
     if (!server || !server.serverUrl) {
+      console.log('❌ [MONITOR] Server not found or not running');
       await storage.updateComfyGeneration(generationId, {
         status: 'failed',
         errorMessage: 'Server not found or not running'
@@ -983,48 +1036,90 @@ async function monitorGeneration(generationId: number, serverId: number, queueId
       return;
     }
 
+    console.log(`✅ [MONITOR] Server found: ${server.name}`);
+    console.log(`🌐 [MONITOR] Server URL: ${server.serverUrl}`);
+
     // Extract hostname from server URL and use port 8188 for ComfyUI
     const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
     const comfyUrl = `http://${serverHost}:8188`;
     const client = new ComfyUIClient(comfyUrl);
 
+    console.log(`🔗 [MONITOR] ComfyUI URL: ${comfyUrl}`);
+
     // Update status to running
+    console.log('🔄 [MONITOR] Updating generation status to running...');
     await storage.updateComfyGeneration(generationId, { status: 'running' });
+    console.log('✅ [MONITOR] Status updated to running');
 
     // Poll for completion
     const maxAttempts = 60; // 5 minutes max
     let attempts = 0;
+    const startTime = Date.now();
+
+    console.log(`⏱️ [MONITOR] Starting polling process (max ${maxAttempts} attempts)`);
 
     const pollGeneration = async () => {
+      attempts++;
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      
+      console.log(`🔍 [POLL ${attempts}/${maxAttempts}] Checking generation status (${elapsed}s elapsed)...`);
+      
       try {
         const history = await client.getHistory(queueId);
         
         if (history && history[queueId]) {
-          const outputs = history[queueId].outputs;
+          console.log('📋 [POLL] Found history entry for queue ID');
+          const historyData = history[queueId];
+          
+          // Log execution status
+          if (historyData.status) {
+            console.log(`📊 [STATUS] Execution status: ${historyData.status.status_str}`);
+            console.log(`✅ [STATUS] Completed: ${historyData.status.completed}`);
+            if (historyData.status.messages?.length > 0) {
+              console.log(`💬 [STATUS] Messages: ${JSON.stringify(historyData.status.messages)}`);
+            }
+          }
+          
+          const outputs = historyData.outputs;
           
           if (outputs) {
+            console.log('🖼️ [OUTPUTS] Processing generation outputs...');
+            
             // Extract image URLs from outputs
             const imageUrls: string[] = [];
             
             for (const nodeId in outputs) {
               const output = outputs[nodeId];
+              console.log(`🔍 [NODE ${nodeId}] Processing output node...`);
+              
               if (output.images) {
+                console.log(`📸 [NODE ${nodeId}] Found ${output.images.length} images`);
+                
                 for (const image of output.images) {
                   const imageUrl = `${comfyUrl}/view?filename=${image.filename}&type=${image.type || 'output'}&subfolder=${image.subfolder || ''}`;
                   imageUrls.push(imageUrl);
+                  console.log(`   ✓ Image: ${image.filename} (${image.type || 'output'})`);
                 }
+              } else {
+                console.log(`🔍 [NODE ${nodeId}] No images found in this node`);
               }
             }
 
+            console.log(`🎉 [SUCCESS] Generation completed with ${imageUrls.length} images!`);
+            console.log(`⏱️ [TIMING] Total generation time: ${elapsed} seconds`);
+            
             await storage.updateComfyGeneration(generationId, {
               status: 'completed',
               imageUrls,
               completedAt: new Date(),
             });
 
+            console.log('💾 [DATABASE] Generation record updated with completed status');
+
             // Log successful image generation
             const generation = await storage.getComfyGeneration(generationId);
             if (generation) {
+              console.log('📝 [AUDIT] Creating audit log entry...');
               await storage.createAuditLog({
                 category: 'user_action',
                 userId: 1, // Default user for now
@@ -1035,42 +1130,60 @@ async function monitorGeneration(generationId: number, serverId: number, queueId
                   serverId,
                   prompt: generation.prompt,
                   imageCount: imageUrls.length,
-                  queueId
+                  queueId,
+                  executionTime: elapsed
                 },
                 ipAddress: null,
                 userAgent: null,
                 severity: 'info'
               });
+              console.log('✅ [AUDIT] Audit log created successfully');
             }
             return;
+          } else {
+            console.log('⏳ [POLL] Generation still in progress, no outputs yet...');
           }
+        } else {
+          console.log('🔍 [POLL] No history entry found yet, generation may still be queued...');
         }
 
-        attempts++;
         if (attempts < maxAttempts) {
+          console.log(`⏳ [POLL] Waiting 5 seconds before next check...`);
           setTimeout(pollGeneration, 5000); // Poll every 5 seconds
         } else {
+          console.log(`⏰ [TIMEOUT] Maximum attempts reached (${maxAttempts}), marking as failed`);
+          console.log(`⏱️ [TIMEOUT] Total time elapsed: ${elapsed} seconds`);
+          
           await storage.updateComfyGeneration(generationId, {
             status: 'failed',
-            errorMessage: 'Generation timeout'
+            errorMessage: 'Generation timeout - exceeded maximum wait time'
           });
+          
+          console.log('💾 [DATABASE] Generation marked as failed due to timeout');
         }
       } catch (error) {
-        console.error('Error polling generation:', error);
+        console.error(`💥 [ERROR] Error during polling attempt ${attempts}:`, error);
+        
         await storage.updateComfyGeneration(generationId, {
           status: 'failed',
-          errorMessage: error instanceof Error ? error.message : 'Unknown error'
+          errorMessage: error instanceof Error ? error.message : 'Unknown polling error'
         });
+        
+        console.log('💾 [DATABASE] Generation marked as failed due to polling error');
       }
     };
 
     // Start polling after a short delay
+    console.log('⏳ [MONITOR] Starting initial polling in 2 seconds...');
     setTimeout(pollGeneration, 2000);
   } catch (error) {
-    console.error('Error monitoring generation:', error);
+    console.error('💥 [MONITOR] Critical error in generation monitoring:', error);
+    
     await storage.updateComfyGeneration(generationId, {
       status: 'failed',
-      errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      errorMessage: error instanceof Error ? error.message : 'Unknown monitoring error'
     });
+    
+    console.log('💾 [DATABASE] Generation marked as failed due to monitoring error');
   }
 }

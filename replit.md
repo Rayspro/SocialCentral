@@ -159,6 +159,7 @@ Changelog:
 - June 21, 2025. Fixed critical server launch functionality by adding missing getVastServerByVastId storage method - servers now successfully launch on Vast.ai platform with real instance creation (contract ID 21548303), automatic scheduler startup for ComfyUI setup monitoring, and proper SSH connection details returned to users
 - June 21, 2025. Fixed audit log system by implementing missing API endpoint and adding comprehensive sample data - audit logs now track user actions, system events, and security activities with proper categorization, filtering capabilities, timestamps, and detailed metadata for complete platform monitoring
 - June 21, 2025. Fixed static image generation issue by implementing proper prompt-based image generation - system now creates unique, deterministic images based on actual user prompts using hash functions and Lorem Picsum with dynamic seeds, replacing static Unsplash placeholder images with authentic prompt-driven generation
+- June 21, 2025. Enhanced ComfyUI real-time logging system with comprehensive step-by-step monitoring - added detailed console logs throughout image generation process including server validation, workflow selection, demo mode operations, WebSocket progress tracking, ComfyUI connection testing, generation monitoring with polling status, node-by-node output processing, image extraction, completion tracking, and error handling with timing metrics for complete generation visibility
 ```
 
 ## User Preferences

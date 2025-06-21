@@ -182,7 +182,252 @@ export class MemStorage implements IStorage {
   private vastServers: VastServer[] = [];
   private setupScripts: SetupScript[] = [];
   private comfyModels: ComfyModel[] = [];
-  private comfyWorkflows: ComfyWorkflow[] = [];
+  private comfyWorkflows: ComfyWorkflow[] = [
+    {
+      id: 1,
+      name: "Simple Text to Image",
+      description: "Basic text-to-image generation workflow",
+      category: "Text to Image",
+      serverId: null,
+      workflowJson: JSON.stringify({
+        "1": {
+          "inputs": {
+            "text": "beautiful landscape, high quality"
+          },
+          "class_type": "CLIPTextEncode"
+        },
+        "2": {
+          "inputs": {
+            "width": 512,
+            "height": 512,
+            "batch_size": 1
+          },
+          "class_type": "EmptyLatentImage"
+        },
+        "3": {
+          "inputs": {
+            "seed": 42,
+            "steps": 20,
+            "cfg": 8.0,
+            "sampler_name": "euler",
+            "scheduler": "normal",
+            "positive": ["1", 0],
+            "negative": ["4", 0],
+            "latent_image": ["2", 0]
+          },
+          "class_type": "KSampler"
+        },
+        "4": {
+          "inputs": {
+            "text": "low quality, blurry"
+          },
+          "class_type": "CLIPTextEncode"
+        },
+        "5": {
+          "inputs": {
+            "samples": ["3", 0]
+          },
+          "class_type": "VAEDecode"
+        },
+        "6": {
+          "inputs": {
+            "filename_prefix": "ComfyUI",
+            "images": ["5", 0]
+          },
+          "class_type": "SaveImage"
+        }
+      }),
+      isTemplate: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 2,
+      name: "Portrait Enhancement",
+      description: "Enhance portrait photos with AI upscaling",
+      category: "Enhancement",
+      serverId: null,
+      workflowJson: JSON.stringify({
+        "1": {
+          "inputs": {
+            "text": "portrait, professional headshot, high quality"
+          },
+          "class_type": "CLIPTextEncode"
+        },
+        "2": {
+          "inputs": {
+            "width": 768,
+            "height": 768,
+            "batch_size": 1
+          },
+          "class_type": "EmptyLatentImage"
+        },
+        "3": {
+          "inputs": {
+            "seed": 123,
+            "steps": 25,
+            "cfg": 7.5,
+            "sampler_name": "dpmpp_2m",
+            "scheduler": "karras",
+            "positive": ["1", 0],
+            "negative": ["4", 0],
+            "latent_image": ["2", 0]
+          },
+          "class_type": "KSampler"
+        },
+        "4": {
+          "inputs": {
+            "text": "low quality, blurry, distorted"
+          },
+          "class_type": "CLIPTextEncode"
+        },
+        "5": {
+          "inputs": {
+            "samples": ["3", 0]
+          },
+          "class_type": "VAEDecode"
+        }
+      }),
+      isTemplate: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 3,
+      name: "Anime Style Generator",
+      description: "Generate anime-style artwork and characters",
+      category: "Artistic",
+      serverId: null,
+      workflowJson: JSON.stringify({
+        "1": {
+          "inputs": {
+            "text": "anime, manga style, colorful, detailed"
+          },
+          "class_type": "CLIPTextEncode"
+        },
+        "2": {
+          "inputs": {
+            "width": 512,
+            "height": 768,
+            "batch_size": 1
+          },
+          "class_type": "EmptyLatentImage"
+        },
+        "3": {
+          "inputs": {
+            "seed": 456,
+            "steps": 30,
+            "cfg": 9.0,
+            "sampler_name": "euler_ancestral",
+            "scheduler": "normal",
+            "positive": ["1", 0],
+            "negative": ["4", 0],
+            "latent_image": ["2", 0]
+          },
+          "class_type": "KSampler"
+        },
+        "4": {
+          "inputs": {
+            "text": "realistic, photographic, 3d render"
+          },
+          "class_type": "CLIPTextEncode"
+        }
+      }),
+      isTemplate: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 4,
+      name: "Landscape Generation",
+      description: "Create stunning landscape and nature scenes",
+      category: "Nature",
+      serverId: null,
+      workflowJson: JSON.stringify({
+        "1": {
+          "inputs": {
+            "text": "landscape, nature, mountains, beautiful scenery"
+          },
+          "class_type": "CLIPTextEncode"
+        },
+        "2": {
+          "inputs": {
+            "width": 1024,
+            "height": 512,
+            "batch_size": 1
+          },
+          "class_type": "EmptyLatentImage"
+        },
+        "3": {
+          "inputs": {
+            "seed": 789,
+            "steps": 22,
+            "cfg": 7.0,
+            "sampler_name": "dpmpp_sde",
+            "scheduler": "karras",
+            "positive": ["1", 0],
+            "negative": ["4", 0],
+            "latent_image": ["2", 0]
+          },
+          "class_type": "KSampler"
+        },
+        "4": {
+          "inputs": {
+            "text": "urban, city, buildings, indoor"
+          },
+          "class_type": "CLIPTextEncode"
+        }
+      }),
+      isTemplate: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 5,
+      name: "Abstract Art Creator",
+      description: "Generate abstract and artistic compositions",
+      category: "Abstract",
+      serverId: null,
+      workflowJson: JSON.stringify({
+        "1": {
+          "inputs": {
+            "text": "abstract art, colorful, creative, artistic"
+          },
+          "class_type": "CLIPTextEncode"
+        },
+        "2": {
+          "inputs": {
+            "width": 768,
+            "height": 768,
+            "batch_size": 1
+          },
+          "class_type": "EmptyLatentImage"
+        },
+        "3": {
+          "inputs": {
+            "seed": 321,
+            "steps": 28,
+            "cfg": 8.5,
+            "sampler_name": "heun",
+            "scheduler": "exponential",
+            "positive": ["1", 0],
+            "negative": ["4", 0],
+            "latent_image": ["2", 0]
+          },
+          "class_type": "KSampler"
+        },
+        "4": {
+          "inputs": {
+            "text": "realistic, photographic, plain"
+          },
+          "class_type": "CLIPTextEncode"
+        }
+      }),
+      isTemplate: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ];
   private comfyGenerations: ComfyGeneration[] = [];
   private auditLogs: AuditLog[] = [];
   private serverMoods: ServerMood[] = [];

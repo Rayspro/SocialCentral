@@ -502,9 +502,8 @@ function ComfyUIImageGenerator() {
   };
 
   const runningServers = servers.filter((server: any) => server.status === "running");
-  const availableWorkflows = workflows.filter((workflow: any) => 
-    !selectedServer || workflow.serverId?.toString() === selectedServer
-  );
+  // Show all workflows when a server is selected (templates and server-specific workflows)
+  const availableWorkflows = selectedServer ? workflows : [];
 
   return (
     <Card>

@@ -291,6 +291,29 @@ export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
 
+// Workflow Analysis table for tracking model requirements
+export const workflowAnalysis = pgTable("workflow_analysis", {
+  id: serial("id").primaryKey(),
+  serverId: integer("server_id").notNull(),
+  workflowName: text("workflow_name").notNull(),
+  workflowJson: text("workflow_json").notNull(),
+  requiredModels: jsonb("required_models").notNull(), // Array of required model info
+  missingModels: jsonb("missing_models").notNull(), // Array of missing models
+  analysisStatus: text("analysis_status").notNull().default("pending"), // pending, completed, failed
+  downloadStatus: text("download_status").notNull().default("pending"), // pending, downloading, completed, failed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertWorkflowAnalysisSchema = createInsertSchema(workflowAnalysis).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type WorkflowAnalysis = typeof workflowAnalysis.$inferSelect;
+export type InsertWorkflowAnalysis = z.infer<typeof insertWorkflowAnalysisSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 

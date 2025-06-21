@@ -12,6 +12,7 @@ import {
   comfyWorkflows,
   comfyGenerations,
   auditLogs,
+  workflowAnalysis,
   type User,
   type InsertUser,
   type Platform,
@@ -38,6 +39,8 @@ import {
   type InsertComfyGeneration,
   type AuditLog,
   type InsertAuditLog,
+  type WorkflowAnalysis,
+  type InsertWorkflowAnalysis,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -130,6 +133,19 @@ export interface IStorage {
   updateComfyGeneration(id: number, generation: Partial<InsertComfyGeneration>): Promise<ComfyGeneration | undefined>;
   deleteComfyGeneration(id: number): Promise<boolean>;
 
+  // Workflow Analysis methods
+  getWorkflowAnalysis(serverId: number): Promise<WorkflowAnalysis[]>;
+  getWorkflowAnalysisById(id: number): Promise<WorkflowAnalysis | undefined>;
+  createWorkflowAnalysis(analysis: InsertWorkflowAnalysis): Promise<WorkflowAnalysis>;
+  updateWorkflowAnalysis(id: number, analysis: Partial<InsertWorkflowAnalysis>): Promise<WorkflowAnalysis | undefined>;
+  deleteWorkflowAnalysis(id: number): Promise<boolean>;
+
+  // Enhanced Model Management methods
+  getComfyModelsByServerAndFolder(serverId: number, folder: string): Promise<ComfyModel[]>;
+  getComfyModelByNameAndServer(name: string, serverId: number): Promise<ComfyModel | undefined>;
+  searchComfyModels(query: string): Promise<ComfyModel[]>;
+  getModelsByStatus(status: string): Promise<ComfyModel[]>;
+  
   // Audit Log methods
   getAuditLogs(limit?: number, offset?: number): Promise<AuditLog[]>;
   getAuditLogsByUser(userId: number, limit?: number): Promise<AuditLog[]>;
@@ -915,6 +931,13 @@ echo "It will start automatically when you connect to the server"`,
   async createComfyModel(model: InsertComfyModel): Promise<ComfyModel> {
     const newModel: ComfyModel = {
       ...model,
+      status: model.status || 'pending',
+      description: model.description || null,
+      serverId: model.serverId || null,
+      fileName: model.fileName || null,
+      fileSize: model.fileSize || null,
+      downloadProgress: model.downloadProgress || null,
+      errorMessage: model.errorMessage || null,
       id: this.comfyModels.length + 1,
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -1180,6 +1203,65 @@ echo "It will start automatically when you connect to the server"`,
     };
     this.auditLogs.unshift(newAuditLog); // Add to beginning for chronological order
     return newAuditLog;
+  }
+
+  // Workflow Analysis methods
+  private workflowAnalysis: WorkflowAnalysis[] = [];
+
+  async getWorkflowAnalysis(serverId: number): Promise<WorkflowAnalysis[]> {
+    return this.workflowAnalysis.filter(w => w.serverId === serverId);
+  }
+
+  async getWorkflowAnalysisById(id: number): Promise<WorkflowAnalysis | undefined> {
+    return this.workflowAnalysis.find(w => w.id === id);
+  }
+
+  async createWorkflowAnalysis(analysis: InsertWorkflowAnalysis): Promise<WorkflowAnalysis> {
+    const newAnalysis: WorkflowAnalysis = {
+      ...analysis,
+      id: this.workflowAnalysis.length + 1,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.workflowAnalysis.push(newAnalysis);
+    return newAnalysis;
+  }
+
+  async updateWorkflowAnalysis(id: number, analysis: Partial<InsertWorkflowAnalysis>): Promise<WorkflowAnalysis | undefined> {
+    const index = this.workflowAnalysis.findIndex(w => w.id === id);
+    if (index === -1) return undefined;
+
+    this.workflowAnalysis[index] = { ...this.workflowAnalysis[index], ...analysis, updatedAt: new Date() };
+    return this.workflowAnalysis[index];
+  }
+
+  async deleteWorkflowAnalysis(id: number): Promise<boolean> {
+    const index = this.workflowAnalysis.findIndex(w => w.id === id);
+    if (index === -1) return false;
+
+    this.workflowAnalysis.splice(index, 1);
+    return true;
+  }
+
+  // Enhanced Model Management methods
+  async getComfyModelsByServerAndFolder(serverId: number, folder: string): Promise<ComfyModel[]> {
+    return this.comfyModels.filter(m => m.serverId === serverId && m.folder === folder);
+  }
+
+  async getComfyModelByNameAndServer(name: string, serverId: number): Promise<ComfyModel | undefined> {
+    return this.comfyModels.find(m => m.name === name && m.serverId === serverId);
+  }
+
+  async searchComfyModels(query: string): Promise<ComfyModel[]> {
+    const lowerQuery = query.toLowerCase();
+    return this.comfyModels.filter(m => 
+      m.name.toLowerCase().includes(lowerQuery) || 
+      (m.description && m.description.toLowerCase().includes(lowerQuery))
+    );
+  }
+
+  async getModelsByStatus(status: string): Promise<ComfyModel[]> {
+    return this.comfyModels.filter(m => m.status === status);
   }
 }
 

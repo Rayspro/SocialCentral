@@ -1,316 +1,393 @@
-import OpenAI from "openai";
 import { storage } from "./storage";
-import { VastServer } from "@shared/schema";
+import { ComfyModel, InsertComfyModel, WorkflowAnalysis, InsertWorkflowAnalysis } from "@shared/schema";
 
-// the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-const openai = new OpenAI({ 
-  apiKey: process.env.OPENAI_API_KEY 
-});
-
-interface WorkflowAnalysis {
-  models: {
-    type: 'checkpoint' | 'lora' | 'vae' | 'embedding' | 'controlnet';
-    name: string;
-    url?: string;
-    folder: string;
-    description: string;
-    required: boolean;
-  }[];
-  nodes: {
-    name: string;
-    type: string;
-    description: string;
-    installCommand?: string;
-    gitUrl?: string;
-    required: boolean;
-  }[];
-  summary: string;
-  complexity: 'simple' | 'medium' | 'complex';
-  estimatedDownloadSize: string;
+interface ModelRequirement {
+  name: string;
+  type: string; // checkpoint, lora, vae, etc.
+  url?: string;
+  description?: string;
+  required: boolean;
 }
 
-interface LogEntry {
-  timestamp: Date;
-  level: 'info' | 'warning' | 'error' | 'success';
-  message: string;
-  details?: any;
+interface WorkflowNode {
+  class_type: string;
+  inputs: Record<string, any>;
+  _meta?: {
+    title?: string;
+  };
 }
 
-class WorkflowAnalyzer {
-  private logs: LogEntry[] = [];
-  private wsConnections: Set<any> = new Set();
+interface WorkflowData {
+  [nodeId: string]: WorkflowNode;
+}
 
-  addLog(level: LogEntry['level'], message: string, details?: any) {
-    const logEntry: LogEntry = {
-      timestamp: new Date(),
-      level,
-      message,
-      details
-    };
+export class WorkflowAnalyzer {
+  // Model mapping database with popular ComfyUI models
+  private modelDatabase: Record<string, ModelRequirement> = {
+    // Checkpoints
+    "sd_xl_base_1.0.safetensors": {
+      name: "SDXL Base 1.0",
+      type: "checkpoints",
+      url: "https://huggingface.co/stabilityai/stable-diffusion-xl-base-1.0/resolve/main/sd_xl_base_1.0.safetensors",
+      description: "Stable Diffusion XL Base Model",
+      required: true
+    },
+    "sd_xl_refiner_1.0.safetensors": {
+      name: "SDXL Refiner 1.0",
+      type: "checkpoints", 
+      url: "https://huggingface.co/stabilityai/stable-diffusion-xl-refiner-1.0/resolve/main/sd_xl_refiner_1.0.safetensors",
+      description: "Stable Diffusion XL Refiner Model",
+      required: false
+    },
+    "v1-5-pruned-emaonly.ckpt": {
+      name: "Stable Diffusion 1.5",
+      type: "checkpoints",
+      url: "https://huggingface.co/runwayml/stable-diffusion-v1-5/resolve/main/v1-5-pruned-emaonly.ckpt",
+      description: "Stable Diffusion v1.5 Base Model",
+      required: true
+    },
+    "realisticVisionV60B1_v60B1VAE.safetensors": {
+      name: "Realistic Vision v6.0",
+      type: "checkpoints",
+      url: "https://civitai.com/api/download/models/245598",
+      description: "Photorealistic checkpoint model",
+      required: false
+    },
     
-    this.logs.push(logEntry);
-    
-    // Broadcast to all connected WebSocket clients
-    this.wsConnections.forEach(ws => {
-      if (ws.readyState === 1) { // WebSocket.OPEN
-        ws.send(JSON.stringify({
-          type: 'workflow_log',
-          log: logEntry
-        }));
-      }
-    });
-    
-    console.log(`[${level.toUpperCase()}] ${message}`, details || '');
-  }
+    // VAE Models
+    "sdxl_vae.safetensors": {
+      name: "SDXL VAE",
+      type: "vae",
+      url: "https://huggingface.co/stabilityai/sdxl-vae/resolve/main/sdxl_vae.safetensors",
+      description: "SDXL Variational Autoencoder",
+      required: true
+    },
+    "vae-ft-mse-840000-ema-pruned.safetensors": {
+      name: "SD 1.5 VAE",
+      type: "vae",
+      url: "https://huggingface.co/stabilityai/sd-vae-ft-mse-original/resolve/main/vae-ft-mse-840000-ema-pruned.safetensors",
+      description: "SD 1.5 Fine-tuned VAE",
+      required: true
+    },
 
-  addWebSocketConnection(ws: any) {
-    this.wsConnections.add(ws);
+    // LoRA Models
+    "detail_tweaker_lora.safetensors": {
+      name: "Detail Tweaker LoRA",
+      type: "loras",
+      url: "https://civitai.com/api/download/models/62833",
+      description: "Enhances fine details in generated images",
+      required: false
+    },
     
-    // Send existing logs to new connection
-    ws.send(JSON.stringify({
-      type: 'workflow_logs_history',
-      logs: this.logs
-    }));
+    // ControlNet Models
+    "control_v11p_sd15_openpose.pth": {
+      name: "OpenPose ControlNet",
+      type: "controlnet",
+      url: "https://huggingface.co/lllyasviel/ControlNet-v1-1/resolve/main/control_v11p_sd15_openpose.pth",
+      description: "OpenPose pose detection control model",
+      required: false
+    },
     
-    ws.on('close', () => {
-      this.wsConnections.delete(ws);
-    });
-  }
+    // Upscale Models
+    "RealESRGAN_x4plus.pth": {
+      name: "RealESRGAN x4",
+      type: "upscale_models",
+      url: "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.1.0/RealESRGAN_x4plus.pth",
+      description: "4x upscaling model",
+      required: false
+    }
+  };
 
-  async analyzeWorkflow(workflowJson: any): Promise<WorkflowAnalysis> {
-    this.addLog('info', 'Starting workflow analysis with OpenAI');
-    
+  async analyzeWorkflow(serverId: number, workflowName: string, workflowJson: string): Promise<WorkflowAnalysis> {
     try {
-      const prompt = `
-Analyze this ComfyUI workflow JSON and extract the following information:
+      const workflow: WorkflowData = JSON.parse(workflowJson);
+      const requiredModels = this.extractModelRequirements(workflow);
+      const installedModels = await storage.getComfyModelsByServer(serverId);
+      const missingModels = this.findMissingModels(requiredModels, installedModels);
 
-1. Required models (checkpoints, LoRAs, VAEs, embeddings, ControlNets) with their:
-   - Type (checkpoint/lora/vae/embedding/controlnet)
-   - Name/filename
-   - Recommended download URL (if standard/popular model)
-   - Folder location in ComfyUI
-   - Description of what the model does
-   - Whether it's required or optional
-
-2. Custom nodes that need to be installed with:
-   - Node name
-   - Node type/category
-   - Description of functionality
-   - Installation method (git clone URL, manager install command, etc.)
-   - Whether it's required or optional
-
-3. Overall workflow summary and complexity assessment
-
-Respond in JSON format with this structure:
-{
-  "models": [
-    {
-      "type": "checkpoint",
-      "name": "model_name.safetensors",
-      "url": "https://example.com/download/url",
-      "folder": "checkpoints",
-      "description": "Model description",
-      "required": true
-    }
-  ],
-  "nodes": [
-    {
-      "name": "Node Name",
-      "type": "category",
-      "description": "What this node does",
-      "installCommand": "git clone https://github.com/...",
-      "gitUrl": "https://github.com/...",
-      "required": true
-    }
-  ],
-  "summary": "Workflow description",
-  "complexity": "simple|medium|complex",
-  "estimatedDownloadSize": "~2.5GB"
-}
-
-Workflow JSON:
-${JSON.stringify(workflowJson, null, 2)}
-`;
-
-      const response = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert ComfyUI workflow analyzer. Analyze workflows and identify all required models and custom nodes. Provide accurate download URLs for popular models when possible."
-          },
-          {
-            role: "user",
-            content: prompt
-          }
-        ],
-        response_format: { type: "json_object" },
-        max_tokens: 4000
+      // Create workflow analysis record
+      const analysis = await storage.createWorkflowAnalysis({
+        serverId,
+        workflowName,
+        workflowJson,
+        requiredModels: requiredModels as any,
+        missingModels: missingModels as any,
+        analysisStatus: 'completed',
+        downloadStatus: missingModels.length > 0 ? 'pending' : 'completed'
       });
 
-      const analysis = JSON.parse(response.choices[0].message.content || '{}');
-      
-      this.addLog('success', 'Workflow analysis completed', {
-        modelsFound: analysis.models?.length || 0,
-        nodesFound: analysis.nodes?.length || 0,
-        complexity: analysis.complexity
-      });
+      // Auto-download missing models if any
+      if (missingModels.length > 0) {
+        this.downloadMissingModels(serverId, missingModels, analysis.id);
+      }
 
       return analysis;
     } catch (error) {
-      this.addLog('error', 'Failed to analyze workflow', error instanceof Error ? error.message : String(error));
-      throw error;
+      console.error('Workflow analysis failed:', error);
+      
+      // Create failed analysis record
+      return await storage.createWorkflowAnalysis({
+        serverId,
+        workflowName,
+        workflowJson,
+        requiredModels: [] as any,
+        missingModels: [] as any,
+        analysisStatus: 'failed',
+        downloadStatus: 'failed'
+      });
     }
   }
 
-  async downloadModelsAndNodes(
-    analysis: WorkflowAnalysis, 
-    serverId: number
-  ): Promise<void> {
-    this.addLog('info', `Starting download process for server ${serverId}`);
-    
-    const server = await storage.getVastServer(serverId);
-    if (!server || !server.serverUrl) {
-      throw new Error('Server not found or not running');
+  private extractModelRequirements(workflow: WorkflowData): ModelRequirement[] {
+    const models: ModelRequirement[] = [];
+    const foundModels = new Set<string>();
+
+    for (const [nodeId, node] of Object.entries(workflow)) {
+      // Extract models from different node types
+      switch (node.class_type) {
+        case 'CheckpointLoaderSimple':
+        case 'CheckpointLoader':
+          this.extractCheckpointModel(node, models, foundModels);
+          break;
+          
+        case 'VAELoader':
+          this.extractVAEModel(node, models, foundModels);
+          break;
+          
+        case 'LoraLoader':
+          this.extractLoRAModel(node, models, foundModels);
+          break;
+          
+        case 'ControlNetLoader':
+          this.extractControlNetModel(node, models, foundModels);
+          break;
+          
+        case 'UpscaleModelLoader':
+          this.extractUpscaleModel(node, models, foundModels);
+          break;
+      }
     }
 
-    // Get existing models for this server
-    const existingModels = await storage.getComfyModelsByServer(serverId);
-    const existingModelNames = existingModels.map(m => m.name);
+    return models;
+  }
 
-    // Download models (skip duplicates)
-    for (const model of analysis.models.filter(m => m.required)) {
-      try {
-        // Check if model already exists
-        if (existingModelNames.includes(model.name)) {
-          this.addLog('info', `Model ${model.name} already exists - skipping download`);
+  private extractCheckpointModel(node: WorkflowNode, models: ModelRequirement[], foundModels: Set<string>) {
+    const modelName = node.inputs?.ckpt_name;
+    if (modelName && !foundModels.has(modelName)) {
+      foundModels.add(modelName);
+      
+      const knownModel = this.modelDatabase[modelName];
+      models.push({
+        name: knownModel?.name || modelName,
+        type: 'checkpoints',
+        url: knownModel?.url,
+        description: knownModel?.description || 'Checkpoint model',
+        required: true
+      });
+    }
+  }
+
+  private extractVAEModel(node: WorkflowNode, models: ModelRequirement[], foundModels: Set<string>) {
+    const modelName = node.inputs?.vae_name;
+    if (modelName && !foundModels.has(modelName)) {
+      foundModels.add(modelName);
+      
+      const knownModel = this.modelDatabase[modelName];
+      models.push({
+        name: knownModel?.name || modelName,
+        type: 'vae',
+        url: knownModel?.url,
+        description: knownModel?.description || 'VAE model',
+        required: true
+      });
+    }
+  }
+
+  private extractLoRAModel(node: WorkflowNode, models: ModelRequirement[], foundModels: Set<string>) {
+    const modelName = node.inputs?.lora_name;
+    if (modelName && !foundModels.has(modelName)) {
+      foundModels.add(modelName);
+      
+      const knownModel = this.modelDatabase[modelName];
+      models.push({
+        name: knownModel?.name || modelName,
+        type: 'loras',
+        url: knownModel?.url,
+        description: knownModel?.description || 'LoRA model',
+        required: false
+      });
+    }
+  }
+
+  private extractControlNetModel(node: WorkflowNode, models: ModelRequirement[], foundModels: Set<string>) {
+    const modelName = node.inputs?.control_net_name;
+    if (modelName && !foundModels.has(modelName)) {
+      foundModels.add(modelName);
+      
+      const knownModel = this.modelDatabase[modelName];
+      models.push({
+        name: knownModel?.name || modelName,
+        type: 'controlnet',
+        url: knownModel?.url,
+        description: knownModel?.description || 'ControlNet model',
+        required: false
+      });
+    }
+  }
+
+  private extractUpscaleModel(node: WorkflowNode, models: ModelRequirement[], foundModels: Set<string>) {
+    const modelName = node.inputs?.model_name;
+    if (modelName && !foundModels.has(modelName)) {
+      foundModels.add(modelName);
+      
+      const knownModel = this.modelDatabase[modelName];
+      models.push({
+        name: knownModel?.name || modelName,
+        type: 'upscale_models',
+        url: knownModel?.url,
+        description: knownModel?.description || 'Upscale model',
+        required: false
+      });
+    }
+  }
+
+  private findMissingModels(requiredModels: ModelRequirement[], installedModels: ComfyModel[]): ModelRequirement[] {
+    const installedNames = new Set(installedModels.map(m => m.name));
+    
+    return requiredModels.filter(model => {
+      // Check if model is already installed (by name or filename)
+      const isInstalled = installedNames.has(model.name) || 
+                         installedModels.some(installed => 
+                           installed.fileName === model.name ||
+                           installed.url === model.url
+                         );
+      
+      return !isInstalled;
+    });
+  }
+
+  private async downloadMissingModels(serverId: number, missingModels: ModelRequirement[], analysisId: number) {
+    try {
+      await storage.updateWorkflowAnalysis(analysisId, { downloadStatus: 'downloading' });
+
+      for (const model of missingModels) {
+        if (!model.url) {
+          console.log(`Skipping ${model.name}: No download URL available`);
           continue;
         }
 
-        this.addLog('info', `Downloading model: ${model.name}`, model);
-        
-        if (model.url) {
-          // Create model entry in database
-          const modelData = {
-            name: model.name,
-            url: model.url,
-            folder: model.folder,
-            description: model.description,
-            serverId: serverId,
-            status: 'downloading'
-          };
-          
-          const createdModel = await storage.createComfyModel(modelData);
-          
-          // Start download in background
-          this.downloadModelInBackground(createdModel.id, serverId, model.url, model.folder, model.name);
-          
-          this.addLog('success', `Started downloading ${model.name}`);
-        } else {
-          this.addLog('warning', `No download URL available for ${model.name} - manual download required`);
+        // Check if model is already being downloaded or exists
+        const existingModel = await storage.getComfyModelByNameAndServer(model.name, serverId);
+        if (existingModel) {
+          console.log(`Model ${model.name} already exists, skipping download`);
+          continue;
         }
-      } catch (error) {
-        this.addLog('error', `Failed to start download for ${model.name}`, error);
-      }
-    }
 
-    // Install custom nodes
-    for (const node of analysis.nodes.filter(n => n.required)) {
-      try {
-        this.addLog('info', `Installing custom node: ${node.name}`, node);
-        
-        if (node.gitUrl || node.installCommand) {
-          // Install node via ComfyUI API or script execution
-          await this.installCustomNode(server, node);
-          this.addLog('success', `Installed custom node: ${node.name}`);
-        } else {
-          this.addLog('warning', `No installation method available for ${node.name} - manual installation required`);
-        }
-      } catch (error) {
-        this.addLog('error', `Failed to install ${node.name}`, error);
-      }
-    }
+        // Create model record and start download
+        const modelRecord: InsertComfyModel = {
+          serverId,
+          name: model.name,
+          url: model.url,
+          folder: model.type,
+          description: model.description,
+          status: 'downloading',
+          fileName: this.extractFilenameFromUrl(model.url),
+          downloadProgress: 0
+        };
 
-    this.addLog('success', 'Download and installation process completed');
-  }
+        const createdModel = await storage.createComfyModel(modelRecord);
+        console.log(`Started downloading model: ${model.name}`);
 
-  private async downloadModelInBackground(
-    modelId: number, 
-    serverId: number, 
-    url: string, 
-    folder: string, 
-    fileName: string
-  ) {
-    try {
-      // This would typically make a request to ComfyUI's download API
-      // For now, we'll simulate the process
-      this.addLog('info', `Background download started for ${fileName}`);
-      
-      // Update model status to downloading
-      await storage.updateComfyModel(modelId, {
-        status: 'downloading',
-        downloadProgress: 0
-      });
-
-      // Simulate download progress
-      for (let progress = 10; progress <= 100; progress += 10) {
-        await new Promise(resolve => setTimeout(resolve, 2000)); // 2 second intervals
-        
-        await storage.updateComfyModel(modelId, {
-          downloadProgress: progress
-        });
-        
-        this.addLog('info', `Download progress for ${fileName}: ${progress}%`);
+        // Simulate download progress (in real implementation, this would be actual download)
+        this.simulateDownload(createdModel.id, model.name);
       }
 
-      // Mark as completed
-      await storage.updateComfyModel(modelId, {
-        status: 'ready',
-        downloadProgress: 100
-      });
-      
-      this.addLog('success', `Download completed: ${fileName}`);
-      
+      await storage.updateWorkflowAnalysis(analysisId, { downloadStatus: 'completed' });
     } catch (error) {
-      this.addLog('error', `Download failed for ${fileName}`, error);
-      await storage.updateComfyModel(modelId, {
-        status: 'failed',
-        errorMessage: error.message
-      });
+      console.error('Error downloading missing models:', error);
+      await storage.updateWorkflowAnalysis(analysisId, { downloadStatus: 'failed' });
     }
   }
 
-  private async installCustomNode(server: VastServer, node: any) {
-    // This would execute installation commands on the server
-    // For now, we'll simulate the process
-    this.addLog('info', `Executing installation command for ${node.name}`);
+  private extractFilenameFromUrl(url: string): string {
+    try {
+      const urlPath = new URL(url).pathname;
+      return urlPath.split('/').pop() || 'unknown_model';
+    } catch {
+      return 'unknown_model';
+    }
+  }
+
+  private async simulateDownload(modelId: number, modelName: string) {
+    // Simulate download progress over time
+    const progressSteps = [10, 25, 40, 60, 80, 95, 100];
     
-    if (node.gitUrl) {
-      this.addLog('info', `Git clone: ${node.gitUrl}`);
-      // Simulate git clone process
-      await new Promise(resolve => setTimeout(resolve, 3000));
+    for (let i = 0; i < progressSteps.length; i++) {
+      setTimeout(async () => {
+        const progress = progressSteps[i];
+        
+        if (progress === 100) {
+          await storage.updateComfyModel(modelId, {
+            status: 'ready',
+            downloadProgress: 100
+          });
+          console.log(`Model ${modelName} download completed`);
+        } else {
+          await storage.updateComfyModel(modelId, {
+            downloadProgress: progress
+          });
+        }
+      }, (i + 1) * 2000); // 2 second intervals
+    }
+  }
+
+  async getModelLibraryStatus(serverId: number): Promise<{
+    totalModels: number;
+    readyModels: number;
+    downloadingModels: number;
+    failedModels: number;
+    storageUsed: string;
+  }> {
+    const models = await storage.getComfyModelsByServer(serverId);
+    
+    const totalModels = models.length;
+    const readyModels = models.filter(m => m.status === 'ready').length;
+    const downloadingModels = models.filter(m => m.status === 'downloading').length;
+    const failedModels = models.filter(m => m.status === 'failed').length;
+    
+    const totalSize = models.reduce((sum, model) => sum + (model.fileSize || 0), 0);
+    const storageUsed = this.formatBytes(totalSize);
+
+    return {
+      totalModels,
+      readyModels,
+      downloadingModels,
+      failedModels,
+      storageUsed
+    };
+  }
+
+  private formatBytes(bytes: number): string {
+    if (bytes === 0) return '0 B';
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  async cleanupFailedDownloads(serverId: number): Promise<number> {
+    const failedModels = await storage.getModelsByStatus('failed');
+    const serverFailedModels = failedModels.filter(m => m.serverId === serverId);
+    
+    let deletedCount = 0;
+    for (const model of serverFailedModels) {
+      const deleted = await storage.deleteComfyModel(model.id);
+      if (deleted) deletedCount++;
     }
     
-    if (node.installCommand) {
-      this.addLog('info', `Running: ${node.installCommand}`);
-      // Simulate command execution
-      await new Promise(resolve => setTimeout(resolve, 2000));
-    }
-  }
-
-  getLogs(): LogEntry[] {
-    return this.logs;
-  }
-
-  clearLogs() {
-    this.logs = [];
-    this.wsConnections.forEach(ws => {
-      if (ws.readyState === 1) {
-        ws.send(JSON.stringify({
-          type: 'workflow_logs_cleared'
-        }));
-      }
-    });
+    return deletedCount;
   }
 }
 

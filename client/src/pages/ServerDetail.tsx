@@ -14,8 +14,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, Package, Download, Trash2, Eye, HardDrive } from "lucide-react";
+import { ChevronLeft, Clock, Activity, AlertCircle, CheckCircle, Play, Square, RefreshCw, Timer, Target, Package, Download, Trash2, Eye, HardDrive, Brain, FolderOpen } from "lucide-react";
 import { format } from "date-fns";
+import { ModelManager } from "@/components/ModelManager";
+import { WorkflowAnalyzer } from "@/components/WorkflowAnalyzer";
 
 interface Server {
   id: number;
@@ -502,6 +504,26 @@ export default function ServerDetail() {
               </p>
             </div>
             <div className="flex gap-2">
+              <ModelManager 
+                serverId={server.id}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <FolderOpen className="h-4 w-4 mr-1" />
+                    Manage Models
+                  </Button>
+                }
+              />
+              
+              <WorkflowAnalyzer 
+                serverId={server.id}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Brain className="h-4 w-4 mr-1" />
+                    Analyze Workflow
+                  </Button>
+                }
+              />
+
               <Dialog open={showModelsDialog} onOpenChange={setShowModelsDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm">

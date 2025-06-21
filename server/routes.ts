@@ -1870,6 +1870,187 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  // Enhanced Model Management API Routes
+  app.get('/api/comfy/models/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const models = await storage.getComfyModelsByServer(serverId);
+      res.json(models);
+    } catch (error) {
+      console.error('Error fetching server models:', error);
+      res.status(500).json({ error: 'Failed to fetch models' });
+    }
+  });
+
+  app.get('/api/comfy/models/:serverId/folder/:folder', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const folder = req.params.folder;
+      const models = await storage.getComfyModelsByServerAndFolder(serverId, folder);
+      res.json(models);
+    } catch (error) {
+      console.error('Error fetching models by folder:', error);
+      res.status(500).json({ error: 'Failed to fetch models' });
+    }
+  });
+
+  app.post('/api/comfy/models/:serverId/download', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const { name, url, folder, description } = req.body;
+
+      // Check for duplicates
+      const existingModel = await storage.getComfyModelByNameAndServer(name, serverId);
+      if (existingModel) {
+        return res.status(400).json({ error: 'Model already exists on this server' });
+      }
+
+      // Create model record and start download
+      const modelRecord = await storage.createComfyModel({
+        serverId,
+        name,
+        url,
+        folder,
+        description,
+        status: 'downloading',
+        fileName: url.split('/').pop() || 'unknown_model',
+        downloadProgress: 0
+      });
+
+      res.json(modelRecord);
+    } catch (error) {
+      console.error('Error starting model download:', error);
+      res.status(500).json({ error: 'Failed to start download' });
+    }
+  });
+
+  app.delete('/api/comfy/models/:modelId', async (req: Request, res: Response) => {
+    try {
+      const modelId = parseInt(req.params.modelId);
+      const deleted = await storage.deleteComfyModel(modelId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Model not found' });
+      }
+
+      res.json({ success: true, message: 'Model deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting model:', error);
+      res.status(500).json({ error: 'Failed to delete model' });
+    }
+  });
+
+  app.get('/api/comfy/models/:serverId/library-status', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const status = await workflowAnalyzer.getModelLibraryStatus(serverId);
+      res.json(status);
+    } catch (error) {
+      console.error('Error fetching library status:', error);
+      res.status(500).json({ error: 'Failed to fetch library status' });
+    }
+  });
+
+  app.post('/api/comfy/models/:serverId/cleanup-failed', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const deletedCount = await workflowAnalyzer.cleanupFailedDownloads(serverId);
+      res.json({ success: true, deletedCount, message: `Cleaned up ${deletedCount} failed downloads` });
+    } catch (error) {
+      console.error('Error cleaning up failed downloads:', error);
+      res.status(500).json({ error: 'Failed to cleanup failed downloads' });
+    }
+  });
+
+  // Workflow Analyzer API Routes
+  app.post('/api/comfy/analyze-workflow/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const { workflowName, workflowJson } = req.body;
+
+      if (!workflowName || !workflowJson) {
+        return res.status(400).json({ error: 'Workflow name and JSON are required' });
+      }
+
+      const analysis = await workflowAnalyzer.analyzeWorkflow(serverId, workflowName, workflowJson);
+      res.json(analysis);
+    } catch (error) {
+      console.error('Error analyzing workflow:', error);
+      res.status(500).json({ error: 'Failed to analyze workflow' });
+    }
+  });
+
+  app.get('/api/comfy/workflow-analysis/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const analyses = await storage.getWorkflowAnalysis(serverId);
+      res.json(analyses);
+    } catch (error) {
+      console.error('Error fetching workflow analyses:', error);
+      res.status(500).json({ error: 'Failed to fetch analyses' });
+    }
+  });
+
+  app.get('/api/comfy/workflow-analysis/details/:analysisId', async (req: Request, res: Response) => {
+    try {
+      const analysisId = parseInt(req.params.analysisId);
+      const analysis = await storage.getWorkflowAnalysisById(analysisId);
+      
+      if (!analysis) {
+        return res.status(404).json({ error: 'Analysis not found' });
+      }
+
+      res.json(analysis);
+    } catch (error) {
+      console.error('Error fetching analysis details:', error);
+      res.status(500).json({ error: 'Failed to fetch analysis details' });
+    }
+  });
+
+  app.delete('/api/comfy/workflow-analysis/:analysisId', async (req: Request, res: Response) => {
+    try {
+      const analysisId = parseInt(req.params.analysisId);
+      const deleted = await storage.deleteWorkflowAnalysis(analysisId);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Analysis not found' });
+      }
+
+      res.json({ success: true, message: 'Analysis deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting analysis:', error);
+      res.status(500).json({ error: 'Failed to delete analysis' });
+    }
+  });
+
+  // Model Search and Filter Routes
+  app.get('/api/comfy/models/search', async (req: Request, res: Response) => {
+    try {
+      const { query } = req.query;
+      
+      if (!query || typeof query !== 'string') {
+        return res.status(400).json({ error: 'Search query is required' });
+      }
+
+      const models = await storage.searchComfyModels(query);
+      res.json(models);
+    } catch (error) {
+      console.error('Error searching models:', error);
+      res.status(500).json({ error: 'Failed to search models' });
+    }
+  });
+
+  app.get('/api/comfy/models/status/:status', async (req: Request, res: Response) => {
+    try {
+      const status = req.params.status;
+      const models = await storage.getModelsByStatus(status);
+      res.json(models);
+    } catch (error) {
+      console.error('Error fetching models by status:', error);
+      res.status(500).json({ error: 'Failed to fetch models' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time logs

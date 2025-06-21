@@ -29,10 +29,15 @@ import {
   XCircle,
   AlertTriangle,
   RefreshCw,
-  Square
+  Square,
+  FolderOpen,
+  Brain,
+  Package
 } from "lucide-react";
 import { format } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { ModelManager } from "@/components/ModelManager";
+import { WorkflowAnalyzer } from "@/components/WorkflowAnalyzer";
 
 export function ServerDetailPage() {
   const params = useParams();
@@ -306,8 +311,9 @@ export function ServerDetailPage() {
 
       {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="models">Models</TabsTrigger>
           <TabsTrigger value="setup">ComfyUI Setup</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
@@ -505,6 +511,59 @@ export function ServerDetailPage() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="models" className="space-y-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium">ComfyUI Models</h3>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Manage AI models for this server's ComfyUI instance
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <ModelManager 
+                serverId={parseInt(serverId)}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <FolderOpen className="h-4 w-4 mr-1" />
+                    Manage Models
+                  </Button>
+                }
+              />
+              
+              <WorkflowAnalyzer 
+                serverId={parseInt(serverId)}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <Brain className="h-4 w-4 mr-1" />
+                    Analyze Workflow
+                  </Button>
+                }
+              />
+            </div>
+          </div>
+
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Model Library Overview
+                </CardTitle>
+                <CardDescription>
+                  Summary of models installed on this server
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8">
+                  <Package className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-gray-600 dark:text-gray-400">Use the buttons above to manage models</p>
+                  <p className="text-sm text-gray-500 mt-1">Add models and analyze workflows for ComfyUI</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">

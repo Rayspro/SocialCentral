@@ -9,6 +9,7 @@ import { Progress } from "@/components/ui/progress";
 import { LoadingMascot } from "@/components/ui/loading-mascot";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { 
   Server, 
   ArrowLeft,
@@ -32,7 +33,11 @@ import {
   Square,
   FolderOpen,
   Brain,
-  Package
+  Package,
+  Home,
+  ChevronRight,
+  User,
+  LogOut
 } from "lucide-react";
 import { format } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
@@ -193,27 +198,54 @@ export function ServerDetailPage() {
   const isSetupComplete = serverData?.setupStatus === 'completed';
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+    <div className="container mx-auto py-4 space-y-4">
+      {/* Header with Breadcrumb Navigation */}
+      <div className="flex items-center justify-between bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 pb-4">
+        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+          <Home className="h-4 w-4" />
+          <ChevronRight className="h-4 w-4" />
           <Button 
             variant="ghost" 
-            size="sm"
+            size="sm" 
+            className="p-0 h-auto font-normal text-muted-foreground hover:text-foreground"
             onClick={() => setLocation("/vast-servers")}
           >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Servers
+            Vast Servers
           </Button>
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <Server className="h-6 w-6" />
-              {serverData?.name || `Server ${serverId}`}
-            </h1>
-            <p className="text-muted-foreground">
-              Server ID: {serverData?.vastId} • {serverData?.location}
-            </p>
-          </div>
+          <ChevronRight className="h-4 w-4" />
+          <span className="font-medium text-foreground">
+            {serverData?.name || `Server ${serverId}`}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span>Profile</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => setLocation("/api/logout")}>
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {/* Server Title and Status */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Server className="h-6 w-6" />
+            {serverData?.name || `Server ${serverId}`}
+          </h1>
+          <p className="text-muted-foreground">
+            Server ID: {serverData?.vastId} • {serverData?.location}
+          </p>
         </div>
 
         <div className="flex items-center gap-2">

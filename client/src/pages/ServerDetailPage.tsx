@@ -47,12 +47,14 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ModelManager } from "@/components/ModelManager";
 import { WorkflowAnalyzer } from "@/components/WorkflowAnalyzer";
 import { WorkflowAnalyzerModal } from "@/components/WorkflowAnalyzerModal";
+import { WorkflowComposer } from "@/components/WorkflowComposer";
 
 export function ServerDetailPage() {
   const params = useParams();
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState("overview");
   const [showWorkflowAnalyzer, setShowWorkflowAnalyzer] = useState(false);
+  const [showWorkflowComposer, setShowWorkflowComposer] = useState(false);
   const queryClient = useQueryClient();
   const serverId = parseInt(params.id || "0");
 
@@ -578,6 +580,24 @@ export function ServerDetailPage() {
         </TabsContent>
 
         <TabsContent value="models" className="space-y-6">
+          <div className="flex gap-4 mb-6">
+            <Button
+              onClick={() => setShowWorkflowAnalyzer(true)}
+              variant="outline"
+              className="flex-1"
+            >
+              <Brain className="h-4 w-4 mr-2" />
+              Analyze Workflow
+            </Button>
+            <Button
+              onClick={() => setShowWorkflowComposer(true)}
+              variant="outline"
+              className="flex-1"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Workflow
+            </Button>
+          </div>
           <ModelManager serverId={serverId} />
         </TabsContent>
 
@@ -697,6 +717,16 @@ export function ServerDetailPage() {
         open={showWorkflowAnalyzer}
         onOpenChange={setShowWorkflowAnalyzer}
         serverId={serverId}
+      />
+
+      {/* Workflow Composer Modal */}
+      <WorkflowComposer
+        open={showWorkflowComposer}
+        onOpenChange={setShowWorkflowComposer}
+        serverId={serverId}
+        onWorkflowSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/comfy/workflows'] });
+        }}
       />
       </div>
     </div>

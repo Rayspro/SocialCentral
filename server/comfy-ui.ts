@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { storage } from './storage';
 import type { InsertComfyModel, InsertComfyWorkflow, InsertComfyGeneration } from '@shared/schema';
 import { comfyConnectionManager, ComfyUIHTTPClient } from './comfy-connection';
+import { comfyWebSocketManager } from './comfy-websocket';
 
 // Generate varied demo image URLs based on prompt keywords
 function generateDemoImageUrls(promptKeywords: string, generationId: number): string[] {
@@ -574,6 +575,9 @@ export async function generateImage(req: Request, res: Response) {
 
       const generation = await storage.createComfyGeneration(generationData);
       
+      // Start WebSocket progress tracking
+      comfyWebSocketManager.startTracking(generation.id, serverId, 5); // 5 total nodes for demo
+      
       // Generate varied demo images based on prompt keywords and selected workflow
       const promptKeywords = (prompt || '').toLowerCase();
       let imageUrls;
@@ -586,13 +590,16 @@ export async function generateImage(req: Request, res: Response) {
         imageUrls = generateDemoImageUrls(promptKeywords, generation.id);
       }
       
-      // Simulate generation process with realistic timing
+      // Simulate generation process with realistic timing and progress updates
       setTimeout(async () => {
         await storage.updateComfyGeneration(generation.id, {
           status: 'completed',
           imageUrls,
           completedAt: new Date()
         });
+        
+        // Complete progress tracking
+        comfyWebSocketManager.completeGeneration(generation.id, imageUrls);
       }, Math.random() * 2000 + 2000); // 2-4 seconds random timing
 
       return res.json({

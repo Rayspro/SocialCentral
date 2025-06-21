@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { WorkflowSelector } from "@/components/WorkflowSelector";
+import { ComfyProgressMonitor } from "@/components/ComfyProgressMonitor";
 import { 
   Sparkles, 
   Type, 
@@ -595,6 +596,14 @@ function ComfyUIImageGenerator() {
             </>
           )}
         </Button>
+
+        {/* Real-time Progress Monitor */}
+        {generationId && (
+          <ComfyProgressMonitor 
+            generationId={parseInt(generationId)}
+            className="mt-4"
+          />
+        )}
 
         {/* Server Status Info */}
         {selectedServer && (

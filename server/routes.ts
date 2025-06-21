@@ -32,6 +32,7 @@ import { startupComfyUI } from "./routes-comfy-startup";
 import { comfyDiagnostics } from "./comfy-diagnostics";
 import { comfyDirectTester } from "./comfy-direct-test";
 import { comfyFallback } from "./comfy-fallback";
+import { comfyWebSocketManager } from "./comfy-websocket";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
@@ -2423,13 +2424,68 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  // Real-time ComfyUI progress endpoints
+  app.get('/api/comfy/progress/:generationId', async (req: Request, res: Response) => {
+    try {
+      const generationId = parseInt(req.params.generationId);
+      const progress = comfyWebSocketManager.getProgress(generationId);
+      
+      if (!progress) {
+        return res.status(404).json({ error: 'Generation not found' });
+      }
+
+      res.json(progress);
+    } catch (error) {
+      console.error('Error fetching progress:', error);
+      res.status(500).json({ error: 'Failed to fetch progress' });
+    }
+  });
+
+  app.get('/api/comfy/progress', async (req: Request, res: Response) => {
+    try {
+      const allProgress = comfyWebSocketManager.getAllProgress();
+      res.json(allProgress);
+    } catch (error) {
+      console.error('Error fetching all progress:', error);
+      res.status(500).json({ error: 'Failed to fetch progress' });
+    }
+  });
+
+  app.post('/api/comfy/:serverId/connect-websocket', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const server = await storage.getVastServer(serverId);
+      
+      if (!server) {
+        return res.status(404).json({ error: 'Server not found' });
+      }
+
+      // Connect to ComfyUI WebSocket for real-time progress
+      const baseUrl = `http://localhost:8188`; // ComfyUI default port
+      const connected = await comfyWebSocketManager.connectToComfyUI(serverId, baseUrl);
+      
+      res.json({ 
+        success: connected, 
+        message: connected ? 'Connected to ComfyUI WebSocket' : 'Failed to connect to ComfyUI WebSocket'
+      });
+    } catch (error) {
+      console.error('Error connecting to ComfyUI WebSocket:', error);
+      res.status(500).json({ error: 'Failed to connect to ComfyUI WebSocket' });
+    }
+  });
+
   const httpServer = createServer(app);
 
-  // WebSocket server for real-time logs
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws/workflow-logs' });
+  // WebSocket server for real-time progress updates
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
   
   wss.on('connection', (ws) => {
-    console.log('WebSocket connection established for workflow logs');
+    console.log('WebSocket connection established for real-time updates');
+    
+    // Add client socket to ComfyUI WebSocket manager for progress updates
+    comfyWebSocketManager.addClientSocket(ws);
+    
+    // Also add to workflow analyzer for logs
     workflowAnalyzer.addWebSocketConnection(ws);
     
     ws.on('close', () => {

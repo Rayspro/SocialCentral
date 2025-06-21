@@ -12,8 +12,7 @@ import {
   Wand2,
   BookOpen,
   Shield,
-  Workflow,
-  Layers
+  Workflow
 } from "lucide-react";
 
 const navigationItems = [

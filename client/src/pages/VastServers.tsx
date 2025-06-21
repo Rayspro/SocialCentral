@@ -20,7 +20,9 @@ import {
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { LoadingMascot, MascotPresets } from "@/components/ui/loading-mascot";
 import { ServerAnalytics } from "@/components/ServerAnalytics";
-import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3, Home, ChevronRight, User, LogOut, Bell, Timer } from "lucide-react";
+import { ModelManager } from "@/components/ModelManager";
+import { WorkflowAnalyzer } from "@/components/WorkflowAnalyzer";
+import { Loader2, Server, Play, Square, Trash2, Search, Filter, ArrowUpDown, Settings, CheckCircle, XCircle, Clock, Terminal, RefreshCw, Eye, BarChart3, Home, ChevronRight, User, LogOut, Bell, Timer, FolderOpen, Brain } from "lucide-react";
 import { LoadingSpinner, LoadingCard, LoadingPage } from "@/components/ui/loading-spinner";
 import { useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
@@ -633,6 +635,40 @@ export default function VastServers() {
                           </Button>
                       </div>
                       
+                      {/* ComfyUI Model Management Actions */}
+                      {server.status === 'running' && (
+                        <div className="flex gap-2">
+                          <ModelManager 
+                            serverId={server.id}
+                            trigger={
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex-1"
+                              >
+                                <FolderOpen className="h-4 w-4 mr-1" />
+                                Models
+                              </Button>
+                            }
+                          />
+                          <WorkflowAnalyzer 
+                            serverId={server.id}
+                            trigger={
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex-1"
+                              >
+                                <Brain className="h-4 w-4 mr-1" />
+                                Analyze
+                              </Button>
+                            }
+                          />
+                        </div>
+                      )}
+
                       {/* Secondary actions row */}
                       {server.isLaunched && ['launching', 'running', 'configuring'].includes(server.status) && (
                         <div className="flex gap-2">

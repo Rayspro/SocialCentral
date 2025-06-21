@@ -84,20 +84,22 @@ function generateDemoImageUrls(promptKeywords: string, generationId: number): st
 
   const categoryImages = imageCategories[category as keyof typeof imageCategories];
   
-  // Select random images from the category
-  const numImages = Math.floor(Math.random() * 2) + 1; // 1-2 images
+  // Generate images based on the actual prompt content
+  const promptHash = promptKeywords.split('').reduce((hash, char) => {
+    return ((hash << 5) - hash) + char.charCodeAt(0);
+  }, 0);
+  
+  const seed = Math.abs(promptHash) + generationId;
+  const numImages = Math.min(3, Math.max(1, Math.floor(promptKeywords.split(' ').length / 2))); // 1-3 images based on prompt complexity
   const selectedImages: string[] = [];
   
   for (let i = 0; i < numImages; i++) {
-    const randomIndex = Math.floor(Math.random() * categoryImages.length);
-    const imageId = categoryImages[randomIndex];
+    const variation = seed + (i * 1000);
+    const width = 512 + (variation % 256);
+    const height = 512 + ((variation * 2) % 256);
     
-    // Add random parameters for variety
-    const width = 512 + Math.floor(Math.random() * 256); // 512-768
-    const height = 512 + Math.floor(Math.random() * 256); // 512-768
-    const seed = Math.floor(Math.random() * 1000000);
-    
-    const imageUrl = `https://images.unsplash.com/${imageId}?w=${width}&h=${height}&fit=crop&crop=center&auto=format&q=80&seed=${seed}`;
+    // Use Lorem Picsum with prompt-based seeds for consistent results
+    const imageUrl = `https://picsum.photos/seed/${variation}/${width}/${height}`;
     selectedImages.push(imageUrl);
   }
   
@@ -108,31 +110,32 @@ function generateDemoImageUrls(promptKeywords: string, generationId: number): st
 function generateWorkflowBasedImages(workflow: any, promptKeywords: string, generationId: number): string[] {
   const workflowName = workflow.name.toLowerCase();
   
-  // Map workflow names to specific image categories
-  if (workflowName.includes('portrait') || workflowName.includes('face')) {
-    return [
-      `https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=512&h=512&fit=crop&crop=face`,
-      `https://images.unsplash.com/photo-1494790108755-2616c997252c?w=512&h=512&fit=crop&crop=face`
-    ];
-  } else if (workflowName.includes('anime') || workflowName.includes('cartoon')) {
-    return [
-      `https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=512&h=512&fit=crop`,
-      `https://images.unsplash.com/photo-1514041181368-bca62cceffcd?w=512&h=512&fit=crop`
-    ];
-  } else if (workflowName.includes('landscape') || workflowName.includes('nature')) {
-    return [
-      `https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=512&h=512&fit=crop`,
-      `https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=512&h=512&fit=crop`
-    ];
-  } else if (workflowName.includes('abstract') || workflowName.includes('art')) {
-    return [
-      `https://images.unsplash.com/photo-1533090161767-e6ffed986c88?w=512&h=512&fit=crop`,
-      `https://images.unsplash.com/photo-1541961017774-22349e4a1262?w=512&h=512&fit=crop`
-    ];
-  } else {
-    // Fall back to prompt-based generation
-    return generateDemoImageUrls(promptKeywords, generationId);
+  // Create a unique seed combining workflow and prompt
+  const workflowHash = workflowName.split('').reduce((hash, char) => {
+    return ((hash << 5) - hash) + char.charCodeAt(0);
+  }, 0);
+  
+  const promptHash = promptKeywords.split('').reduce((hash, char) => {
+    return ((hash << 5) - hash) + char.charCodeAt(0);
+  }, 0);
+  
+  const combinedSeed = Math.abs(workflowHash + promptHash) + generationId;
+  
+  // Generate workflow-specific variations
+  const selectedImages = [];
+  const numImages = Math.min(3, Math.max(1, Math.floor(promptKeywords.split(' ').length / 2))); // 1-3 images
+  
+  for (let i = 0; i < numImages; i++) {
+    const variation = combinedSeed + (i * 2000); // Larger variation for workflow-based generation
+    const width = 512 + (variation % 512); // More variety in dimensions
+    const height = 512 + ((variation * 3) % 512);
+    
+    // Use workflow-specific seed for consistent workflow results
+    const imageUrl = `https://picsum.photos/seed/wf${variation}/${width}/${height}`;
+    selectedImages.push(imageUrl);
   }
+  
+  return selectedImages;
 }
 
 // ComfyUI API client class

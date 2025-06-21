@@ -110,8 +110,8 @@ export class WorkflowAnalyzer {
         serverId,
         workflowName,
         workflowJson,
-        requiredModels: requiredModels as any,
-        missingModels: missingModels as any,
+        requiredModels: JSON.stringify(requiredModels),
+        missingModels: JSON.stringify(missingModels),
         analysisStatus: 'completed',
         downloadStatus: missingModels.length > 0 ? 'pending' : 'completed'
       });
@@ -121,20 +121,32 @@ export class WorkflowAnalyzer {
         this.downloadMissingModels(serverId, missingModels, analysis.id);
       }
 
-      return analysis;
+      // Return properly formatted analysis result for frontend
+      return {
+        ...analysis,
+        requiredModels: requiredModels,
+        missingNodes: missingModels
+      };
     } catch (error) {
       console.error('Workflow analysis failed:', error);
       
       // Create failed analysis record
-      return await storage.createWorkflowAnalysis({
+      const failedAnalysis = await storage.createWorkflowAnalysis({
         serverId,
         workflowName,
         workflowJson,
-        requiredModels: [] as any,
-        missingModels: [] as any,
-        analysisStatus: 'failed',
-        downloadStatus: 'failed'
+        requiredModels: JSON.stringify([]),
+        missingModels: JSON.stringify([]),
+        analysisStatus: 'error',
+        downloadStatus: 'error'
       });
+
+      // Return properly formatted failed analysis result for frontend
+      return {
+        ...failedAnalysis,
+        requiredModels: [],
+        missingNodes: []
+      };
     }
   }
 

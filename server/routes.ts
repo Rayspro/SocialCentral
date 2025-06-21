@@ -1712,7 +1712,7 @@ echo "CUDA environment configured!"`,
       }
 
       // Analyze workflow to detect required models and missing nodes
-      const analysisResult = await workflowAnalyzer.analyzeWorkflow(serverId, workflow, workflowName);
+      const analysisResult = await workflowAnalyzer.analyzeWorkflow(serverId, workflowName, workflowJson);
       
       res.json(analysisResult);
     } catch (error) {

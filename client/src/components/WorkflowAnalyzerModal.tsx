@@ -34,22 +34,26 @@ interface WorkflowAnalyzerModalProps {
   serverId: number;
 }
 
+interface RequiredModel {
+  name: string;
+  type: string;
+  url?: string;
+  size?: string;
+  status: 'available' | 'missing' | 'downloading';
+}
+
+interface MissingNode {
+  name: string;
+  type: string;
+  description?: string;
+  installUrl?: string;
+}
+
 interface AnalysisResult {
   id: number;
   workflowName: string;
-  requiredModels: Array<{
-    name: string;
-    type: string;
-    url?: string;
-    size?: string;
-    status: 'available' | 'missing' | 'downloading';
-  }>;
-  missingNodes: Array<{
-    name: string;
-    type: string;
-    description?: string;
-    installUrl?: string;
-  }>;
+  requiredModels: RequiredModel[];
+  missingNodes: MissingNode[];
   analysisStatus: 'pending' | 'analyzing' | 'completed' | 'error';
   downloadStatus: 'idle' | 'downloading' | 'completed' | 'error';
   createdAt: string;
@@ -88,7 +92,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
       setActiveTab("results");
       toast({
         title: "Analysis Complete",
-        description: "Workflow has been analyzed successfully.",
+        description: "Workflow analysis completed successfully.",
       });
     },
     onError: (error: Error) => {
@@ -121,7 +125,6 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
         title: "Downloads Started",
         description: "Missing models are being downloaded in the background.",
       });
-      queryClient.invalidateQueries({ queryKey: [`/api/comfy/models/${serverId}`] });
     },
     onError: (error: Error) => {
       toast({
@@ -139,7 +142,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
     if (!file.name.endsWith('.json')) {
       toast({
         title: "Invalid File Type",
-        description: "Please upload a JSON file.",
+        description: "Please select a JSON file.",
         variant: "destructive",
       });
       return;
@@ -147,22 +150,23 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
 
     const reader = new FileReader();
     reader.onload = (e) => {
-      try {
-        const content = e.target?.result as string;
-        JSON.parse(content); // Validate JSON
+      const content = e.target?.result as string;
+      if (content) {
         setWorkflowJson(content);
-        setWorkflowName(file.name.replace('.json', ''));
+        const fileName = file.name.replace('.json', '');
+        setWorkflowName(fileName);
         toast({
           title: "File Loaded",
-          description: `Workflow "${file.name}" loaded successfully.`,
-        });
-      } catch (error) {
-        toast({
-          title: "Invalid JSON File",
-          description: "The uploaded file contains invalid JSON.",
-          variant: "destructive",
+          description: `Successfully loaded ${file.name}`,
         });
       }
+    };
+    reader.onerror = () => {
+      toast({
+        title: "File Read Error",
+        description: "Failed to read the selected file.",
+        variant: "destructive",
+      });
     };
     reader.readAsText(file);
   };
@@ -170,8 +174,8 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
   const handleAnalyze = () => {
     if (!workflowJson.trim()) {
       toast({
-        title: "Validation Error",
-        description: "Please paste or upload a workflow JSON.",
+        title: "No Workflow",
+        description: "Please provide a workflow JSON to analyze.",
         variant: "destructive",
       });
       return;
@@ -192,7 +196,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
   };
 
   const handleCopyNodeList = () => {
-    if (!analysisResult) return;
+    if (!analysisResult?.missingNodes || analysisResult.missingNodes.length === 0) return;
     
     const nodeList = analysisResult.missingNodes
       .map(node => `${node.name} (${node.type})`)
@@ -224,11 +228,6 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
-    toast({
-      title: "Exported",
-      description: "Workflow exported successfully.",
-    });
   };
 
   const handleValidateWorkflow = () => {
@@ -264,6 +263,14 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
     }
   };
 
+  // Safe getters with default values
+  const safeAnalysisResult = analysisResult || null;
+  const requiredModels = safeAnalysisResult?.requiredModels || [];
+  const missingNodes = safeAnalysisResult?.missingNodes || [];
+  const workflowNameDisplay = safeAnalysisResult?.workflowName || "Unknown Workflow";
+  const createdAtDisplay = safeAnalysisResult?.createdAt ? new Date(safeAnalysisResult.createdAt).toLocaleString() : "";
+  const analysisId = safeAnalysisResult?.id || 0;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
@@ -277,134 +284,108 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="upload" className="flex items-center gap-2">
-              <Upload className="h-4 w-4" />
-              Upload & Analyze
-            </TabsTrigger>
-            <TabsTrigger value="results" disabled={!analysisResult} className="flex items-center gap-2">
-              <Target className="h-4 w-4" />
-              Analysis Results
+            <TabsTrigger value="upload">Upload & Analyze</TabsTrigger>
+            <TabsTrigger value="results" disabled={!safeAnalysisResult}>
+              Results {safeAnalysisResult && `(${requiredModels.length} models, ${missingNodes.length} missing nodes)`}
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="upload" className="space-y-4">
-            <div className="grid gap-4">
-              <div>
-                <Label htmlFor="workflow-name">Workflow Name (Optional)</Label>
-                <input
-                  id="workflow-name"
-                  value={workflowName}
-                  onChange={(e) => setWorkflowName(e.target.value)}
-                  placeholder="Enter a name for this workflow"
-                  className="w-full px-3 py-2 border rounded-md bg-background text-sm mt-1"
-                />
-              </div>
-
-              {/* Upload Method Selection */}
-              <div className="space-y-3">
-                <Label>Input Method</Label>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant={uploadMethod === "paste" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setUploadMethod("paste")}
-                    className="flex items-center gap-2"
-                  >
-                    <FileText className="h-4 w-4" />
-                    Paste JSON
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={uploadMethod === "file" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setUploadMethod("file")}
-                    className="flex items-center gap-2"
-                  >
-                    <Upload className="h-4 w-4" />
-                    Upload File
-                  </Button>
-                </div>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button
+                  variant={uploadMethod === "paste" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setUploadMethod("paste")}
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Paste JSON
+                </Button>
+                <Button
+                  variant={uploadMethod === "file" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setUploadMethod("file")}
+                >
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload File
+                </Button>
               </div>
 
               {uploadMethod === "paste" ? (
-                <div>
-                  <Label htmlFor="workflow-json">Workflow JSON</Label>
-                  <Textarea
-                    id="workflow-json"
-                    value={workflowJson}
-                    onChange={(e) => setWorkflowJson(e.target.value)}
-                    placeholder="Paste your ComfyUI workflow JSON here..."
-                    className="min-h-[200px] font-mono text-sm mt-1"
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="workflow-name">Workflow Name (Optional)</Label>
+                    <input
+                      id="workflow-name"
+                      type="text"
+                      value={workflowName}
+                      onChange={(e) => setWorkflowName(e.target.value)}
+                      placeholder="Enter workflow name..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="workflow-json">Workflow JSON</Label>
+                    <Textarea
+                      id="workflow-json"
+                      value={workflowJson}
+                      onChange={(e) => setWorkflowJson(e.target.value)}
+                      placeholder="Paste your ComfyUI workflow JSON here..."
+                      className="min-h-[200px] font-mono text-sm"
+                    />
+                  </div>
                 </div>
               ) : (
-                <div>
-                  <Label htmlFor="workflow-file">Upload Workflow File</Label>
-                  <div className="mt-1">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="workflow-file">Select Workflow File</Label>
                     <input
                       id="workflow-file"
                       type="file"
                       accept=".json"
                       onChange={handleFileUpload}
-                      className="w-full px-3 py-2 border rounded-md bg-background text-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary file:text-primary-foreground hover:file:bg-primary/90"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Upload a .json file containing your ComfyUI workflow
-                    </p>
                   </div>
-                </div>
-              )}
-
-              {workflowJson && (
-                <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                      <div>
-                        <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                          Workflow loaded successfully
-                        </p>
-                        <p className="text-xs text-green-600 dark:text-green-300">
-                          {workflowJson?.length || 0} characters loaded
+                  {workflowJson && (
+                    <div className="space-y-2">
+                      <Label>Loaded Workflow</Label>
+                      <div className="p-3 bg-muted rounded-md">
+                        <p className="text-sm font-medium">{workflowName || "Unnamed Workflow"}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {workflowJson.length} characters loaded
                         </p>
                       </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={handleValidateWorkflow}>
-                        <FileText className="h-3 w-3 mr-1" />
-                        Validate
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={handleExportWorkflow}>
-                        <Download className="h-3 w-3 mr-1" />
-                        Export
-                      </Button>
-                    </div>
-                  </div>
+                  )}
                 </div>
               )}
 
-              <div className="bg-muted/50 p-4 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <FileText className="h-5 w-5 text-blue-500 mt-0.5" />
-                  <div className="space-y-1">
-                    <p className="text-sm font-medium">How to get workflow JSON:</p>
-                    <ul className="text-sm text-muted-foreground space-y-1">
-                      <li>• Open ComfyUI in your browser</li>
-                      <li>• Load your workflow</li>
-                      <li>• Click "Save (API Format)" button</li>
-                      <li>• Copy the JSON and paste it above, or save as .json file and upload</li>
-                    </ul>
-                  </div>
-                </div>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleValidateWorkflow}
+                  disabled={!workflowJson.trim()}
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Validate JSON
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleExportWorkflow}
+                  disabled={!workflowJson.trim()}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Export
+                </Button>
               </div>
             </div>
           </TabsContent>
 
           <TabsContent value="results" className="space-y-4">
-            {analysisResult && (
+            {safeAnalysisResult && (
               <ScrollArea className="h-[400px] pr-4">
                 <div className="space-y-4">
                   {/* Analysis Summary */}
@@ -415,7 +396,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                         Analysis Summary
                       </CardTitle>
                       <CardDescription>
-                        Workflow: {analysisResult.workflowName}
+                        Workflow: {workflowNameDisplay}
                       </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -424,13 +405,13 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                           <div className="flex items-center gap-2">
                             <Package className="h-4 w-4 text-blue-500" />
                             <span className="text-sm font-medium">Required Models</span>
-                            <Badge variant="secondary">{analysisResult.requiredModels.length}</Badge>
+                            <Badge variant="secondary">{requiredModels.length}</Badge>
                           </div>
                           <div className="flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-orange-500" />
                             <span className="text-sm font-medium">Missing Nodes</span>
-                            <Badge variant={analysisResult.missingNodes.length > 0 ? "destructive" : "secondary"}>
-                              {analysisResult.missingNodes.length}
+                            <Badge variant={missingNodes.length > 0 ? "destructive" : "secondary"}>
+                              {missingNodes.length}
                             </Badge>
                           </div>
                         </div>
@@ -438,7 +419,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                           <div className="flex items-center gap-2">
                             <Clock className="h-4 w-4 text-muted-foreground" />
                             <span className="text-sm text-muted-foreground">
-                              Analyzed {new Date(analysisResult.createdAt).toLocaleString()}
+                              {createdAtDisplay && `Analyzed ${createdAtDisplay}`}
                             </span>
                           </div>
                         </div>
@@ -452,12 +433,12 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base flex items-center gap-2">
                           <Package className="h-4 w-4" />
-                          Required Models ({analysisResult?.requiredModels?.length || 0})
+                          Required Models ({requiredModels.length})
                         </CardTitle>
-                        {(analysisResult?.requiredModels || []).some(m => m.status === 'missing') && (
+                        {requiredModels.some(m => m.status === 'missing') && (
                           <Button
                             size="sm"
-                            onClick={() => downloadRequirementsMutation.mutate(analysisResult.id)}
+                            onClick={() => downloadRequirementsMutation.mutate(analysisId)}
                             disabled={downloadRequirementsMutation.isPending}
                           >
                             {downloadRequirementsMutation.isPending ? (
@@ -472,7 +453,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {(analysisResult?.requiredModels || []).map((model, index) => (
+                        {requiredModels.map((model, index) => (
                           <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -511,13 +492,13 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                   </Card>
 
                   {/* Missing Nodes */}
-                  {(analysisResult?.missingNodes?.length || 0) > 0 && (
+                  {missingNodes.length > 0 && (
                     <Card>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-orange-500" />
-                            Missing Nodes ({analysisResult?.missingNodes?.length || 0})
+                            Missing Nodes ({missingNodes.length})
                           </CardTitle>
                           <Button variant="outline" size="sm" onClick={handleCopyNodeList}>
                             <Copy className="h-4 w-4 mr-2" />
@@ -527,7 +508,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {(analysisResult?.missingNodes || []).map((node, index) => (
+                          {missingNodes.map((node, index) => (
                             <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">
@@ -570,15 +551,15 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
               {analyzeWorkflowMutation.isPending ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
-                <Brain className="h-4 w-4 mr-2" />
+                <Search className="h-4 w-4 mr-2" />
               )}
               Analyze Workflow
             </Button>
           )}
           {activeTab === "results" && (
-            <Button onClick={handleReset}>
-              <Upload className="h-4 w-4 mr-2" />
-              Analyze Another
+            <Button variant="outline" onClick={handleReset}>
+              <Zap className="h-4 w-4 mr-2" />
+              New Analysis
             </Button>
           )}
         </DialogFooter>

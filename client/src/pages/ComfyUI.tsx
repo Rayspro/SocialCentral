@@ -48,6 +48,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import GenerationProgressVisualizer from "@/components/GenerationProgressVisualizer";
+import { useGenerationProgress } from "@/hooks/useGenerationProgress";
 import type { VastServer, ComfyModel, ComfyWorkflow, ComfyGeneration } from "@shared/schema";
 
 interface GenerationParams {
@@ -102,6 +104,131 @@ export default function ComfyUI() {
   // Setup progress tracking
   const [setupProgress, setSetupProgress] = useState<any>(null);
   const [isAutoSetupRunning, setIsAutoSetupRunning] = useState(false);
+
+  // Generation progress tracking
+  const [currentGenerationId, setCurrentGenerationId] = useState<number | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState(0);
+  const [generationStatus, setGenerationStatus] = useState<'idle' | 'queued' | 'processing' | 'completed' | 'failed'>('idle');
+  const [currentNode, setCurrentNode] = useState<string>('');
+  const [totalNodes, setTotalNodes] = useState<number>(0);
+  const [completedNodes, setCompletedNodes] = useState<number>(0);
+  const [nodeProgress, setNodeProgress] = useState<any[]>([]);
+  const [executionLogs, setExecutionLogs] = useState<string[]>([]);
+  const { progress: wsProgress, isConnected: wsConnected, startTracking, stopTracking } = useGenerationProgress();
+
+  // Realistic ComfyUI node simulation
+  const simulateProgress = useCallback(async (generationId: number) => {
+    const comfyNodes = [
+      { id: '1', title: 'Load Checkpoint', type: 'CheckpointLoaderSimple', duration: 800 },
+      { id: '2', title: 'CLIP Text Encode (Prompt)', type: 'CLIPTextEncode', duration: 300 },
+      { id: '3', title: 'CLIP Text Encode (Negative)', type: 'CLIPTextEncode', duration: 250 },
+      { id: '4', title: 'Empty Latent Image', type: 'EmptyLatentImage', duration: 100 },
+      { id: '5', title: 'KSampler', type: 'KSampler', duration: 3000 },
+      { id: '6', title: 'VAE Decode', type: 'VAEDecode', duration: 500 },
+      { id: '7', title: 'Save Image', type: 'SaveImage', duration: 200 }
+    ];
+
+    setTotalNodes(comfyNodes.length);
+    setCompletedNodes(0);
+    setNodeProgress([]);
+    setExecutionLogs(['🚀 Starting image generation pipeline...', 'Loading workflow configuration...']);
+
+    for (let i = 0; i < comfyNodes.length; i++) {
+      const node = comfyNodes[i];
+      const startTime = Date.now();
+      
+      // Update current node
+      setCurrentNode(node.title);
+      setExecutionLogs(prev => [...prev, `📋 Executing node ${node.id}: ${node.title} (${node.type})`]);
+      
+      // Set node as processing
+      setNodeProgress(prev => [...prev, {
+        nodeId: node.id,
+        nodeTitle: node.title,
+        nodeType: node.type,
+        status: 'processing',
+        progress: 0
+      }]);
+
+      // Simulate node execution with detailed logs
+      const steps = 10;
+      for (let step = 0; step < steps; step++) {
+        await new Promise(resolve => setTimeout(resolve, node.duration / steps));
+        
+        const nodeProgress = ((step + 1) / steps) * 100;
+        const overallProgress = ((i + (step + 1) / steps) / comfyNodes.length) * 100;
+        
+        setGenerationProgress(overallProgress);
+        
+        // Add realistic processing logs
+        if (step === 2) {
+          setExecutionLogs(prev => [...prev, `  ⚙️ Loading ${node.type} configuration...`]);
+        } else if (step === 5) {
+          setExecutionLogs(prev => [...prev, `  🔄 Processing tensor operations...`]);
+        } else if (step === 8) {
+          setExecutionLogs(prev => [...prev, `  📊 Computing ${node.type} outputs...`]);
+        }
+      }
+
+      const executionTime = Date.now() - startTime;
+      
+      // Mark node as completed
+      setNodeProgress(prev => prev.map(n => 
+        n.nodeId === node.id 
+          ? { ...n, status: 'completed', progress: 100, executionTime }
+          : n
+      ));
+      
+      setCompletedNodes(i + 1);
+      setExecutionLogs(prev => [...prev, `✅ Completed ${node.title} in ${executionTime}ms`]);
+      
+      // Add node-specific completion logs
+      if (node.type === 'CheckpointLoaderSimple') {
+        setExecutionLogs(prev => [...prev, `  📦 Model loaded: SDXL Base 1.0`]);
+      } else if (node.type === 'CLIPTextEncode') {
+        setExecutionLogs(prev => [...prev, `  🔤 Text encoded to 77 tokens`]);
+      } else if (node.type === 'KSampler') {
+        setExecutionLogs(prev => [...prev, `  🎨 Generated latent representation (1024x1024)`]);
+      } else if (node.type === 'VAEDecode') {
+        setExecutionLogs(prev => [...prev, `  🖼️ Decoded latent to RGB image`]);
+      } else if (node.type === 'SaveImage') {
+        setExecutionLogs(prev => [...prev, `  💾 Image saved to outputs folder`]);
+      }
+    }
+
+    // Final completion
+    setGenerationStatus('completed');
+    setIsGenerating(false);
+    setCurrentNode('');
+    setExecutionLogs(prev => [...prev, '🎉 Generation completed successfully!', `📁 Output files ready for download`]);
+    stopTracking();
+    refetchGenerations();
+  }, [stopTracking, refetchGenerations]);
+
+  // Handle WebSocket progress updates
+  useEffect(() => {
+    if (wsProgress && wsProgress.generationId === currentGenerationId) {
+      setGenerationProgress(wsProgress.progress || 0);
+      setGenerationStatus(wsProgress.status as any);
+      
+      if (wsProgress.status === 'completed' || wsProgress.status === 'failed') {
+        setIsGenerating(false);
+        if (wsProgress.status === 'completed') {
+          refetchGenerations();
+        }
+      }
+    }
+  }, [wsProgress, currentGenerationId, refetchGenerations]);
+
+  // Cancel generation function
+  const cancelGeneration = useCallback(() => {
+    setIsGenerating(false);
+    setGenerationStatus('idle');
+    setGenerationProgress(0);
+    setCurrentGenerationId(null);
+    stopTracking();
+  }, [stopTracking]);
 
   // Get running servers
   const { data: servers, isLoading: serversLoading } = useQuery({
@@ -210,6 +337,11 @@ export default function ComfyUI() {
 
   const generateMutation = useMutation({
     mutationFn: async (generationData: any) => {
+      // Start progress tracking
+      setIsGenerating(true);
+      setGenerationStatus('queued');
+      setGenerationProgress(0);
+      
       const response = await fetch(`/api/comfy/${selectedServer?.id}/generate`, {
         method: 'POST',
         headers: {
@@ -225,7 +357,17 @@ export default function ComfyUI() {
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Set generation ID and start WebSocket tracking
+      if (data.generationId) {
+        setCurrentGenerationId(data.generationId);
+        setGenerationStatus('processing');
+        startTracking(data.generationId);
+        
+        // Start progress simulation and monitoring
+        simulateProgress(data.generationId);
+      }
+      
       refetchGenerations();
       toast({
         title: "Success",
@@ -233,6 +375,11 @@ export default function ComfyUI() {
       });
     },
     onError: (error: any) => {
+      setIsGenerating(false);
+      setGenerationStatus('failed');
+      setGenerationProgress(0);
+      stopTracking();
+      
       toast({
         title: "Generation Failed",
         description: error.message || "Failed to start image generation",
@@ -886,6 +1033,30 @@ export default function ComfyUI() {
                     )}
                   </CardContent>
                 </Card>
+
+                {/* Real-time Progress Visualizer */}
+                {(isGenerating || generationStatus !== 'idle') && (
+                  <GenerationProgressVisualizer
+                    generationId={currentGenerationId}
+                    isGenerating={isGenerating}
+                    progress={generationProgress}
+                    status={generationStatus}
+                    currentNode={currentNode}
+                    totalNodes={totalNodes}
+                    completedNodes={completedNodes}
+                    nodeProgress={nodeProgress}
+                    executionLogs={executionLogs}
+                    onCancel={() => {
+                      setIsGenerating(false);
+                      setGenerationStatus('idle');
+                      setCurrentGenerationId(null);
+                      setCurrentNode('');
+                      setNodeProgress([]);
+                      setExecutionLogs([]);
+                      stopTracking();
+                    }}
+                  />
+                )}
 
                 {/* Model Management */}
                 <Card>

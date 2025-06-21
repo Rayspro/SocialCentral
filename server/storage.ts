@@ -688,6 +688,116 @@ export class MemStorage implements IStorage {
     this.workflowAnalyses.splice(index, 1);
   }
 
+  // Workflow management with model instances
+  async getWorkflowsWithModels(): Promise<any[]> {
+    const workflowsWithModels = this.comfyWorkflows.map(workflow => {
+      // Get server info if serverId exists
+      const server = workflow.serverId ? this.vastServers.find(s => s.id === workflow.serverId) : null;
+      
+      // Get model instances related to this workflow
+      const modelInstances = this.comfyModels.filter(model => 
+        model.serverId === workflow.serverId
+      );
+
+      // Get analysis results for this workflow
+      const analysisResults = this.workflowAnalyses.filter(analysis => 
+        analysis.workflowName === workflow.name && analysis.serverId === workflow.serverId
+      );
+
+      return {
+        ...workflow,
+        server: server ? {
+          id: server.id,
+          name: server.name,
+          status: server.status
+        } : null,
+        modelInstances: modelInstances.map(model => ({
+          id: model.id,
+          name: model.name,
+          status: model.status,
+          serverId: model.serverId,
+          downloadProgress: model.downloadProgress,
+          errorMessage: model.errorMessage
+        })),
+        analysisResults: analysisResults.map(analysis => ({
+          id: analysis.id,
+          requiredModels: typeof analysis.requiredModels === 'string' 
+            ? JSON.parse(analysis.requiredModels) 
+            : analysis.requiredModels,
+          missingModels: typeof analysis.missingModels === 'string' 
+            ? JSON.parse(analysis.missingModels) 
+            : analysis.missingModels,
+          analysisStatus: analysis.analysisStatus,
+          downloadStatus: analysis.downloadStatus
+        }))
+      };
+    });
+
+    return workflowsWithModels;
+  }
+
+  async syncWorkflowModels(workflowId: number): Promise<void> {
+    const workflow = this.comfyWorkflows.find(w => w.id === workflowId);
+    if (!workflow) {
+      throw new Error('Workflow not found');
+    }
+
+    // Get latest analysis for this workflow
+    const latestAnalysis = this.workflowAnalyses
+      .filter(a => a.workflowName === workflow.name && a.serverId === workflow.serverId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+
+    if (latestAnalysis) {
+      const requiredModels = typeof latestAnalysis.requiredModels === 'string' 
+        ? JSON.parse(latestAnalysis.requiredModels) 
+        : latestAnalysis.requiredModels;
+
+      // Sync model instances with required models
+      for (const modelInfo of requiredModels) {
+        const existingModel = this.comfyModels.find(m => 
+          m.name === modelInfo.name && m.serverId === workflow.serverId
+        );
+
+        if (!existingModel) {
+          // Create new model instance
+          const newModel = {
+            id: this.comfyModels.length + 1,
+            serverId: workflow.serverId,
+            name: modelInfo.name,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            url: modelInfo.url || '',
+            folder: modelInfo.folder || 'models',
+            description: modelInfo.description || null,
+            status: 'pending',
+            fileName: modelInfo.fileName || null,
+            fileSize: modelInfo.fileSize || null,
+            downloadProgress: null,
+            errorMessage: null
+          };
+          this.comfyModels.push(newModel);
+        }
+      }
+    }
+  }
+
+  async deleteComfyWorkflow(workflowId: number): Promise<void> {
+    const workflowIndex = this.comfyWorkflows.findIndex(w => w.id === workflowId);
+    if (workflowIndex === -1) {
+      throw new Error('Workflow not found');
+    }
+
+    const workflow = this.comfyWorkflows[workflowIndex];
+    
+    // Remove workflow
+    this.comfyWorkflows.splice(workflowIndex, 1);
+
+    // Remove associated analysis results
+    this.workflowAnalyses = this.workflowAnalyses.filter(a => 
+      !(a.workflowName === workflow.name && a.serverId === workflow.serverId)
+    );
+  }
+
   // Server execution operations
   async getServerExecutions(serverId?: number): Promise<ServerExecution[]> {
     if (serverId) {

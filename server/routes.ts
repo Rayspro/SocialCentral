@@ -2366,6 +2366,39 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  // Workflow management with model instances
+  app.get('/api/workflows/with-models', async (req: Request, res: Response) => {
+    try {
+      const workflowsWithModels = await storage.getWorkflowsWithModels();
+      res.json(workflowsWithModels);
+    } catch (error) {
+      console.error('Error fetching workflows with models:', error);
+      res.status(500).json({ message: 'Failed to fetch workflows with models' });
+    }
+  });
+
+  app.post('/api/workflows/:id/sync-models', async (req: Request, res: Response) => {
+    try {
+      const workflowId = parseInt(req.params.id);
+      await storage.syncWorkflowModels(workflowId);
+      res.json({ success: true, message: 'Models synchronized successfully' });
+    } catch (error) {
+      console.error('Error syncing workflow models:', error);
+      res.status(500).json({ message: error.message || 'Failed to sync workflow models' });
+    }
+  });
+
+  app.delete('/api/workflows/:id', async (req: Request, res: Response) => {
+    try {
+      const workflowId = parseInt(req.params.id);
+      await storage.deleteComfyWorkflow(workflowId);
+      res.json({ success: true, message: 'Workflow deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting workflow:', error);
+      res.status(500).json({ message: error.message || 'Failed to delete workflow' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time logs

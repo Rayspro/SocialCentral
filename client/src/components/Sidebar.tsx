@@ -11,7 +11,8 @@ import {
   RotateCw,
   Wand2,
   BookOpen,
-  Shield
+  Shield,
+  Workflow
 } from "lucide-react";
 
 const navigationItems = [
@@ -23,6 +24,7 @@ const navigationItems = [
   { path: "/schedule", label: "Schedule", icon: Calendar },
   { path: "/vast-servers", label: "Vast.ai Servers", icon: Server },
   { path: "/comfy-ui", label: "ComfyUI", icon: Wand2 },
+  { path: "/workflows", label: "Workflows", icon: Workflow },
   { path: "/performance-story", label: "Performance Story", icon: BookOpen },
   { path: "/audit-log", label: "Audit Log", icon: Shield },
   { path: "/settings", label: "Settings", icon: Settings },

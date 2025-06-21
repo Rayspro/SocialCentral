@@ -15,6 +15,9 @@ import {
   ServerMoodApplication,
   WorkflowAnalysis,
   ServerExecution,
+  UserPreferences,
+  WorkflowRecommendation,
+  UserInteraction,
   type InsertUser,
   type InsertPlatform,
   type InsertAccount,
@@ -31,6 +34,9 @@ import {
   type InsertServerMoodApplication,
   type InsertWorkflowAnalysis,
   type InsertServerExecution,
+  type InsertUserPreferences,
+  type InsertWorkflowRecommendation,
+  type InsertUserInteraction,
 } from "@shared/schema";
 
 export interface IStorage {
@@ -149,6 +155,25 @@ export interface IStorage {
   getServerExecution(id: number): Promise<ServerExecution | undefined>;
   createServerExecution(execution: InsertServerExecution): Promise<ServerExecution>;
   updateServerExecution(id: number, execution: Partial<InsertServerExecution>): Promise<ServerExecution>;
+
+  // User preferences operations
+  getUserPreferences(userId: number): Promise<UserPreferences | null>;
+  createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
+  updateUserPreferences(userId: number, preferences: Partial<InsertUserPreferences>): Promise<UserPreferences>;
+
+  // Workflow recommendations operations
+  getWorkflowRecommendations(userId: number): Promise<WorkflowRecommendation[]>;
+  createWorkflowRecommendation(recommendation: InsertWorkflowRecommendation): Promise<WorkflowRecommendation>;
+  updateWorkflowRecommendation(id: number, recommendation: Partial<InsertWorkflowRecommendation>): Promise<WorkflowRecommendation>;
+  deleteWorkflowRecommendation(id: number): Promise<boolean>;
+
+  // User interaction tracking operations
+  getUserInteractions(userId: number, limit?: number): Promise<UserInteraction[]>;
+  createUserInteraction(interaction: InsertUserInteraction): Promise<UserInteraction>;
+
+  // Helper methods for recommendations
+  getUserGenerations(userId: number, limit?: number): Promise<ComfyGeneration[]>;
+  getRecentGenerations(limit?: number): Promise<ComfyGeneration[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -430,6 +455,9 @@ export class MemStorage implements IStorage {
     }
   ];
   private comfyGenerations: ComfyGeneration[] = [];
+  private userPreferences: UserPreferences[] = [];
+  private workflowRecommendations: WorkflowRecommendation[] = [];
+  private userInteractions: UserInteraction[] = [];
   private auditLogs: AuditLog[] = [
     {
       id: 1,
@@ -1225,6 +1253,109 @@ export class MemStorage implements IStorage {
     if (index === -1) return false;
     this.workflowAnalyses.splice(index, 1);
     return true;
+  }
+
+  // User preferences operations
+  async getUserPreferences(userId: number): Promise<UserPreferences | null> {
+    return this.userPreferences.find(p => p.userId === userId) || null;
+  }
+
+  async createUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences> {
+    const newPreferences: UserPreferences = {
+      id: this.userPreferences.length + 1,
+      ...preferences,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.userPreferences.push(newPreferences);
+    return newPreferences;
+  }
+
+  async updateUserPreferences(userId: number, preferences: Partial<InsertUserPreferences>): Promise<UserPreferences> {
+    const index = this.userPreferences.findIndex(p => p.userId === userId);
+    if (index === -1) throw new Error("User preferences not found");
+    this.userPreferences[index] = { 
+      ...this.userPreferences[index], 
+      ...preferences,
+      updatedAt: new Date()
+    };
+    return this.userPreferences[index];
+  }
+
+  // Workflow recommendations operations
+  async getWorkflowRecommendations(userId: number): Promise<WorkflowRecommendation[]> {
+    return this.workflowRecommendations
+      .filter(r => r.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async createWorkflowRecommendation(recommendation: InsertWorkflowRecommendation): Promise<WorkflowRecommendation> {
+    const newRecommendation: WorkflowRecommendation = {
+      id: this.workflowRecommendations.length + 1,
+      ...recommendation,
+      createdAt: new Date(),
+    };
+    this.workflowRecommendations.push(newRecommendation);
+    return newRecommendation;
+  }
+
+  async updateWorkflowRecommendation(id: number, recommendation: Partial<InsertWorkflowRecommendation>): Promise<WorkflowRecommendation> {
+    const index = this.workflowRecommendations.findIndex(r => r.id === id);
+    if (index === -1) throw new Error("Workflow recommendation not found");
+    this.workflowRecommendations[index] = { ...this.workflowRecommendations[index], ...recommendation };
+    return this.workflowRecommendations[index];
+  }
+
+  async deleteWorkflowRecommendation(id: number): Promise<boolean> {
+    const index = this.workflowRecommendations.findIndex(r => r.id === id);
+    if (index === -1) return false;
+    this.workflowRecommendations.splice(index, 1);
+    return true;
+  }
+
+  // User interaction tracking operations
+  async getUserInteractions(userId: number, limit?: number): Promise<UserInteraction[]> {
+    const interactions = this.userInteractions
+      .filter(i => i.userId === userId)
+      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+    
+    if (limit) {
+      return interactions.slice(0, limit);
+    }
+    return interactions;
+  }
+
+  async createUserInteraction(interaction: InsertUserInteraction): Promise<UserInteraction> {
+    const newInteraction: UserInteraction = {
+      id: this.userInteractions.length + 1,
+      ...interaction,
+      timestamp: new Date(),
+    };
+    this.userInteractions.push(newInteraction);
+    return newInteraction;
+  }
+
+  // Helper methods for recommendations
+  async getUserGenerations(userId: number, limit?: number): Promise<ComfyGeneration[]> {
+    // For now, return all generations since we don't have userId tracking on generations
+    // In a real implementation, you'd add userId to ComfyGeneration table
+    const generations = this.comfyGenerations
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    
+    if (limit) {
+      return generations.slice(0, limit);
+    }
+    return generations;
+  }
+
+  async getRecentGenerations(limit?: number): Promise<ComfyGeneration[]> {
+    const generations = this.comfyGenerations
+      .sort((a, b) => (b.createdAt?.getTime() || 0) - (a.createdAt?.getTime() || 0));
+    
+    if (limit) {
+      return generations.slice(0, limit);
+    }
+    return generations;
   }
 }
 

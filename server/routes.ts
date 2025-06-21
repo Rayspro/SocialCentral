@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { workflowAnalyzer } from "./workflow-analyzer";
 import { auditLogger } from "./audit-logger";
 import { serverScheduler } from "./server-scheduler";
+import { recommendationEngine } from "./recommendation-engine";
 import { insertAccountSchema, insertContentSchema, insertScheduleSchema, insertSetupScriptSchema } from "@shared/schema";
 import { z } from "zod";
 import OpenAI from "openai";
@@ -33,6 +34,7 @@ import { comfyDiagnostics } from "./comfy-diagnostics";
 import { comfyDirectTester } from "./comfy-direct-test";
 import { comfyFallback } from "./comfy-fallback";
 import { comfyWebSocketManager } from "./comfy-websocket";
+import { recommendationEngine } from "./recommendation-engine";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
@@ -2516,6 +2518,116 @@ echo "CUDA environment configured!"`,
     ws.on('close', () => {
       console.log('WebSocket connection closed');
     });
+  });
+
+  // AI Workflow Recommendation System API endpoints
+  app.get('/api/recommendations/:userId', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const recommendations = await storage.getWorkflowRecommendations(userId);
+      res.json(recommendations);
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      res.status(500).json({ error: 'Failed to fetch recommendations' });
+    }
+  });
+
+  app.post('/api/recommendations/:userId/generate', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      
+      // Generate personalized recommendations using AI
+      const recommendations = await recommendationEngine.generatePersonalizedRecommendations(userId);
+      
+      res.json({
+        success: true,
+        message: `Generated ${recommendations.length} personalized recommendations`,
+        recommendations
+      });
+    } catch (error) {
+      console.error('Error generating recommendations:', error);
+      res.status(500).json({ error: 'Failed to generate recommendations' });
+    }
+  });
+
+  app.get('/api/recommendations/trending', async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 5;
+      const trendingWorkflows = await recommendationEngine.getTrendingWorkflows(limit);
+      res.json(trendingWorkflows);
+    } catch (error) {
+      console.error('Error fetching trending workflows:', error);
+      res.status(500).json({ error: 'Failed to fetch trending workflows' });
+    }
+  });
+
+  app.post('/api/recommendations/:recommendationId/feedback', async (req: Request, res: Response) => {
+    try {
+      const recommendationId = parseInt(req.params.recommendationId);
+      const { feedback, isUsed } = req.body;
+      
+      const updated = await storage.updateWorkflowRecommendation(recommendationId, {
+        userFeedback: feedback,
+        isUsed: isUsed || false,
+        isViewed: true
+      });
+      
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating recommendation feedback:', error);
+      res.status(500).json({ error: 'Failed to update feedback' });
+    }
+  });
+
+  app.post('/api/user-preferences/:userId', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const preferencesData = req.body;
+      
+      await recommendationEngine.updateUserPreferences(userId, preferencesData);
+      
+      res.json({ success: true, message: 'User preferences updated' });
+    } catch (error) {
+      console.error('Error updating user preferences:', error);
+      res.status(500).json({ error: 'Failed to update preferences' });
+    }
+  });
+
+  app.get('/api/user-preferences/:userId', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const preferences = await storage.getUserPreferences(userId);
+      res.json(preferences);
+    } catch (error) {
+      console.error('Error fetching user preferences:', error);
+      res.status(500).json({ error: 'Failed to fetch preferences' });
+    }
+  });
+
+  app.post('/api/interactions/:userId/track', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const { actionType, entityType, entityId, metadata } = req.body;
+      
+      await recommendationEngine.trackUserInteraction(userId, actionType, entityType, entityId, metadata);
+      
+      res.json({ success: true, message: 'Interaction tracked' });
+    } catch (error) {
+      console.error('Error tracking interaction:', error);
+      res.status(500).json({ error: 'Failed to track interaction' });
+    }
+  });
+
+  app.get('/api/interactions/:userId', async (req: Request, res: Response) => {
+    try {
+      const userId = parseInt(req.params.userId);
+      const limit = parseInt(req.query.limit as string) || 50;
+      const interactions = await storage.getUserInteractions(userId, limit);
+      res.json(interactions);
+    } catch (error) {
+      console.error('Error fetching interactions:', error);
+      res.status(500).json({ error: 'Failed to fetch interactions' });
+    }
   });
 
   return httpServer;

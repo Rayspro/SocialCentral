@@ -12,7 +12,8 @@ import {
   Wand2,
   BookOpen,
   Shield,
-  Workflow
+  Workflow,
+  Brain
 } from "lucide-react";
 
 const navigationItems = [
@@ -24,6 +25,7 @@ const navigationItems = [
   { path: "/schedule", label: "Schedule", icon: Calendar },
   { path: "/vast-servers", label: "Vast.ai Servers", icon: Server },
   { path: "/workflows", label: "Workflows", icon: Workflow },
+  { path: "/recommendations", label: "AI Recommendations", icon: Brain },
   { path: "/performance-story", label: "Performance Story", icon: BookOpen },
   { path: "/audit-log", label: "Audit Log", icon: Shield },
   { path: "/settings", label: "Settings", icon: Settings },

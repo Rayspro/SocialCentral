@@ -48,6 +48,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { ModelManager } from "@/components/ModelManager";
 import { WorkflowAnalyzer } from "@/components/WorkflowAnalyzer";
 import { WorkflowAnalyzerModal } from "@/components/WorkflowAnalyzerModal";
+import { WorkflowTemplateLibrary } from "@/components/WorkflowTemplateLibrary";
 import { WorkflowComposer } from "@/components/WorkflowComposer";
 
 export function ServerDetailPage() {
@@ -56,6 +57,7 @@ export function ServerDetailPage() {
   const [activeTab, setActiveTab] = useState("overview");
   const [showWorkflowAnalyzer, setShowWorkflowAnalyzer] = useState(false);
   const [showWorkflowComposer, setShowWorkflowComposer] = useState(false);
+  const [showTemplateLibrary, setShowTemplateLibrary] = useState(false);
   const queryClient = useQueryClient();
   const serverId = parseInt(params.id || "0");
 
@@ -581,22 +583,30 @@ export function ServerDetailPage() {
         </TabsContent>
 
         <TabsContent value="models" className="space-y-6">
-          <div className="flex gap-4 mb-6">
+          <div className="grid grid-cols-3 gap-3 mb-6">
             <Button
               onClick={() => setShowWorkflowAnalyzer(true)}
               variant="outline"
-              className="flex-1"
+              className="flex items-center gap-2"
             >
-              <Brain className="h-4 w-4 mr-2" />
+              <Brain className="h-4 w-4" />
               Analyze Workflow
             </Button>
             <Button
               onClick={() => setShowWorkflowComposer(true)}
               variant="outline"
-              className="flex-1"
+              className="flex items-center gap-2"
             >
-              <Plus className="h-4 w-4 mr-2" />
+              <Plus className="h-4 w-4" />
               Create Workflow
+            </Button>
+            <Button
+              onClick={() => setShowTemplateLibrary(true)}
+              variant="outline"
+              className="flex items-center gap-2"
+            >
+              <FolderOpen className="h-4 w-4" />
+              Templates
             </Button>
           </div>
           <ModelManager serverId={serverId} />
@@ -726,6 +736,16 @@ export function ServerDetailPage() {
         onOpenChange={setShowWorkflowComposer}
         serverId={serverId}
         onWorkflowSaved={() => {
+          queryClient.invalidateQueries({ queryKey: ['/api/comfy/workflows'] });
+        }}
+      />
+
+      {/* Template Library Modal */}
+      <WorkflowTemplateLibrary
+        open={showTemplateLibrary}
+        onOpenChange={setShowTemplateLibrary}
+        serverId={serverId}
+        onTemplateSelect={() => {
           queryClient.invalidateQueries({ queryKey: ['/api/comfy/workflows'] });
         }}
       />

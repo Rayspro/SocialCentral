@@ -212,6 +212,58 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
     setActiveTab("upload");
   };
 
+  const handleExportWorkflow = () => {
+    if (!workflowJson) return;
+    
+    const blob = new Blob([workflowJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${workflowName || 'workflow'}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Exported",
+      description: "Workflow exported successfully.",
+    });
+  };
+
+  const handleValidateWorkflow = () => {
+    if (!workflowJson) return;
+    
+    try {
+      const parsed = JSON.parse(workflowJson);
+      const nodes = Object.keys(parsed);
+      const hasValidStructure = nodes.every(key => 
+        parsed[key] && 
+        typeof parsed[key] === 'object' && 
+        parsed[key].class_type
+      );
+      
+      if (hasValidStructure) {
+        toast({
+          title: "Valid Workflow",
+          description: `Workflow contains ${nodes.length} valid nodes.`,
+        });
+      } else {
+        toast({
+          title: "Invalid Structure",
+          description: "Workflow JSON structure appears invalid.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Invalid JSON",
+        description: "The workflow JSON is not properly formatted.",
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
@@ -308,15 +360,29 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
 
               {workflowJson && (
                 <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                      Workflow loaded successfully
-                    </p>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-green-800 dark:text-green-200">
+                          Workflow loaded successfully
+                        </p>
+                        <p className="text-xs text-green-600 dark:text-green-300">
+                          {workflowJson?.length || 0} characters loaded
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={handleValidateWorkflow}>
+                        <FileText className="h-3 w-3 mr-1" />
+                        Validate
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={handleExportWorkflow}>
+                        <Download className="h-3 w-3 mr-1" />
+                        Export
+                      </Button>
+                    </div>
                   </div>
-                  <p className="text-xs text-green-600 dark:text-green-300 mt-1">
-                    {JSON.stringify(JSON.parse(workflowJson)).length} characters loaded
-                  </p>
                 </div>
               )}
 
@@ -386,9 +452,9 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                       <div className="flex items-center justify-between">
                         <CardTitle className="text-base flex items-center gap-2">
                           <Package className="h-4 w-4" />
-                          Required Models ({analysisResult.requiredModels.length})
+                          Required Models ({analysisResult?.requiredModels?.length || 0})
                         </CardTitle>
-                        {analysisResult.requiredModels.some(m => m.status === 'missing') && (
+                        {(analysisResult?.requiredModels || []).some(m => m.status === 'missing') && (
                           <Button
                             size="sm"
                             onClick={() => downloadRequirementsMutation.mutate(analysisResult.id)}
@@ -406,7 +472,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                     </CardHeader>
                     <CardContent>
                       <div className="space-y-2">
-                        {analysisResult.requiredModels.map((model, index) => (
+                        {(analysisResult?.requiredModels || []).map((model, index) => (
                           <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
@@ -445,13 +511,13 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                   </Card>
 
                   {/* Missing Nodes */}
-                  {analysisResult.missingNodes.length > 0 && (
+                  {(analysisResult?.missingNodes?.length || 0) > 0 && (
                     <Card>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <CardTitle className="text-base flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-orange-500" />
-                            Missing Nodes ({analysisResult.missingNodes.length})
+                            Missing Nodes ({analysisResult?.missingNodes?.length || 0})
                           </CardTitle>
                           <Button variant="outline" size="sm" onClick={handleCopyNodeList}>
                             <Copy className="h-4 w-4 mr-2" />
@@ -461,7 +527,7 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-2">
-                          {analysisResult.missingNodes.map((node, index) => (
+                          {(analysisResult?.missingNodes || []).map((node, index) => (
                             <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
                               <div className="flex-1">
                                 <div className="flex items-center gap-2">

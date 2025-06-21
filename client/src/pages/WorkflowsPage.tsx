@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -284,148 +285,168 @@ export default function WorkflowsPage() {
             </Button>
           </div>
         ) : (
-          <div className="space-y-3">
-            {filteredWorkflows.map((workflow: WorkflowWithModels) => (
-              <div key={workflow.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:shadow-md transition-shadow">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">
-                          {workflow.name}
-                        </h3>
+          <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[300px]">Workflow</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Server</TableHead>
+                  <TableHead>Models</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredWorkflows.map((workflow: WorkflowWithModels) => (
+                  <TableRow key={workflow.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                    <TableCell>
+                      <div className="space-y-1">
                         <div className="flex items-center gap-2">
-                          {workflow.category && (
-                            <Badge variant="secondary" className="text-xs">
-                              {workflow.category}
-                            </Badge>
-                          )}
+                          <h3 className="font-semibold text-gray-900 dark:text-gray-100 truncate">
+                            {workflow.name}
+                          </h3>
                           {workflow.isTemplate && (
                             <Badge variant="outline" className="text-xs">
                               Template
                             </Badge>
                           )}
                         </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-2">
-                        <div className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(workflow.createdAt).toLocaleDateString()}
-                        </div>
-                        
-                        {workflow.server && (
-                          <div className="flex items-center gap-2">
-                            <Server className="h-3 w-3" />
-                            <span className="truncate">{workflow.server.name}</span>
-                            {getStatusBadge(workflow.server.status)}
-                          </div>
-                        )}
-                        
-                        {workflow.modelInstances && workflow.modelInstances.length > 0 && (
-                          <div className="flex items-center gap-1">
-                            <FileText className="h-3 w-3" />
-                            <span>{workflow.modelInstances.length} models</span>
-                          </div>
+                        {workflow.description && (
+                          <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1">
+                            {workflow.description}
+                          </p>
                         )}
                       </div>
-                      
-                      {workflow.description && (
-                        <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-1 mb-2">
-                          {workflow.description}
-                        </p>
+                    </TableCell>
+                    
+                    <TableCell>
+                      {workflow.category ? (
+                        <Badge variant="secondary" className="text-xs">
+                          {workflow.category}
+                        </Badge>
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
                       )}
-                      
-                      {workflow.modelInstances && workflow.modelInstances.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {workflow.modelInstances.slice(0, 4).map((model) => (
-                            <div key={model.id} className="flex items-center gap-1">
-                              {getStatusBadge(model.status)}
-                            </div>
-                          ))}
-                          {workflow.modelInstances.length > 4 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{workflow.modelInstances.length - 4} more
-                            </Badge>
-                          )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      {workflow.server ? (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm truncate max-w-[120px]">
+                            {workflow.server.name}
+                          </span>
+                          {getStatusBadge(workflow.server.status)}
                         </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
                       )}
-                    </div>
+                    </TableCell>
+                    
+                    <TableCell>
+                      {workflow.modelInstances && workflow.modelInstances.length > 0 ? (
+                        <div className="space-y-1">
+                          <span className="text-sm font-medium">
+                            {workflow.modelInstances.length} models
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {workflow.modelInstances.slice(0, 3).map((model) => (
+                              <div key={model.id}>
+                                {getStatusBadge(model.status)}
+                              </div>
+                            ))}
+                            {workflow.modelInstances.length > 3 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{workflow.modelInstances.length - 3}
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">—</span>
+                      )}
+                    </TableCell>
+                    
+                    <TableCell>
+                      <span className="text-sm text-gray-600 dark:text-gray-400">
+                        {new Date(workflow.createdAt).toLocaleDateString()}
+                      </span>
+                    </TableCell>
+                    
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-1">
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setSelectedWorkflow(workflow)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                            <DialogHeader>
+                              <DialogTitle>Workflow Details: {selectedWorkflow?.name}</DialogTitle>
+                            </DialogHeader>
+                            {selectedWorkflow && (
+                              <WorkflowDetailsModal 
+                                workflow={selectedWorkflow} 
+                                onSync={() => syncModelsMutation.mutate(selectedWorkflow.id)}
+                                syncPending={syncModelsMutation.isPending}
+                              />
+                            )}
+                          </DialogContent>
+                        </Dialog>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 ml-4">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedWorkflow(workflow)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-                          <DialogHeader>
-                            <DialogTitle>Workflow Details: {selectedWorkflow?.name}</DialogTitle>
-                          </DialogHeader>
-                          {selectedWorkflow && (
-                            <WorkflowDetailsModal 
-                              workflow={selectedWorkflow} 
-                              onSync={() => syncModelsMutation.mutate(selectedWorkflow.id)}
-                              syncPending={syncModelsMutation.isPending}
-                            />
-                          )}
-                        </DialogContent>
-                      </Dialog>
-
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const blob = new Blob([workflow.workflowJson], { type: 'application/json' });
-                          const url = URL.createObjectURL(blob);
-                          const a = document.createElement('a');
-                          a.href = url;
-                          a.download = `${workflow.name}.json`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
-                        }}
-                      >
-                        <Download className="h-4 w-4" />
-                      </Button>
-
-                      {workflow.modelInstances && workflow.modelInstances.length > 0 && (
                         <Button
-                          variant="outline"
+                          variant="ghost"
                           size="sm"
-                          onClick={() => syncModelsMutation.mutate(workflow.id)}
-                          disabled={syncModelsMutation.isPending}
+                          onClick={() => {
+                            const blob = new Blob([workflow.workflowJson], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `${workflow.name}.json`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          }}
                         >
-                          {syncModelsMutation.isPending ? (
-                            <RefreshCw className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <RefreshCw className="h-4 w-4" />
-                          )}
+                          <Download className="h-4 w-4" />
                         </Button>
-                      )}
 
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => deleteWorkflowMutation.mutate(workflow.id)}
-                        disabled={deleteWorkflowMutation.isPending}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                        {workflow.modelInstances && workflow.modelInstances.length > 0 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => syncModelsMutation.mutate(workflow.id)}
+                            disabled={syncModelsMutation.isPending}
+                          >
+                            {syncModelsMutation.isPending ? (
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <RefreshCw className="h-4 w-4" />
+                            )}
+                          </Button>
+                        )}
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteWorkflowMutation.mutate(workflow.id)}
+                          disabled={deleteWorkflowMutation.isPending}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>

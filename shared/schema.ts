@@ -314,6 +314,49 @@ export const insertWorkflowAnalysisSchema = createInsertSchema(workflowAnalysis)
 export type WorkflowAnalysis = typeof workflowAnalysis.$inferSelect;
 export type InsertWorkflowAnalysis = z.infer<typeof insertWorkflowAnalysisSchema>;
 
+// Server Mood Configurations
+export const serverMoods = pgTable("server_moods", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  description: text("description"),
+  icon: text("icon").notNull(), // Lucide icon name
+  color: text("color").notNull(), // Tailwind color class
+  category: text("category").notNull(), // "productivity", "gaming", "ai", "development"
+  configuration: jsonb("configuration").notNull(), // Settings to apply
+  isBuiltIn: boolean("is_built_in").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Server Mood Applications (history of applied moods)
+export const serverMoodApplications = pgTable("server_mood_applications", {
+  id: serial("id").primaryKey(),
+  serverId: integer("server_id").notNull().references(() => vastServers.id),
+  moodId: integer("mood_id").notNull().references(() => serverMoods.id),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
+  appliedBy: integer("applied_by").references(() => users.id),
+  previousConfiguration: jsonb("previous_configuration"), // Backup of previous settings
+  status: text("status").notNull().default("applied"), // applied, failed, reverted
+  notes: text("notes"),
+});
+
+export const insertServerMoodSchema = createInsertSchema(serverMoods).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertServerMoodApplicationSchema = createInsertSchema(serverMoodApplications).omit({
+  id: true,
+  appliedAt: true,
+});
+
+export type ServerMood = typeof serverMoods.$inferSelect;
+export type InsertServerMood = z.infer<typeof insertServerMoodSchema>;
+export type ServerMoodApplication = typeof serverMoodApplications.$inferSelect;
+export type InsertServerMoodApplication = z.infer<typeof insertServerMoodApplicationSchema>;
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
 

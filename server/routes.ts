@@ -2119,6 +2119,158 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  // Server Mood Configurator API Routes
+  app.get('/api/server-moods', async (req: Request, res: Response) => {
+    try {
+      const moods = await storage.getServerMoods();
+      res.json(moods);
+    } catch (error) {
+      console.error('Error fetching server moods:', error);
+      res.status(500).json({ error: 'Failed to fetch server moods' });
+    }
+  });
+
+  app.get('/api/server-moods/category/:category', async (req: Request, res: Response) => {
+    try {
+      const category = req.params.category;
+      const moods = await storage.getServerMoodsByCategory(category);
+      res.json(moods);
+    } catch (error) {
+      console.error('Error fetching moods by category:', error);
+      res.status(500).json({ error: 'Failed to fetch moods' });
+    }
+  });
+
+  app.get('/api/server-moods/applications/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const applications = await storage.getServerMoodApplications(serverId);
+      res.json(applications);
+    } catch (error) {
+      console.error('Error fetching mood applications:', error);
+      res.status(500).json({ error: 'Failed to fetch mood applications' });
+    }
+  });
+
+  app.get('/api/server-moods/current/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const currentMood = await storage.getCurrentServerMood(serverId);
+      res.json(currentMood || null);
+    } catch (error) {
+      console.error('Error fetching current mood:', error);
+      res.status(500).json({ error: 'Failed to fetch current mood' });
+    }
+  });
+
+  app.post('/api/server-moods/apply', async (req: Request, res: Response) => {
+    try {
+      const { serverId, moodId } = req.body;
+      
+      if (!serverId || !moodId) {
+        return res.status(400).json({ error: 'Server ID and Mood ID are required' });
+      }
+
+      // Get the mood configuration
+      const mood = await storage.getServerMood(moodId);
+      if (!mood) {
+        return res.status(404).json({ error: 'Mood not found' });
+      }
+
+      // Get the server
+      const server = await storage.getVastServer(serverId);
+      if (!server) {
+        return res.status(404).json({ error: 'Server not found' });
+      }
+
+      // Create mood application record
+      const application = await storage.createServerMoodApplication({
+        serverId,
+        moodId,
+        appliedBy: null, // TODO: Get from session when auth is implemented
+        previousConfiguration: server.metadata || {},
+        status: 'applied',
+        notes: `Applied ${mood.name} configuration`
+      });
+
+      // In a real implementation, this would apply the configuration to the actual server
+      // For now, we'll simulate the configuration application
+      console.log(`Applying mood "${mood.name}" to server ${serverId}:`, mood.configuration);
+
+      res.json({
+        success: true,
+        message: `${mood.name} configuration applied successfully`,
+        application
+      });
+    } catch (error) {
+      console.error('Error applying mood:', error);
+      res.status(500).json({ error: 'Failed to apply mood configuration' });
+    }
+  });
+
+  app.post('/api/server-moods/revert/:applicationId', async (req: Request, res: Response) => {
+    try {
+      const applicationId = parseInt(req.params.applicationId);
+      const reverted = await storage.revertServerMoodApplication(applicationId);
+      
+      if (!reverted) {
+        return res.status(404).json({ error: 'Application not found' });
+      }
+
+      res.json({
+        success: true,
+        message: 'Configuration reverted successfully'
+      });
+    } catch (error) {
+      console.error('Error reverting mood:', error);
+      res.status(500).json({ error: 'Failed to revert configuration' });
+    }
+  });
+
+  app.post('/api/server-moods', async (req: Request, res: Response) => {
+    try {
+      const moodData = req.body;
+      const mood = await storage.createServerMood(moodData);
+      res.status(201).json(mood);
+    } catch (error) {
+      console.error('Error creating mood:', error);
+      res.status(500).json({ error: 'Failed to create mood' });
+    }
+  });
+
+  app.put('/api/server-moods/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const moodData = req.body;
+      const mood = await storage.updateServerMood(id, moodData);
+      
+      if (!mood) {
+        return res.status(404).json({ error: 'Mood not found' });
+      }
+
+      res.json(mood);
+    } catch (error) {
+      console.error('Error updating mood:', error);
+      res.status(500).json({ error: 'Failed to update mood' });
+    }
+  });
+
+  app.delete('/api/server-moods/:id', async (req: Request, res: Response) => {
+    try {
+      const id = parseInt(req.params.id);
+      const deleted = await storage.deleteServerMood(id);
+      
+      if (!deleted) {
+        return res.status(404).json({ error: 'Mood not found' });
+      }
+
+      res.json({ success: true, message: 'Mood deleted successfully' });
+    } catch (error) {
+      console.error('Error deleting mood:', error);
+      res.status(500).json({ error: 'Failed to delete mood' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time logs

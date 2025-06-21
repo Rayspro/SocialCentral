@@ -13,6 +13,8 @@ import {
   comfyGenerations,
   auditLogs,
   workflowAnalysis,
+  serverMoods,
+  serverMoodApplications,
   type User,
   type InsertUser,
   type Platform,
@@ -41,6 +43,10 @@ import {
   type InsertAuditLog,
   type WorkflowAnalysis,
   type InsertWorkflowAnalysis,
+  type ServerMood,
+  type InsertServerMood,
+  type ServerMoodApplication,
+  type InsertServerMoodApplication,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
@@ -151,6 +157,20 @@ export interface IStorage {
   getAuditLogsByUser(userId: number, limit?: number): Promise<AuditLog[]>;
   getAuditLogsByResource(resource: string, resourceId?: string): Promise<AuditLog[]>;
   createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog>;
+
+  // Server Mood methods
+  getServerMoods(): Promise<ServerMood[]>;
+  getServerMood(id: number): Promise<ServerMood | undefined>;
+  getServerMoodsByCategory(category: string): Promise<ServerMood[]>;
+  createServerMood(mood: InsertServerMood): Promise<ServerMood>;
+  updateServerMood(id: number, mood: Partial<InsertServerMood>): Promise<ServerMood | undefined>;
+  deleteServerMood(id: number): Promise<boolean>;
+  
+  // Server Mood Application methods
+  getServerMoodApplications(serverId: number): Promise<ServerMoodApplication[]>;
+  getCurrentServerMood(serverId: number): Promise<ServerMood | undefined>;
+  createServerMoodApplication(application: InsertServerMoodApplication): Promise<ServerMoodApplication>;
+  revertServerMoodApplication(applicationId: number): Promise<boolean>;
 
   // Stats
   getStats(): Promise<{
@@ -562,6 +582,215 @@ echo "It will start automatically when you connect to the server"`,
   private comfyModels: ComfyModel[] = [];
   private comfyWorkflows: ComfyWorkflow[] = [];
   private comfyGenerations: ComfyGeneration[] = [];
+  private auditLogs: AuditLog[] = [];
+  private workflowAnalyses: WorkflowAnalysis[] = [];
+  private serverMoods: ServerMood[] = [
+    {
+      id: 1,
+      name: "AI Powerhouse",
+      description: "Optimized for AI/ML workloads with maximum GPU utilization",
+      icon: "brain",
+      color: "purple",
+      category: "ai",
+      configuration: {
+        comfySettings: {
+          autoStartup: true,
+          modelPresets: ["sd_xl_base", "sd_xl_refiner"],
+          workflowTemplates: ["text2img", "img2img"],
+          performanceMode: "maximum"
+        },
+        systemSettings: {
+          ramAllocation: "80%",
+          gpuBoost: true,
+          cpuPriority: "high",
+          storageOptimization: true
+        },
+        networkSettings: {
+          bandwidth: "unlimited",
+          latencyOptimization: true,
+          portForwarding: ["8188", "7860"]
+        }
+      },
+      isBuiltIn: true,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 2,
+      name: "Gaming Beast",
+      description: "High-performance gaming configuration with low latency",
+      icon: "gamepad",
+      color: "red",
+      category: "gaming",
+      configuration: {
+        comfySettings: {
+          autoStartup: false,
+          modelPresets: [],
+          workflowTemplates: [],
+          performanceMode: "gaming"
+        },
+        systemSettings: {
+          ramAllocation: "90%",
+          gpuBoost: true,
+          cpuPriority: "realtime",
+          storageOptimization: false
+        },
+        networkSettings: {
+          bandwidth: "unlimited",
+          latencyOptimization: true,
+          portForwarding: ["25565", "27015", "7777"]
+        }
+      },
+      isBuiltIn: true,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 3,
+      name: "Developer Focus",
+      description: "Balanced setup for coding and development work",
+      icon: "code",
+      color: "blue",
+      category: "development",
+      configuration: {
+        comfySettings: {
+          autoStartup: false,
+          modelPresets: [],
+          workflowTemplates: [],
+          performanceMode: "balanced"
+        },
+        systemSettings: {
+          ramAllocation: "70%",
+          gpuBoost: false,
+          cpuPriority: "normal",
+          storageOptimization: true
+        },
+        networkSettings: {
+          bandwidth: "normal",
+          latencyOptimization: false,
+          portForwarding: ["3000", "8080", "5000"]
+        }
+      },
+      isBuiltIn: true,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 4,
+      name: "Productivity Pro",
+      description: "Optimized for work and productivity applications",
+      icon: "target",
+      color: "green",
+      category: "productivity",
+      configuration: {
+        comfySettings: {
+          autoStartup: false,
+          modelPresets: [],
+          workflowTemplates: [],
+          performanceMode: "efficiency"
+        },
+        systemSettings: {
+          ramAllocation: "60%",
+          gpuBoost: false,
+          cpuPriority: "normal",
+          storageOptimization: true
+        },
+        networkSettings: {
+          bandwidth: "normal",
+          latencyOptimization: false,
+          portForwarding: ["80", "443"]
+        }
+      },
+      isBuiltIn: true,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 5,
+      name: "Creative Studio",
+      description: "Perfect for creative work with ComfyUI and media processing",
+      icon: "sparkles",
+      color: "pink",
+      category: "ai",
+      configuration: {
+        comfySettings: {
+          autoStartup: true,
+          modelPresets: ["sd_xl_base", "controlnet", "lora_models"],
+          workflowTemplates: ["creative_workflow", "batch_processing"],
+          performanceMode: "creative"
+        },
+        systemSettings: {
+          ramAllocation: "75%",
+          gpuBoost: true,
+          cpuPriority: "high",
+          storageOptimization: false
+        },
+        networkSettings: {
+          bandwidth: "high",
+          latencyOptimization: true,
+          portForwarding: ["8188", "8080"]
+        }
+      },
+      isBuiltIn: true,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    },
+    {
+      id: 6,
+      name: "Speed Demon",
+      description: "Maximum performance for demanding computational tasks",
+      icon: "rocket",
+      color: "orange",
+      category: "ai",
+      configuration: {
+        comfySettings: {
+          autoStartup: true,
+          modelPresets: ["fastest_models"],
+          workflowTemplates: ["speed_optimized"],
+          performanceMode: "turbo"
+        },
+        systemSettings: {
+          ramAllocation: "95%",
+          gpuBoost: true,
+          cpuPriority: "realtime",
+          storageOptimization: false
+        },
+        networkSettings: {
+          bandwidth: "unlimited",
+          latencyOptimization: true,
+          portForwarding: ["8188"]
+        }
+      },
+      isBuiltIn: true,
+      isActive: true,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    }
+  ];
+  private serverMoodApplications: ServerMoodApplication[] = [];
+
+  private nextId = 1;
+  private nextUserId = 2;
+  private nextPlatformId = 5;
+  private nextAccountId = 5;
+  private nextContentId = 2;
+  private nextScheduleId = 1;
+  private nextApiKeyId = 1;
+  private nextVastServerId = 1;
+  private nextSetupScriptId = 4;
+  private nextServerExecutionId = 1;
+  private nextComfyModelId = 1;
+  private nextComfyWorkflowId = 1;
+  private nextComfyGenerationId = 1;
+  private nextAuditLogId = 1;
+  private nextWorkflowAnalysisId = 1;
+  private nextMoodId = 7;
+  private nextMoodApplicationId = 1;
 
   async getUser(id: number): Promise<User | undefined> {
     return this.users.find(u => u.id === id);
@@ -1055,118 +1284,167 @@ echo "It will start automatically when you connect to the server"`,
     return true;
   }
 
-  // Audit Log methods
-  private auditLogs: AuditLog[] = [
-    {
-      id: 1,
-      category: 'user_action',
-      userId: 1,
-      action: 'user_login',
-      resource: 'authentication',
-      resourceId: null,
-      details: { success: true, method: 'password' },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      timestamp: new Date(Date.now() - 2 * 60 * 1000), // 2 minutes ago
-      severity: 'info'
-    },
-    {
-      id: 2,
-      category: 'system_event',
-      userId: 1,
-      action: 'server_create',
-      resource: 'vast_server',
-      resourceId: 'demo_server_1',
-      details: { gpuType: 'RTX 4090', pricePerHour: 1.5, location: 'US-Central' },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000), // 5 minutes ago
-      severity: 'info'
-    },
-    {
-      id: 3,
-      category: 'security_event',
-      userId: null,
-      action: 'failed_login_attempt',
-      resource: 'authentication',
-      resourceId: null,
-      details: { email: 'invalid@example.com', reason: 'invalid_credentials' },
-      ipAddress: '192.168.1.101',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      timestamp: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
-      severity: 'warning'
-    },
-    {
-      id: 4,
-      category: 'user_action',
-      userId: 1,
-      action: 'comfy_generation',
-      resource: 'comfy_ui',
-      resourceId: 'gen_123',
-      details: { prompt: 'A beautiful landscape', model: 'SDXL', steps: 20 },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
-      severity: 'info'
-    },
-    {
-      id: 5,
-      category: 'system_event',
-      userId: 1,
-      action: 'api_key_update',
-      resource: 'settings',
-      resourceId: 'vast_ai',
-      details: { service: 'vast_ai', action: 'key_updated' },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-      severity: 'info'
-    },
-    {
-      id: 6,
-      category: 'system_event',
-      userId: 1,
-      action: 'server_stop',
-      resource: 'vast_server',
-      resourceId: 'demo_server_2',
-      details: { reason: 'user_requested', uptime_hours: 2.5 },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      timestamp: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
-      severity: 'info'
-    },
-    {
-      id: 7,
-      category: 'security_event',
-      userId: 1,
-      action: 'unusual_activity',
-      resource: 'user_behavior',
-      resourceId: null,
-      details: { activity: 'multiple_rapid_requests', count: 50, timeframe: '5_minutes' },
-      ipAddress: '192.168.1.100',
-      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      timestamp: new Date(Date.now() - 60 * 60 * 1000), // 1 hour ago
-      severity: 'warning'
-    },
-    {
-      id: 8,
-      category: 'system_event',
-      userId: null,
-      action: 'system_error',
-      resource: 'vast_api',
-      resourceId: null,
-      details: { error: 'connection_timeout', endpoint: '/instances', retry_count: 3 },
-      ipAddress: null,
-      userAgent: null,
-      timestamp: new Date(Date.now() - 90 * 60 * 1000), // 1.5 hours ago
-      severity: 'error'
-    }
-  ];
+  async getAuditLogs(): Promise<AuditLog[]> {
+    return this.auditLogs;
+  }
 
-  async getAuditLogs(limit: number = 100, offset: number = 0): Promise<AuditLog[]> {
-    return this.auditLogs
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(offset, offset + limit);
+  async createAuditLog(auditLogData: InsertAuditLog): Promise<AuditLog> {
+    const auditLog = {
+      id: this.nextAuditLogId++,
+      ...auditLogData,
+      timestamp: auditLogData.timestamp || new Date(),
+    };
+    this.auditLogs.push(auditLog);
+    return auditLog;
+  }
+
+  // Workflow Analysis methods
+  async getWorkflowAnalyses(): Promise<WorkflowAnalysis[]> {
+    return this.workflowAnalyses;
+  }
+
+  async getWorkflowAnalysis(serverId: number): Promise<WorkflowAnalysis[]> {
+    return this.workflowAnalyses.filter(wa => wa.serverId === serverId);
+  }
+
+  async getWorkflowAnalysisById(id: number): Promise<WorkflowAnalysis | undefined> {
+    return this.workflowAnalyses.find(wa => wa.id === id);
+  }
+
+  async createWorkflowAnalysis(analysisData: InsertWorkflowAnalysis): Promise<WorkflowAnalysis> {
+    const analysis = {
+      id: this.nextWorkflowAnalysisId++,
+      ...analysisData,
+      analysisStatus: analysisData.analysisStatus || 'pending',
+      downloadStatus: analysisData.downloadStatus || 'pending',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.workflowAnalyses.push(analysis);
+    return analysis;
+  }
+
+  async updateWorkflowAnalysis(id: number, analysisData: Partial<InsertWorkflowAnalysis>): Promise<WorkflowAnalysis | undefined> {
+    const index = this.workflowAnalyses.findIndex(wa => wa.id === id);
+    if (index === -1) return undefined;
+
+    this.workflowAnalyses[index] = {
+      ...this.workflowAnalyses[index],
+      ...analysisData,
+      updatedAt: new Date(),
+    };
+    return this.workflowAnalyses[index];
+  }
+
+  async deleteWorkflowAnalysis(id: number): Promise<boolean> {
+    const index = this.workflowAnalyses.findIndex(wa => wa.id === id);
+    if (index === -1) return false;
+
+    this.workflowAnalyses.splice(index, 1);
+    return true;
+  }
+
+  // Enhanced Model methods
+  async searchComfyModels(query: string): Promise<ComfyModel[]> {
+    return this.comfyModels.filter(model => 
+      model.name.toLowerCase().includes(query.toLowerCase()) ||
+      (model.description && model.description.toLowerCase().includes(query.toLowerCase()))
+    );
+  }
+
+  async getModelsByStatus(status: string): Promise<ComfyModel[]> {
+    return this.comfyModels.filter(model => model.status === status);
+  }
+
+  // Server Mood Configurator methods
+  async getServerMoods(): Promise<ServerMood[]> {
+    return this.serverMoods;
+  }
+
+  async getServerMood(id: number): Promise<ServerMood | undefined> {
+    return this.serverMoods.find(mood => mood.id === id);
+  }
+
+  async getServerMoodsByCategory(category: string): Promise<ServerMood[]> {
+    return this.serverMoods.filter(mood => mood.category === category);
+  }
+
+  async createServerMood(moodData: InsertServerMood): Promise<ServerMood> {
+    const mood = {
+      id: this.nextMoodId++,
+      ...moodData,
+      isActive: moodData.isActive ?? true,
+      isBuiltIn: moodData.isBuiltIn ?? false,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    this.serverMoods.push(mood);
+    return mood;
+  }
+
+  async updateServerMood(id: number, moodData: Partial<InsertServerMood>): Promise<ServerMood | undefined> {
+    const index = this.serverMoods.findIndex(mood => mood.id === id);
+    if (index === -1) return undefined;
+
+    this.serverMoods[index] = {
+      ...this.serverMoods[index],
+      ...moodData,
+      updatedAt: new Date(),
+    };
+    return this.serverMoods[index];
+  }
+
+  async deleteServerMood(id: number): Promise<boolean> {
+    const index = this.serverMoods.findIndex(mood => mood.id === id);
+    if (index === -1) return false;
+
+    this.serverMoods.splice(index, 1);
+    return true;
+  }
+
+  // Server Mood Application methods
+  async getServerMoodApplications(serverId: number): Promise<ServerMoodApplication[]> {
+    return this.serverMoodApplications
+      .filter(app => app.serverId === serverId)
+      .sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime());
+  }
+
+  async getCurrentServerMood(serverId: number): Promise<ServerMood | undefined> {
+    const applications = this.serverMoodApplications
+      .filter(app => app.serverId === serverId && app.status === 'applied')
+      .sort((a, b) => b.appliedAt.getTime() - a.appliedAt.getTime());
+    
+    if (applications.length === 0) return undefined;
+    
+    return this.serverMoods.find(mood => mood.id === applications[0].moodId);
+  }
+
+  async createServerMoodApplication(applicationData: InsertServerMoodApplication): Promise<ServerMoodApplication> {
+    const application = {
+      id: this.nextMoodApplicationId++,
+      ...applicationData,
+      status: applicationData.status || 'applied',
+      appliedAt: new Date(),
+    };
+    this.serverMoodApplications.push(application);
+    return application;
+  }
+
+  async revertServerMoodApplication(applicationId: number): Promise<boolean> {
+    const application = this.serverMoodApplications.find(app => app.id === applicationId);
+    if (!application) return false;
+
+    application.status = 'reverted';
+    return true;
+  }
+
+  // Additional methods required by IStorage interface
+  async getComfyModelsByServerAndFolder(serverId: number, folder: string): Promise<ComfyModel[]> {
+    return this.comfyModels.filter(m => m.serverId === serverId && m.folder === folder);
+  }
+
+  async getComfyModelByNameAndServer(name: string, serverId: number): Promise<ComfyModel | undefined> {
+    return this.comfyModels.find(m => m.name === name && m.serverId === serverId);
   }
 
   async getAuditLogsByUser(userId: number, limit: number = 50): Promise<AuditLog[]> {
@@ -1185,83 +1463,6 @@ echo "It will start automatically when you connect to the server"`,
         return log.resource === resource;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }
-
-  async createAuditLog(auditLog: InsertAuditLog): Promise<AuditLog> {
-    const newAuditLog: AuditLog = {
-      id: this.auditLogs.length + 9,
-      category: auditLog.category || 'system_event',
-      userId: auditLog.userId || null,
-      action: auditLog.action,
-      resource: auditLog.resource,
-      resourceId: auditLog.resourceId || null,
-      details: auditLog.details || {},
-      ipAddress: auditLog.ipAddress || null,
-      userAgent: auditLog.userAgent || null,
-      timestamp: new Date(),
-      severity: auditLog.severity || 'info',
-    };
-    this.auditLogs.unshift(newAuditLog); // Add to beginning for chronological order
-    return newAuditLog;
-  }
-
-  // Workflow Analysis methods
-  private workflowAnalysis: WorkflowAnalysis[] = [];
-
-  async getWorkflowAnalysis(serverId: number): Promise<WorkflowAnalysis[]> {
-    return this.workflowAnalysis.filter(w => w.serverId === serverId);
-  }
-
-  async getWorkflowAnalysisById(id: number): Promise<WorkflowAnalysis | undefined> {
-    return this.workflowAnalysis.find(w => w.id === id);
-  }
-
-  async createWorkflowAnalysis(analysis: InsertWorkflowAnalysis): Promise<WorkflowAnalysis> {
-    const newAnalysis: WorkflowAnalysis = {
-      ...analysis,
-      id: this.workflowAnalysis.length + 1,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    this.workflowAnalysis.push(newAnalysis);
-    return newAnalysis;
-  }
-
-  async updateWorkflowAnalysis(id: number, analysis: Partial<InsertWorkflowAnalysis>): Promise<WorkflowAnalysis | undefined> {
-    const index = this.workflowAnalysis.findIndex(w => w.id === id);
-    if (index === -1) return undefined;
-
-    this.workflowAnalysis[index] = { ...this.workflowAnalysis[index], ...analysis, updatedAt: new Date() };
-    return this.workflowAnalysis[index];
-  }
-
-  async deleteWorkflowAnalysis(id: number): Promise<boolean> {
-    const index = this.workflowAnalysis.findIndex(w => w.id === id);
-    if (index === -1) return false;
-
-    this.workflowAnalysis.splice(index, 1);
-    return true;
-  }
-
-  // Enhanced Model Management methods
-  async getComfyModelsByServerAndFolder(serverId: number, folder: string): Promise<ComfyModel[]> {
-    return this.comfyModels.filter(m => m.serverId === serverId && m.folder === folder);
-  }
-
-  async getComfyModelByNameAndServer(name: string, serverId: number): Promise<ComfyModel | undefined> {
-    return this.comfyModels.find(m => m.name === name && m.serverId === serverId);
-  }
-
-  async searchComfyModels(query: string): Promise<ComfyModel[]> {
-    const lowerQuery = query.toLowerCase();
-    return this.comfyModels.filter(m => 
-      m.name.toLowerCase().includes(lowerQuery) || 
-      (m.description && m.description.toLowerCase().includes(lowerQuery))
-    );
-  }
-
-  async getModelsByStatus(status: string): Promise<ComfyModel[]> {
-    return this.comfyModels.filter(m => m.status === status);
   }
 }
 

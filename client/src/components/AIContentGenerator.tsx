@@ -6,19 +6,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { 
   Sparkles, 
   Type, 
   Image as ImageIcon, 
-  Video, 
   Wand2, 
   Copy,
   RefreshCw,
   Download
 } from "lucide-react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -37,11 +35,6 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
   const [enhancePlatform, setEnhancePlatform] = useState("instagram");
   const [enhanceObjective, setEnhanceObjective] = useState("increase engagement");
   const [enhancedText, setEnhancedText] = useState("");
-  
-  const [imagePrompt, setImagePrompt] = useState("");
-  const [imageStyle, setImageStyle] = useState("realistic");
-  const [imageSize, setImageSize] = useState("1024x1024");
-  const [generatedImageUrl, setGeneratedImageUrl] = useState("");
 
   const { toast } = useToast();
 
@@ -89,28 +82,6 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
     },
   });
 
-  const generateImageMutation = useMutation({
-    mutationFn: async (data: { prompt: string; style: string; size: string }) => {
-      return apiRequest("POST", "/api/content/generate-image", data);
-    },
-    onSuccess: (data: any) => {
-      if (data.imageUrl) {
-        setGeneratedImageUrl(data.imageUrl);
-        toast({
-          title: "Image generated successfully",
-          description: "AI-generated image is ready for use.",
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Image generation failed",
-        description: error.message || "Please check your OpenAI API key in Settings.",
-        variant: "destructive",
-      });
-    },
-  });
-
   const handleGenerateText = () => {
     if (!textPrompt.trim()) {
       toast({
@@ -141,22 +112,6 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
       text: enhanceText,
       platform: enhancePlatform,
       objective: enhanceObjective
-    });
-  };
-
-  const handleGenerateImage = () => {
-    if (!imagePrompt.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter a prompt for image generation.",
-        variant: "destructive",
-      });
-      return;
-    }
-    generateImageMutation.mutate({
-      prompt: imagePrompt,
-      style: imageStyle,
-      size: imageSize
     });
   };
 
@@ -396,100 +351,308 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
         </TabsContent>
 
         <TabsContent value="image" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ImageIcon className="h-4 w-4 text-green-600" />
-                Generate AI Images
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="image-prompt" className="text-xs">Image Description</Label>
-                <Textarea
-                  id="image-prompt"
-                  placeholder="Describe the image you want to create..."
-                  value={imagePrompt}
-                  onChange={(e) => setImagePrompt(e.target.value)}
-                  rows={3}
-                />
-              </div>
+          <ComfyUIImageGenerator />
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-xs">Style</Label>
-                  <Select value={imageStyle} onValueChange={setImageStyle}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="realistic">Realistic</SelectItem>
-                      <SelectItem value="artistic">Artistic</SelectItem>
-                      <SelectItem value="cartoon">Cartoon</SelectItem>
-                      <SelectItem value="digital art">Digital Art</SelectItem>
-                      <SelectItem value="photography">Photography</SelectItem>
-                      <SelectItem value="minimalist">Minimalist</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+function ComfyUIImageGenerator() {
+  const [selectedServer, setSelectedServer] = useState<string>("");
+  const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [generationId, setGenerationId] = useState<string | null>(null);
+  const { toast } = useToast();
 
-                <div className="space-y-2">
-                  <Label className="text-xs">Size</Label>
-                  <Select value={imageSize} onValueChange={setImageSize}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="1024x1024">Square (1024x1024)</SelectItem>
-                      <SelectItem value="1792x1024">Landscape (1792x1024)</SelectItem>
-                      <SelectItem value="1024x1792">Portrait (1024x1792)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
+  // Fetch available servers
+  const { data: servers = [], isLoading: serversLoading } = useQuery({
+    queryKey: ["/api/vast-servers"],
+    queryFn: async () => {
+      const response = await fetch("/api/vast-servers");
+      if (!response.ok) throw new Error("Failed to fetch servers");
+      return response.json();
+    },
+  });
 
-              <Button 
-                onClick={handleGenerateImage}
-                disabled={generateImageMutation.isPending}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-              >
-                {generateImageMutation.isPending ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <ImageIcon className="h-4 w-4 mr-2" />
-                    Generate Image
-                  </>
-                )}
-              </Button>
+  // Fetch available workflows
+  const { data: workflows = [], isLoading: workflowsLoading } = useQuery({
+    queryKey: ["/api/workflows/with-models"],
+    queryFn: async () => {
+      const response = await fetch("/api/workflows/with-models");
+      if (!response.ok) throw new Error("Failed to fetch workflows");
+      return response.json();
+    },
+  });
 
-              {generatedImageUrl && (
-                <div className="mt-4 p-4 bg-gray-50 dark:bg-slate-800 rounded-lg border">
-                  <div className="flex items-center justify-between mb-2">
-                    <Label className="text-sm font-medium">Generated Image</Label>
+  // Image generation mutation
+  const generateImageMutation = useMutation({
+    mutationFn: async (data: { serverId: string; workflowId: string; prompt: string }) => {
+      const response = await fetch(`/api/comfy/${data.serverId}/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: data.prompt,
+          workflowId: data.workflowId,
+        }),
+      });
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || "Failed to generate image");
+      }
+      return response.json();
+    },
+    onSuccess: (data) => {
+      setGenerationId(data.generationId);
+      toast({
+        title: "Image generation started",
+        description: "Your image is being generated. This may take a few minutes.",
+      });
+      // Start polling for results
+      pollGenerationStatus(data.generationId);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Generation failed",
+        description: error.message || "Failed to start image generation",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Poll generation status
+  const pollGenerationStatus = async (genId: string) => {
+    const pollInterval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/comfy/generation/${genId}`);
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        
+        if (data.status === "completed" && data.imageUrls && data.imageUrls.length > 0) {
+          setGeneratedImages(data.imageUrls);
+          setGenerationId(null);
+          clearInterval(pollInterval);
+          toast({
+            title: "Image generated successfully",
+            description: "Your AI-generated images are ready!",
+          });
+        } else if (data.status === "failed") {
+          setGenerationId(null);
+          clearInterval(pollInterval);
+          toast({
+            title: "Generation failed",
+            description: data.errorMessage || "Image generation failed",
+            variant: "destructive",
+          });
+        }
+      } catch (error) {
+        console.error("Error polling generation status:", error);
+      }
+    }, 3000);
+
+    // Stop polling after 5 minutes
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      if (generationId === genId) {
+        setGenerationId(null);
+        toast({
+          title: "Generation timeout",
+          description: "Image generation is taking longer than expected",
+          variant: "destructive",
+        });
+      }
+    }, 300000);
+  };
+
+  const handleGenerateImage = () => {
+    if (!selectedServer) {
+      toast({
+        title: "Server required",
+        description: "Please select a server for image generation",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!selectedWorkflow) {
+      toast({
+        title: "Workflow required", 
+        description: "Please select a workflow for image generation",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!imagePrompt.trim()) {
+      toast({
+        title: "Prompt required",
+        description: "Please enter a description for your image",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    generateImageMutation.mutate({
+      serverId: selectedServer,
+      workflowId: selectedWorkflow,
+      prompt: imagePrompt,
+    });
+  };
+
+  const runningServers = servers.filter((server: any) => server.status === "running");
+  const availableWorkflows = workflows.filter((workflow: any) => 
+    !selectedServer || workflow.serverId?.toString() === selectedServer
+  );
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ImageIcon className="h-4 w-4 text-green-600" />
+          Generate AI Images with ComfyUI
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Server Selection */}
+        <div className="space-y-2">
+          <Label className="text-xs">Select Server Instance</Label>
+          <Select value={selectedServer} onValueChange={setSelectedServer}>
+            <SelectTrigger>
+              <SelectValue placeholder={serversLoading ? "Loading servers..." : "Choose a running server"} />
+            </SelectTrigger>
+            <SelectContent>
+              {runningServers.length === 0 ? (
+                <SelectItem value="none" disabled>
+                  No running servers available
+                </SelectItem>
+              ) : (
+                runningServers.map((server: any) => (
+                  <SelectItem key={server.id} value={server.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      {server.name} ({server.gpu})
+                    </div>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Workflow Selection */}
+        <div className="space-y-2">
+          <Label className="text-xs">Select Workflow</Label>
+          <Select 
+            value={selectedWorkflow} 
+            onValueChange={setSelectedWorkflow}
+            disabled={!selectedServer}
+          >
+            <SelectTrigger>
+              <SelectValue placeholder={workflowsLoading ? "Loading workflows..." : "Choose a workflow"} />
+            </SelectTrigger>
+            <SelectContent>
+              {availableWorkflows.length === 0 ? (
+                <SelectItem value="none" disabled>
+                  {selectedServer ? "No workflows available for this server" : "Select a server first"}
+                </SelectItem>
+              ) : (
+                availableWorkflows.map((workflow: any) => (
+                  <SelectItem key={workflow.id} value={workflow.id.toString()}>
+                    <div className="flex items-center gap-2">
+                      {workflow.isTemplate && (
+                        <Badge variant="outline" className="text-xs">Template</Badge>
+                      )}
+                      {workflow.name}
+                      {workflow.category && (
+                        <Badge variant="secondary" className="text-xs">{workflow.category}</Badge>
+                      )}
+                    </div>
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Image Prompt */}
+        <div className="space-y-2">
+          <Label htmlFor="image-prompt" className="text-xs">Image Description</Label>
+          <Textarea
+            id="image-prompt"
+            placeholder="Describe the image you want to create..."
+            value={imagePrompt}
+            onChange={(e) => setImagePrompt(e.target.value)}
+            rows={3}
+          />
+        </div>
+
+        {/* Generate Button */}
+        <Button 
+          onClick={handleGenerateImage}
+          disabled={generateImageMutation.isPending || !!generationId}
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+        >
+          {generateImageMutation.isPending || generationId ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              Generating Image...
+            </>
+          ) : (
+            <>
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Generate Image
+            </>
+          )}
+        </Button>
+
+        {/* Server Status Info */}
+        {selectedServer && (
+          <div className="text-xs text-gray-600 dark:text-gray-400 p-2 bg-blue-50 dark:bg-blue-900/20 rounded">
+            <strong>Server Info:</strong> {runningServers.find((s: any) => s.id.toString() === selectedServer)?.name} - 
+            Status: Running, GPU: {runningServers.find((s: any) => s.id.toString() === selectedServer)?.gpu}
+          </div>
+        )}
+
+        {/* Generated Images */}
+        {generatedImages.length > 0 && (
+          <div className="mt-6 space-y-3">
+            <Label className="text-sm font-medium">Generated Images</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {generatedImages.map((imageUrl, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={imageUrl}
+                    alt={`Generated image ${index + 1}`}
+                    className="w-full h-auto rounded-lg border shadow-sm"
+                    onError={(e) => {
+                      console.error("Image failed to load:", imageUrl);
+                      e.currentTarget.src = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjNmNGY2Ii8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzM3NDE1MSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIEZhaWxlZDwvdGV4dD48L3N2Zz4=";
+                    }}
+                  />
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => window.open(generatedImageUrl, '_blank')}
+                      className="bg-white/90 hover:bg-white"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = imageUrl;
+                        link.download = `generated-image-${index + 1}.png`;
+                        link.click();
+                      }}
                     >
                       <Download className="h-3 w-3 mr-1" />
                       Download
                     </Button>
                   </div>
-                  <img 
-                    src={generatedImageUrl} 
-                    alt="Generated content" 
-                    className="w-full max-w-md mx-auto rounded-lg border"
-                  />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

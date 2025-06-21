@@ -8,6 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import {
   Download,
@@ -26,6 +29,10 @@ import {
   SortAsc,
   Server,
   Database,
+  MoreVertical,
+  Edit2,
+  Calendar,
+  FileText,
 } from "lucide-react";
 import { ComfyModel } from "@shared/schema";
 
@@ -39,6 +46,9 @@ interface InstalledModel {
   size: string;
   path: string;
   lastModified: string;
+  status: 'ready' | 'downloading' | 'error' | 'pending';
+  progress?: number;
+  downloadDate?: string;
 }
 
 export function ModelManager({ serverId }: ModelManagerProps) {
@@ -46,6 +56,8 @@ export function ModelManager({ serverId }: ModelManagerProps) {
   const [selectedFolder, setSelectedFolder] = useState("all");
   const [sortBy, setSortBy] = useState("name");
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingModel, setEditingModel] = useState<InstalledModel | null>(null);
+  const [deleteModel, setDeleteModel] = useState<InstalledModel | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     url: "",
@@ -445,19 +457,31 @@ export function ModelManager({ serverId }: ModelManagerProps) {
 
         <TabsContent value="installed" className="space-y-4">
           {loadingInstalled ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {[...Array(6)].map((_, i) => (
-                <Card key={i} className="animate-pulse">
-                  <CardHeader className="space-y-2">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="h-3 bg-gray-200 rounded w-full mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Size</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...Array(6)].map((_, i) => (
+                    <TableRow key={i}>
+                      <TableCell><div className="h-4 bg-gray-200 rounded w-16 animate-pulse"></div></TableCell>
+                      <TableCell><div className="h-4 bg-gray-200 rounded w-32 animate-pulse"></div></TableCell>
+                      <TableCell><div className="h-4 bg-gray-200 rounded w-20 animate-pulse"></div></TableCell>
+                      <TableCell><div className="h-4 bg-gray-200 rounded w-16 animate-pulse"></div></TableCell>
+                      <TableCell><div className="h-4 bg-gray-200 rounded w-24 animate-pulse"></div></TableCell>
+                      <TableCell><div className="h-4 bg-gray-200 rounded w-8 animate-pulse"></div></TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           ) : filteredInstalledModels.length === 0 ? (
             <Card className="border-dashed">
@@ -474,36 +498,82 @@ export function ModelManager({ serverId }: ModelManagerProps) {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredInstalledModels.map((model: InstalledModel, index) => (
-                <Card key={index} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <CardTitle className="text-sm font-medium truncate">{model.name}</CardTitle>
-                        <CardDescription className="text-xs mt-1">
-                          {model.type} • {model.size}
-                        </CardDescription>
-                      </div>
-                      <Badge variant="secondary" className="ml-2 text-xs">
-                        Installed
-                      </Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="pt-0">
-                    <div className="space-y-2 text-xs text-muted-foreground">
-                      <div className="flex items-center gap-2">
-                        <FolderOpen className="h-3 w-3" />
-                        <span className="truncate">{model.path}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-3 w-3" />
-                        <span>Modified {model.lastModified}</span>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[80px]">Status</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="w-[120px]">Type</TableHead>
+                    <TableHead className="w-[100px]">Size</TableHead>
+                    <TableHead className="w-[140px]">Date</TableHead>
+                    <TableHead className="w-[100px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredInstalledModels.map((model: InstalledModel, index) => (
+                    <TableRow key={index} className="hover:bg-muted/50">
+                      <TableCell>
+                        <Badge 
+                          variant={model.status === 'ready' ? 'default' : 
+                                  model.status === 'downloading' ? 'secondary' : 
+                                  model.status === 'error' ? 'destructive' : 'outline'}
+                          className="text-xs"
+                        >
+                          {model.status === 'ready' && <CheckCircle className="h-3 w-3 mr-1" />}
+                          {model.status === 'downloading' && <Clock className="h-3 w-3 mr-1" />}
+                          {model.status === 'error' && <AlertCircle className="h-3 w-3 mr-1" />}
+                          {model.status || 'ready'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm truncate max-w-[200px]" title={model.name}>
+                            {model.name}
+                          </span>
+                          <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={model.path}>
+                            {model.path}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm capitalize">{model.type}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm">{model.size}</span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col">
+                          <span className="text-sm">{model.downloadDate || model.lastModified}</span>
+                          <span className="text-xs text-muted-foreground">Modified</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => setEditingModel(model)}>
+                              <Edit2 className="h-4 w-4 mr-2" />
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => setDeleteModel(model)}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
             </div>
           )}
         </TabsContent>
@@ -602,6 +672,90 @@ export function ModelManager({ serverId }: ModelManagerProps) {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Rename Model Dialog */}
+      <Dialog open={!!editingModel} onOpenChange={() => setEditingModel(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Model</DialogTitle>
+            <DialogDescription>
+              Enter a new name for the model "{editingModel?.name}".
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new-name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="new-name"
+                defaultValue={editingModel?.name}
+                className="col-span-3"
+                placeholder="Enter new model name"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditingModel(null)}>
+              Cancel
+            </Button>
+            <Button onClick={() => {
+              // TODO: Implement rename functionality
+              toast({
+                title: "Feature Coming Soon",
+                description: "Model renaming will be available in a future update.",
+              });
+              setEditingModel(null);
+            }}>
+              Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Model Dialog */}
+      <Dialog open={!!deleteModel} onOpenChange={() => setDeleteModel(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Model</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{deleteModel?.name}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="bg-muted/50 p-4 rounded-lg">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-medium">This will permanently remove:</p>
+                <ul className="text-sm text-muted-foreground space-y-1">
+                  <li>• Model file from ComfyUI instance</li>
+                  <li>• All associated data and configurations</li>
+                  <li>• Any workflows that depend on this model</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteModel(null)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                // TODO: Implement delete functionality
+                toast({
+                  title: "Feature Coming Soon",
+                  description: "Model deletion will be available in a future update.",
+                });
+                setDeleteModel(null);
+              }}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete Model
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

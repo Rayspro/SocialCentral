@@ -46,18 +46,31 @@ export default function WorkflowRecommendations({ userId }: WorkflowRecommendati
   // Generate new recommendations
   const generateRecommendations = useMutation({
     mutationFn: async () => {
-      return apiRequest(`/api/recommendations/${userId}/generate`, {
-        method: 'POST'
+      console.log('Generating recommendations for userId:', userId);
+      const response = await fetch(`/api/recommendations/${userId}/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       });
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', response.status, errorText);
+        throw new Error(`Failed to generate recommendations: ${errorText}`);
+      }
+      const result = await response.json();
+      console.log('Generated recommendations:', result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/recommendations', userId] });
       toast({
         title: "Recommendations Generated",
-        description: "New personalized workflow recommendations are ready!"
+        description: `Generated ${data.recommendations?.length || 0} new personalized workflow recommendations!`
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Mutation error:', error);
       toast({
         title: "Generation Failed",
         description: "Unable to generate recommendations. Please try again.",
@@ -73,10 +86,17 @@ export default function WorkflowRecommendations({ userId }: WorkflowRecommendati
       feedback: string;
       isUsed?: boolean;
     }) => {
-      return apiRequest(`/api/recommendations/${recommendationId}/feedback`, {
+      const response = await fetch(`/api/recommendations/${recommendationId}/feedback`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ feedback, isUsed })
       });
+      if (!response.ok) {
+        throw new Error('Failed to update feedback');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/recommendations', userId] });
@@ -141,7 +161,10 @@ export default function WorkflowRecommendations({ userId }: WorkflowRecommendati
           </p>
         </div>
         <Button
-          onClick={() => generateRecommendations.mutate()}
+          onClick={() => {
+            console.log('Generate button clicked');
+            generateRecommendations.mutate();
+          }}
           disabled={generateRecommendations.isPending}
           className="gap-2"
         >

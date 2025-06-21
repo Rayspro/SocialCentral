@@ -49,10 +49,17 @@ export default function Recommendations() {
   // Update user preferences
   const updatePreferences = useMutation({
     mutationFn: async (data: Partial<UserPreferences>) => {
-      return apiRequest(`/api/user-preferences/${userId}`, {
+      const response = await fetch(`/api/user-preferences/${userId}`, {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(data)
       });
+      if (!response.ok) {
+        throw new Error('Failed to update preferences');
+      }
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/user-preferences', userId] });

@@ -1811,6 +1811,31 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  app.get('/api/audit-logs', async (req: Request, res: Response) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const category = req.query.category as string;
+      const severity = req.query.severity as string;
+      
+      let logs = await storage.getAuditLogs(limit, offset);
+      
+      // Apply filters if provided
+      if (category && category !== 'all') {
+        logs = logs.filter(log => log.category === category);
+      }
+      
+      if (severity && severity !== 'all') {
+        logs = logs.filter(log => log.severity === severity);
+      }
+      
+      res.json(logs);
+    } catch (error) {
+      console.error('Error fetching audit logs:', error);
+      res.status(500).json({ error: 'Failed to fetch audit logs' });
+    }
+  });
+
   app.get('/api/audit-logs/summary', async (req: Request, res: Response) => {
     try {
       const logs = await storage.getAuditLogs(1000, 0);

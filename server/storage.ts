@@ -430,7 +430,112 @@ export class MemStorage implements IStorage {
     }
   ];
   private comfyGenerations: ComfyGeneration[] = [];
-  private auditLogs: AuditLog[] = [];
+  private auditLogs: AuditLog[] = [
+    {
+      id: 1,
+      category: 'user_action',
+      userId: 1,
+      action: 'login',
+      resource: 'authentication',
+      resourceId: null,
+      details: { success: true, method: 'password' },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
+      severity: 'info'
+    },
+    {
+      id: 2,
+      category: 'system_event',
+      userId: null,
+      action: 'server_launch',
+      resource: 'vast_server',
+      resourceId: '21548303',
+      details: { gpu: 'RTX 4090', status: 'success', contractId: '21548303' },
+      ipAddress: null,
+      userAgent: null,
+      timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000), // 1 hour ago
+      severity: 'info'
+    },
+    {
+      id: 3,
+      category: 'security_event',
+      userId: null,
+      action: 'api_key_access',
+      resource: 'vast_api',
+      resourceId: null,
+      details: { service: 'vast.ai', action: 'server_list' },
+      ipAddress: '10.0.0.1',
+      userAgent: 'SocialSync/1.0',
+      timestamp: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 4,
+      category: 'user_action',
+      userId: 1,
+      action: 'comfy_generation',
+      resource: 'ai_content',
+      resourceId: 'gen_001',
+      details: { prompt: 'beautiful landscape', workflow: 'text_to_image', status: 'completed' },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 15 * 60 * 1000), // 15 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 5,
+      category: 'system_event',
+      userId: null,
+      action: 'scheduler_start',
+      resource: 'server_scheduler',
+      resourceId: '1',
+      details: { serverId: 1, action: 'comfy_setup_monitoring' },
+      ipAddress: null,
+      userAgent: null,
+      timestamp: new Date(Date.now() - 45 * 60 * 1000), // 45 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 6,
+      category: 'user_action',
+      userId: 1,
+      action: 'workflow_upload',
+      resource: 'comfy_workflow',
+      resourceId: 'workflow_002',
+      details: { name: 'Custom Portrait Generator', nodes: 12, models: ['sdxl_base', 'sdxl_refiner'] },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 20 * 60 * 1000), // 20 minutes ago
+      severity: 'info'
+    },
+    {
+      id: 7,
+      category: 'security_event',
+      userId: 1,
+      action: 'api_key_update',
+      resource: 'api_keys',
+      resourceId: 'vast',
+      details: { service: 'vast.ai', action: 'key_updated' },
+      ipAddress: '192.168.1.100',
+      userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000), // 3 hours ago
+      severity: 'warning'
+    },
+    {
+      id: 8,
+      category: 'system_event',
+      userId: null,
+      action: 'model_download',
+      resource: 'comfy_model',
+      resourceId: 'sdxl_base_1.0',
+      details: { url: 'https://civitai.com/api/download/models/128713', size: '6.46 GB', progress: 100 },
+      ipAddress: null,
+      userAgent: null,
+      timestamp: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
+      severity: 'info'
+    }
+  ];
   private serverMoods: ServerMood[] = [];
   private serverMoodApplications: ServerMoodApplication[] = [];
   private workflowAnalyses: WorkflowAnalysis[] = [];

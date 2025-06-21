@@ -33,9 +33,13 @@ export default function WorkflowRecommendations({ userId }: WorkflowRecommendati
   const queryClient = useQueryClient();
 
   // Fetch user recommendations
-  const { data: recommendations = [], isLoading } = useQuery({
+  const { data: recommendations = [], isLoading } = useQuery<WorkflowRecommendation[]>({
     queryKey: ['/api/recommendations', userId],
-    enabled: !!userId
+    enabled: !!userId,
+    select: (data: any) => {
+      console.log('Raw recommendations data:', data);
+      return Array.isArray(data) ? data : [];
+    }
   });
 
   // Fetch trending workflows
@@ -180,6 +184,7 @@ export default function WorkflowRecommendations({ userId }: WorkflowRecommendati
         </TabsList>
 
         <TabsContent value="personal" className="space-y-4">
+          {console.log('Recommendations length:', recommendations.length, 'Recommendations:', recommendations)}
           {recommendations.length === 0 ? (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">

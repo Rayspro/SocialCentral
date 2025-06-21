@@ -86,6 +86,7 @@ export interface IStorage {
   // Vast server operations
   getVastServers(): Promise<VastServer[]>;
   getVastServer(id: number): Promise<VastServer | undefined>;
+  getVastServerByVastId(vastId: string): Promise<VastServer | undefined>;
   createVastServer(server: InsertVastServer): Promise<VastServer>;
   updateVastServer(id: number, server: Partial<InsertVastServer>): Promise<VastServer>;
   deleteVastServer(id: number): Promise<void>;
@@ -649,6 +650,10 @@ export class MemStorage implements IStorage {
 
   async getVastServer(id: number): Promise<VastServer | undefined> {
     return this.vastServers.find(s => s.id === id);
+  }
+
+  async getVastServerByVastId(vastId: string): Promise<VastServer | undefined> {
+    return this.vastServers.find(s => s.vastId === vastId);
   }
 
   async createVastServer(server: InsertVastServer): Promise<VastServer> {

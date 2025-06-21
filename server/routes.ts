@@ -29,7 +29,6 @@ import {
   autoSetupComfyUI,
 } from "./comfy-ui";
 import { startupComfyUI } from "./routes-comfy-startup";
-import { workflowAnalyzer } from "./workflow-analyzer";
 import { comfyDiagnostics } from "./comfy-diagnostics";
 import { comfyDirectTester } from "./comfy-direct-test";
 import { comfyFallback } from "./comfy-fallback";

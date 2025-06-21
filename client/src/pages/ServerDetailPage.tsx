@@ -10,6 +10,8 @@ import { LoadingMascot } from "@/components/ui/loading-mascot";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ThemeSwitcher } from "@/components/ThemeSwitcher";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { 
   Server, 
   ArrowLeft,
@@ -37,7 +39,8 @@ import {
   Home,
   ChevronRight,
   User,
-  LogOut
+  LogOut,
+  Bell
 } from "lucide-react";
 import { format } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
@@ -198,54 +201,73 @@ export function ServerDetailPage() {
   const isSetupComplete = serverData?.setupStatus === 'completed';
 
   return (
-    <div className="container mx-auto py-4 space-y-4">
-      {/* Header with Breadcrumb Navigation */}
-      <div className="flex items-center justify-between bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800 pb-4">
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <Home className="h-4 w-4" />
-          <ChevronRight className="h-4 w-4" />
-          <Button 
-            variant="ghost" 
-            size="sm" 
-            className="p-0 h-auto font-normal text-muted-foreground hover:text-foreground"
-            onClick={() => setLocation("/vast-servers")}
-          >
-            Vast Servers
-          </Button>
-          <ChevronRight className="h-4 w-4" />
-          <span className="font-medium text-foreground">
-            {serverData?.name || `Server ${serverId}`}
-          </span>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="container mx-auto px-6 py-4 space-y-6">
+        {/* Header with Breadcrumb and Profile */}
+        <div className="flex items-center justify-between">
+          <nav className="flex items-center space-x-2 text-sm">
+            <button 
+              onClick={() => setLocation('/')}
+              className="flex items-center gap-1 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+            >
+              <Home className="h-4 w-4" />
+              Dashboard
+            </button>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <button 
+              onClick={() => setLocation('/vast-servers')}
+              className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 transition-colors"
+            >
+              Vast Servers
+            </button>
+            <ChevronRight className="h-4 w-4 text-slate-400" />
+            <span className="text-slate-900 dark:text-slate-100 font-medium">
+              {serverData?.name || `Server ${serverId}`}
+            </span>
+          </nav>
+          
+          <div className="flex items-center gap-3">
+            <ThemeSwitcher />
+            
+            <Button variant="ghost" size="sm" className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
+              <Bell className="h-3.5 w-3.5" />
+            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="p-0 w-7 h-7 rounded-full">
+                  <Avatar className="w-7 h-7">
+                    <AvatarFallback className="text-xs bg-slate-200 dark:bg-slate-700">
+                      AD
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => setLocation("/api/logout")}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                <span>Profile</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => setLocation("/api/logout")}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      {/* Server Title and Status */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Server className="h-6 w-6" />
-            {serverData?.name || `Server ${serverId}`}
-          </h1>
-          <p className="text-muted-foreground">
-            Server ID: {serverData?.vastId} • {serverData?.location}
-          </p>
+        {/* Enhanced Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gray-100 dark:bg-gray-900/50 rounded-xl">
+              <Server className="h-7 w-7 text-gray-600 dark:text-gray-400" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+                {serverData?.name || `Server ${serverId}`}
+              </h1>
+              <p className="text-sm text-slate-600 dark:text-slate-400">
+                Server ID: {serverData?.vastId} • {serverData?.location}
+              </p>
+            </div>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -271,10 +293,9 @@ export function ServerDetailPage() {
             </Button>
           )}
         </div>
-      </div>
 
-      {/* Status Overview */}
-      <div className="grid gap-4 md:grid-cols-3">
+        {/* Status Overview */}
+        <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Server Status</CardTitle>
@@ -339,9 +360,9 @@ export function ServerDetailPage() {
             </p>
           </CardContent>
         </Card>
-      </div>
+        </div>
 
-      {/* Main Content */}
+        {/* Main Content */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -659,6 +680,7 @@ export function ServerDetailPage() {
           </Card>
         </TabsContent>
       </Tabs>
+      </div>
     </div>
   );
 }

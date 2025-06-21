@@ -2367,6 +2367,30 @@ echo "CUDA environment configured!"`,
   });
 
   // Workflow management with model instances
+  app.post('/api/workflows', async (req: Request, res: Response) => {
+    try {
+      const { name, workflowJson, serverId, description, category } = req.body;
+
+      if (!name || !workflowJson) {
+        return res.status(400).json({ message: "Name and workflow JSON are required" });
+      }
+
+      const workflow = await storage.createComfyWorkflow({
+        name: name.trim(),
+        workflowJson,
+        serverId: serverId || null,
+        description: description || null,
+        category: category || "general",
+        isTemplate: false
+      });
+
+      res.json(workflow);
+    } catch (error) {
+      console.error("Error creating workflow:", error);
+      res.status(500).json({ message: "Failed to create workflow" });
+    }
+  });
+
   app.get('/api/workflows/with-models', async (req: Request, res: Response) => {
     try {
       const workflowsWithModels = await storage.getWorkflowsWithModels();

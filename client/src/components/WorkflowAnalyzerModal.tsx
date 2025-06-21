@@ -135,6 +135,45 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
     },
   });
 
+  const saveWorkflowMutation = useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/workflows`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: workflowName.trim(),
+          workflowJson,
+          serverId,
+          description: `Analyzed workflow with ${analysisResult?.requiredModels?.length || 0} required models`,
+          category: "analyzed"
+        }),
+      });
+      
+      if (!response.ok) {
+        throw new Error("Failed to save workflow");
+      }
+      
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Workflow Saved",
+        description: "The analyzed workflow has been saved to your workflows collection.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/workflows/with-models"] });
+      onOpenChange(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Save Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -216,6 +255,45 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
     setActiveTab("upload");
   };
 
+  const handleSaveWorkflow = () => {
+    if (!workflowName.trim()) {
+      toast({
+        title: "Missing Workflow Name",
+        description: "Please provide a name for the workflow before saving.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!workflowJson.trim()) {
+      toast({
+        title: "Missing Workflow Data",
+        description: "No workflow data to save.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Determine category based on analysis results
+    let category = "general";
+    if (analysisResult?.requiredModels) {
+      const modelTypes = analysisResult.requiredModels.map(m => m.type?.toLowerCase() || "");
+      if (modelTypes.some(t => t.includes("checkpoint") || t.includes("model"))) {
+        category = "text-to-image";
+      } else if (modelTypes.some(t => t.includes("upscale"))) {
+        category = "upscaling";
+      } else if (modelTypes.some(t => t.includes("controlnet"))) {
+        category = "controlnet";
+      }
+    }
+
+    const description = analysisResult 
+      ? `Analyzed workflow with ${analysisResult.requiredModels?.length || 0} required models and ${analysisResult.missingNodes?.length || 0} missing nodes.`
+      : "Imported ComfyUI workflow";
+
+    saveWorkflowMutation.mutate();
+  };
+
   const handleExportWorkflow = () => {
     if (!workflowJson) return;
     
@@ -262,6 +340,9 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
       });
     }
   };
+
+
+
 
   // Safe getters with default values
   const safeAnalysisResult = analysisResult || null;
@@ -557,10 +638,24 @@ export function WorkflowAnalyzerModal({ open, onOpenChange, serverId }: Workflow
             </Button>
           )}
           {activeTab === "results" && (
-            <Button variant="outline" onClick={handleReset}>
-              <Zap className="h-4 w-4 mr-2" />
-              New Analysis
-            </Button>
+            <>
+              <Button 
+                onClick={handleSaveWorkflow}
+                disabled={saveWorkflowMutation.isPending || !workflowJson || !workflowName.trim()}
+                className="mr-2"
+              >
+                {saveWorkflowMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Package className="h-4 w-4 mr-2" />
+                )}
+                Save Workflow
+              </Button>
+              <Button variant="outline" onClick={handleReset}>
+                <Zap className="h-4 w-4 mr-2" />
+                New Analysis
+              </Button>
+            </>
           )}
         </DialogFooter>
       </DialogContent>

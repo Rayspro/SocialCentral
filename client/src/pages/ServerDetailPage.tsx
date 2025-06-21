@@ -40,7 +40,8 @@ import {
   ChevronRight,
   User,
   LogOut,
-  Bell
+  Bell,
+  Plus
 } from "lucide-react";
 import { format } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";

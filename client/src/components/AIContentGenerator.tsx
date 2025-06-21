@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
+import { WorkflowSelector } from "@/components/WorkflowSelector";
 import { 
   Sparkles, 
   Type, 
@@ -360,7 +361,7 @@ export function AIContentGenerator({ onContentGenerated }: AIContentGeneratorPro
 
 function ComfyUIImageGenerator() {
   const [selectedServer, setSelectedServer] = useState<string>("");
-  const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
+  const [selectedWorkflow, setSelectedWorkflow] = useState<number | undefined>();
   const [imagePrompt, setImagePrompt] = useState("");
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [generationId, setGenerationId] = useState<string | null>(null);
@@ -496,7 +497,7 @@ function ComfyUIImageGenerator() {
 
     generateImageMutation.mutate({
       serverId: selectedServer,
-      workflowId: selectedWorkflow,
+      workflowId: selectedWorkflow.toString(),
       prompt: imagePrompt,
     });
   };
@@ -540,40 +541,29 @@ function ComfyUIImageGenerator() {
           </Select>
         </div>
 
-        {/* Workflow Selection */}
-        <div className="space-y-2">
-          <Label className="text-xs">Select Workflow</Label>
-          <Select 
-            value={selectedWorkflow} 
-            onValueChange={setSelectedWorkflow}
-            disabled={!selectedServer}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder={workflowsLoading ? "Loading workflows..." : "Choose a workflow"} />
-            </SelectTrigger>
-            <SelectContent>
-              {availableWorkflows.length === 0 ? (
-                <SelectItem value="none" disabled>
-                  {selectedServer ? "No workflows available for this server" : "Select a server first"}
-                </SelectItem>
-              ) : (
-                availableWorkflows.map((workflow: any) => (
-                  <SelectItem key={workflow.id} value={workflow.id.toString()}>
-                    <div className="flex items-center gap-2">
-                      {workflow.isTemplate && (
-                        <Badge variant="outline" className="text-xs">Template</Badge>
-                      )}
-                      {workflow.name}
-                      {workflow.category && (
-                        <Badge variant="secondary" className="text-xs">{workflow.category}</Badge>
-                      )}
-                    </div>
-                  </SelectItem>
-                ))
-              )}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* Interactive Workflow Selection */}
+        {selectedServer && availableWorkflows.length > 0 && (
+          <WorkflowSelector
+            workflows={availableWorkflows}
+            selectedWorkflowId={selectedWorkflow}
+            onSelectWorkflow={(workflowId) => setSelectedWorkflow(workflowId === 0 ? undefined : workflowId)}
+          />
+        )}
+        
+        {selectedServer && availableWorkflows.length === 0 && (
+          <div className="text-center py-6 text-muted-foreground">
+            <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">No workflows available for this server</p>
+            <p className="text-xs">Create a workflow to get started</p>
+          </div>
+        )}
+        
+        {!selectedServer && (
+          <div className="text-center py-6 text-muted-foreground">
+            <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+            <p className="text-sm">Select a server to view available workflows</p>
+          </div>
+        )}
 
         {/* Image Prompt */}
         <div className="space-y-2">

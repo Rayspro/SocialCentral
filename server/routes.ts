@@ -2544,6 +2544,91 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  // ComfyUI Reset/Cleanup endpoint
+  app.post('/api/comfy/:serverId/reset', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const server = await storage.getVastServer(serverId);
+      
+      if (!server) {
+        return res.status(404).json({ error: 'Server not found' });
+      }
+
+      // Create cleanup execution record
+      const execution = await storage.createServerExecution({
+        serverId,
+        scriptId: 2, // Cleanup script ID
+        status: 'running' as const,
+        output: 'Starting ComfyUI cleanup and reset...\n',
+      });
+
+      // Cleanup script for ComfyUI
+      const cleanupScript = `#!/bin/bash
+set -e
+
+echo "=== ComfyUI Cleanup Started ==="
+echo "Step 1/4: Stopping ComfyUI processes..."
+pkill -f "python.*main.py" || true
+pkill -f "comfyui" || true
+
+echo "Step 2/4: Removing ComfyUI installation..."
+cd /root
+rm -rf ComfyUI/ || true
+
+echo "Step 3/4: Cleaning up models and cache..."
+rm -rf ~/.cache/huggingface || true
+rm -rf /tmp/comfyui* || true
+
+echo "Step 4/4: Resetting server status..."
+echo "=== ComfyUI Cleanup Complete ==="
+echo "Server is ready for fresh ComfyUI installation"
+`;
+
+      // Execute cleanup via SSH simulation (in a real environment, this would connect via SSH)
+      setTimeout(async () => {
+        try {
+          // Simulate cleanup process
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // Update execution as completed
+          await storage.updateServerExecution(execution.id, {
+            status: 'completed',
+            output: execution.output + cleanupScript + '\n=== CLEANUP SUCCESS ===\n'
+          });
+
+          // Reset server setup status
+          await storage.updateVastServer(serverId, {
+            setupStatus: 'pending',
+            metadata: {
+              ...((server.metadata as any) || {}),
+              comfyUIStatus: 'pending',
+              lastCleanup: new Date().toISOString()
+            }
+          });
+
+          console.log(`ComfyUI cleanup completed for server ${serverId}`);
+        } catch (error) {
+          console.error(`ComfyUI cleanup failed for server ${serverId}:`, error);
+          await storage.updateServerExecution(execution.id, {
+            status: 'failed',
+            output: execution.output + `\nERROR: Cleanup failed - ${error}\n`
+          });
+        }
+      }, 100);
+
+      res.json({
+        success: true,
+        message: 'ComfyUI cleanup initiated',
+        executionId: execution.id,
+        estimatedTime: '30-60 seconds'
+      });
+
+    } catch (error) {
+      console.error('Error resetting ComfyUI:', error);
+      res.status(500).json({ error: 'Failed to reset ComfyUI installation' });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time progress updates

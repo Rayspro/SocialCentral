@@ -50,6 +50,7 @@ import { WorkflowAnalyzer } from "@/components/WorkflowAnalyzer";
 import { WorkflowAnalyzerModal } from "@/components/WorkflowAnalyzerModal";
 import { WorkflowTemplateLibrary } from "@/components/WorkflowTemplateLibrary";
 import { WorkflowComposer } from "@/components/WorkflowComposer";
+import { ComfyUISetupTab } from "@/components/ComfyUISetupTab";
 
 export function ServerDetailPage() {
   const params = useParams();
@@ -500,86 +501,16 @@ export function ServerDetailPage() {
         </TabsContent>
 
         <TabsContent value="setup" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                ComfyUI Setup Status
-              </CardTitle>
-              <CardDescription>
-                Status: <Badge variant={serverData?.status === 'running' ? 'default' : 'secondary'}>
-                  {serverData?.status || 'Unknown'}
-                </Badge>
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isSetupInProgress && (
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="text-sm font-medium">Setup in progress...</span>
-                  </div>
-                  <Progress value={75} className="w-full" />
-                </div>
-              )}
-
-              {needsSetup && serverData?.setupStatus !== 'running' && (
-                <div className="space-y-4">
-                  <div className="p-4 border rounded-lg bg-yellow-50 dark:bg-yellow-900/20">
-                    <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
-                      ComfyUI setup required
-                    </p>
-                    <p className="text-sm text-yellow-600 dark:text-yellow-300 mt-1">
-                      Your server is running but ComfyUI needs to be installed and configured.
-                    </p>
-                  </div>
-                  
-                  <Button
-                    onClick={() => setupMutation.mutate()}
-                    disabled={setupMutation.isPending}
-                    className="w-full"
-                  >
-                    {setupMutation.isPending ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Starting Setup...
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-4 w-4" />
-                        Start ComfyUI Setup
-                      </>
-                    )}
-                  </Button>
-                </div>
-              )}
-
-              {isSetupComplete && (
-                <div className="p-4 border rounded-lg bg-green-50 dark:bg-green-900/20">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <p className="text-sm font-medium text-green-800 dark:text-green-200">
-                      ComfyUI is ready
-                    </p>
-                  </div>
-                  {serverData?.serverUrl && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-sm text-green-600 dark:text-green-300">
-                        ComfyUI URL: <a 
-                          href={serverData.serverUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="underline hover:no-underline"
-                        >
-                          {serverData.serverUrl}
-                        </a>
-                      </p>
-                    </div>
-                  )}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <ComfyUISetupTab 
+            serverId={serverId} 
+            serverData={serverData}
+            executions={Array.isArray(executions) ? executions : []}
+            isLoadingExecutions={isLoadingExecutions}
+            onSetupComplete={() => {
+              queryClient.invalidateQueries({ queryKey: [`/api/vast-servers/${serverId}`] });
+              queryClient.invalidateQueries({ queryKey: [`/api/server-scheduler/${serverId}`] });
+            }}
+          />
         </TabsContent>
 
         <TabsContent value="models" className="space-y-6">

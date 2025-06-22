@@ -1099,7 +1099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/vast-servers/stop/:id", async (req, res) => {
+  app.post("/api/vast-servers/:id/stop", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const server = await storage.getVastServer(id);
@@ -1336,8 +1336,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     getAvailableServers
   } = await import('./vast-ai');
 
-  // Use real Vast.ai API handlers
-  app.get("/api/vast-servers", getVastServers);
+  // Use modified Vast.ai API handlers that respect local overrides
+  app.get("/api/vast-servers", async (req, res) => {
+    try {
+      // Get stored servers from database (respects local overrides)
+      const storedServers = await storage.getVastServers();
+      res.json(storedServers);
+    } catch (error) {
+      console.error("Failed to get servers:", error);
+      res.status(500).json({ error: "Failed to get servers" });
+    }
+  });
   app.get("/api/vast-servers/available", getAvailableServers);
   
   // Start server route

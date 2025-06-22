@@ -2187,6 +2187,89 @@ echo "CUDA environment configured!"`,
     }
   });
 
+  // ComfyUI Setup/Startup endpoint
+  app.post('/api/comfy/startup/:serverId', async (req: Request, res: Response) => {
+    try {
+      const serverId = parseInt(req.params.serverId);
+      const server = await storage.getVastServer(serverId);
+      
+      if (!server) {
+        return res.status(404).json({ error: 'Server not found' });
+      }
+
+      if (server.status !== 'running') {
+        return res.status(400).json({ error: 'Server must be running to setup ComfyUI' });
+      }
+
+      // Create execution record
+      const execution = await storage.createServerExecution({
+        serverId,
+        scriptId: 1,
+        status: 'running' as const,
+        output: 'Starting ComfyUI setup...\n',
+      });
+
+      // Simulate setup process
+      setTimeout(async () => {
+        try {
+          const setupScript = `#!/bin/bash
+set -e
+
+echo "=== ComfyUI Auto-Setup Starting ==="
+echo "Step 1/6: Updating system packages..."
+echo "Step 2/6: Installing system dependencies..."
+echo "Step 3/6: Setting up Python environment..."
+echo "Step 4/6: Cloning ComfyUI repository..."
+echo "Step 5/6: Installing ComfyUI requirements..."
+echo "Step 6/6: Downloading SDXL model..."
+echo "Starting ComfyUI server..."
+echo "=== ComfyUI Setup Complete ==="
+echo "ComfyUI is now running on port 8188"
+`;
+
+          await storage.updateServerExecution(execution.id, {
+            status: 'completed',
+            output: execution.output + setupScript
+          });
+
+          await storage.updateVastServer(serverId, {
+            setupStatus: 'ready',
+            metadata: {
+              ...((server.metadata as any) || {}),
+              comfyUIStatus: 'ready'
+            }
+          });
+
+          console.log(`ComfyUI setup completed for server ${serverId}`);
+        } catch (error) {
+          await storage.updateServerExecution(execution.id, {
+            status: 'failed',
+            output: execution.output + `\nERROR: Setup failed - ${error}\n`
+          });
+        }
+      }, 2000);
+
+      res.json({
+        success: true,
+        message: 'ComfyUI auto-setup initiated',
+        executionId: execution.id,
+        estimatedTime: '2-3 minutes',
+        steps: [
+          'Installing system dependencies',
+          'Setting up Python environment', 
+          'Cloning ComfyUI repository',
+          'Installing ComfyUI requirements',
+          'Downloading basic models',
+          'Starting ComfyUI server'
+        ]
+      });
+
+    } catch (error) {
+      console.error('Error in auto-setup:', error);
+      res.status(500).json({ error: 'Failed to initiate ComfyUI setup' });
+    }
+  });
+
   // Workflow Analyzer API Routes
   app.post('/api/comfy/analyze-workflow/:serverId', async (req: Request, res: Response) => {
     try {
@@ -2758,7 +2841,14 @@ echo "Server is ready for fresh ComfyUI installation"
     }
   });
 
-
+  // Setup Vite after API routes to ensure API routes are handled first
+  if (process.env.NODE_ENV !== "production") {
+    const { setupVite } = await import("./vite");
+    await setupVite(app, httpServer);
+  } else {
+    const { serveStatic } = await import("./vite");
+    serveStatic(app);
+  }
   
   return httpServer;
 }

@@ -22,9 +22,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 lg:px-6 py-4 space-y-4 sm:space-y-6">
+      <div className="container mx-auto px-6 py-4 space-y-6">
         {/* Header with Breadcrumb and Profile */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between">
           <nav className="flex items-center space-x-2 text-sm">
             <span className="text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1">
               <Home className="h-4 w-4" />
@@ -78,18 +78,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Enhanced Header - Professional mobile design */}
-        <div className="space-y-4">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 rounded-xl flex items-center justify-center shadow-sm">
-              <BarChart3 className="h-6 w-6 text-white dark:text-slate-900" />
+        {/* Enhanced Header */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
+              <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
                 Dashboard
               </h1>
-              <p className="text-sm text-slate-600 dark:text-slate-400 leading-tight">
-                Analytics & Control Center
+              <p className="text-xs text-slate-600 dark:text-slate-400">
+                Manage your social media presence and AI workloads
               </p>
             </div>
           </div>
@@ -97,13 +97,9 @@ export default function Dashboard() {
 
         <StatsGrid />
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          <div className="md:col-span-2 lg:col-span-1">
-            <PlatformManager />
-          </div>
-          <div className="md:col-span-2 lg:col-span-2">
-            <QuickActions />
-          </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <PlatformManager />
+          <QuickActions />
         </div>
 
         <ServerAnalytics />

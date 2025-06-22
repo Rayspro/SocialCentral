@@ -385,9 +385,9 @@ export default function VastServers() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
+      <div className="container mx-auto px-6 py-4 space-y-6">
         {/* Header with Breadcrumb and Profile */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between">
           <nav className="flex items-center space-x-2 text-sm">
             <button 
               onClick={() => setLocation('/')}
@@ -402,7 +402,7 @@ export default function VastServers() {
             </span>
           </nav>
           
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-3">
             <ThemeSwitcher />
             
             <Button variant="ghost" size="sm" className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
@@ -488,15 +488,15 @@ export default function VastServers() {
             </Button>
           </div>
           {isLoadingLaunched ? (
-            <div className="grid gap-4 sm:gap-6 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="border rounded-lg p-4 sm:p-6">
+                <div key={i} className="border rounded-lg p-6">
                   <LoadingCard />
                 </div>
               ))}
             </div>
           ) : launchedServers && launchedServers.length > 0 ? (
-            <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {launchedServers.map((server) => (
                 <Card 
                   key={server.id} 
@@ -742,7 +742,7 @@ export default function VastServers() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium">Search</label>
                   <div className="relative">
@@ -834,7 +834,7 @@ export default function VastServers() {
 
           {/* Servers Table */}
           {isLoadingAvailable ? (
-            <div className="grid gap-4 sm:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="border rounded-lg p-4">
                   <LoadingCard />
@@ -844,20 +844,19 @@ export default function VastServers() {
           ) : filteredServers.length > 0 ? (
             <Card>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="min-w-[120px]">Server</TableHead>
-                        <TableHead className="min-w-[100px]">GPU</TableHead>
-                        <TableHead className="min-w-[100px]">CPU/RAM</TableHead>
-                        <TableHead className="min-w-[80px]">Storage</TableHead>
-                        <TableHead className="min-w-[80px]">Location</TableHead>
-                        <TableHead className="min-w-[100px]">Performance</TableHead>
-                        <TableHead className="min-w-[80px]">Price/Hour</TableHead>
-                        <TableHead className="min-w-[80px]">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Server</TableHead>
+                      <TableHead>GPU</TableHead>
+                      <TableHead>CPU/RAM</TableHead>
+                      <TableHead>Storage</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Performance</TableHead>
+                      <TableHead>Price/Hour</TableHead>
+                      <TableHead>Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
                   <TableBody>
                     {filteredServers.map((server) => (
                       <TableRow 
@@ -934,7 +933,6 @@ export default function VastServers() {
                     ))}
                   </TableBody>
                 </Table>
-                </div>
               </CardContent>
             </Card>
           ) : (

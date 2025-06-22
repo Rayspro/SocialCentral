@@ -203,9 +203,9 @@ export default function Settings() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
+      <div className="container mx-auto px-6 py-4 space-y-6">
         {/* Header with Breadcrumb and Profile */}
-        <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center justify-between">
           <nav className="flex items-center space-x-2 text-sm">
             <button 
               onClick={() => setLocation('/')}
@@ -220,7 +220,7 @@ export default function Settings() {
             </span>
           </nav>
           
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-3">
             <ThemeSwitcher />
             
             <Button variant="ghost" size="sm" className="p-1.5 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-lg transition-colors">
@@ -280,32 +280,27 @@ export default function Settings() {
           </div>
         </div>
         
-        <Tabs defaultValue="profile" className="space-y-4 sm:space-y-6">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1">
-            <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <User className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Profile</span>
-              <span className="sm:hidden">Profile</span>
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="profile" className="flex items-center gap-2">
+              <User className="h-4 w-4" />
+              Profile
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <Bell className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Notifications</span>
-              <span className="sm:hidden">Notify</span>
+            <TabsTrigger value="notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Notifications
             </TabsTrigger>
-            <TabsTrigger value="appearance" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <Palette className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Appearance</span>
-              <span className="sm:hidden">Theme</span>
+            <TabsTrigger value="appearance" className="flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              Appearance
             </TabsTrigger>
-            <TabsTrigger value="api" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <Key className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">API & AI</span>
-              <span className="sm:hidden">API</span>
+            <TabsTrigger value="api" className="flex items-center gap-2">
+              <Key className="h-4 w-4" />
+              API & AI
             </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
-              <Shield className="h-3 w-3 sm:h-4 sm:w-4" />
-              <span className="hidden sm:inline">Security</span>
-              <span className="sm:hidden">Security</span>
+            <TabsTrigger value="security" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Security
             </TabsTrigger>
           </TabsList>
 

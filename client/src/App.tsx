@@ -99,7 +99,7 @@ function AppLayout() {
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-slate-900">
       <Sidebar />
-      <main className="flex-1 min-h-screen transition-all duration-300" style={{ marginLeft: 'var(--sidebar-width, 16rem)' }}>
+      <main className="flex-1 min-h-screen transition-all duration-500 ease-in-out" style={{ marginLeft: 'var(--sidebar-width, 16rem)' }}>
         <Router />
       </main>
     </div>

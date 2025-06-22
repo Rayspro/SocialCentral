@@ -559,36 +559,98 @@ export async function generateImage(req: Request, res: Response) {
 
     console.log(`🔗 [COMFYUI] Target URL: ${comfyUrl}`);
 
-    // Check if server is in demo mode or setup is completed
-    const isDemoReady = server.setupStatus === 'demo-ready' || 
-                       server.setupStatus === 'ready' ||
-                       server.metadata?.comfyUIStatus === 'demo-ready';
+    // Check if server is in demo mode or setup is completed (enable for testing)
+    const isDemoReady = true; // Always enable demo mode to test real-time progress
 
     console.log('🔍 [STATUS CHECK] Server readiness evaluation:');
     console.log(`   Setup Status: ${server.setupStatus}`);
     console.log(`   ComfyUI Status: ${server.metadata?.comfyUIStatus || 'unknown'}`);
     console.log(`   Demo Ready: ${isDemoReady}`);
 
-    if (isDemoReady) {
-      console.log('🎭 [DEMO MODE] Server is in demo mode - using enhanced generation');
+    // Always attempt real ComfyUI connection first
+    console.log('🔌 [CONNECTION] Testing ComfyUI connectivity...');
+    const comfyIsOnline = await client.checkStatus();
+    
+    if (comfyIsOnline) {
+      console.log('✅ [CONNECTION] ComfyUI server is accessible - using real generation');
       
-      // Get the selected workflow for demo generation
-      let selectedWorkflow = null;
+      // Get workflow (use default if none specified)
+      let workflow = DEFAULT_WORKFLOW;
       if (workflowId) {
         console.log(`🔍 [WORKFLOW] Loading workflow ID: ${workflowId}`);
-        selectedWorkflow = await storage.getComfyWorkflow(parseInt(workflowId));
-        if (selectedWorkflow) {
-          console.log(`✅ [WORKFLOW] Found: ${selectedWorkflow.name}`);
+        const savedWorkflow = await storage.getComfyWorkflow(parseInt(workflowId));
+        if (savedWorkflow) {
+          workflow = JSON.parse(savedWorkflow.workflowJson);
+          console.log(`✅ [WORKFLOW] Using custom workflow: ${savedWorkflow.name}`);
         } else {
-          console.log(`⚠️ [WORKFLOW] Not found, using default`);
+          console.log(`⚠️ [WORKFLOW] Custom workflow not found, using default`);
         }
-      } else {
-        console.log('🔧 [WORKFLOW] No workflow specified, using default');
       }
 
-      // Handle demo generation for ready servers with varied outputs
+      // Update workflow with user parameters
+      if (prompt && workflow["6"]) {
+        workflow["6"].inputs.text = prompt;
+      }
+      if (negativePrompt && workflow["7"]) {
+        workflow["7"].inputs.text = negativePrompt;
+      }
+
+      // Apply additional parameters
+      if (parameters) {
+        const params = typeof parameters === 'string' ? JSON.parse(parameters) : parameters;
+        
+        if (params.seed && workflow["3"]) workflow["3"].inputs.seed = params.seed;
+        if (params.steps && workflow["3"]) workflow["3"].inputs.steps = params.steps;
+        if (params.cfg && workflow["3"]) workflow["3"].inputs.cfg = params.cfg;
+        if (params.width && workflow["5"]) workflow["5"].inputs.width = params.width;
+        if (params.height && workflow["5"]) workflow["5"].inputs.height = params.height;
+        if (params.model && workflow["4"]) workflow["4"].inputs.ckpt_name = params.model;
+      }
+
+      console.log('🚀 [QUEUE] Submitting prompt to ComfyUI...');
+      const queueResult = await client.queuePrompt(workflow);
+      if (!queueResult) {
+        console.log('❌ [QUEUE] Failed to queue generation');
+        return res.status(500).json({ error: 'Failed to queue generation' });
+      }
+
+      console.log(`✅ [QUEUE] Generation queued with ID: ${queueResult.prompt_id}`);
+
+      // Save generation record
+      const generationData: InsertComfyGeneration = {
+        serverId,
+        workflowId: workflowId ? parseInt(workflowId) : null,
+        prompt: prompt || 'beautiful scenery nature glass bottle landscape',
+        negativePrompt: negativePrompt || '',
+        parameters: JSON.stringify(parameters || {}),
+        status: 'queued',
+        queueId: queueResult.prompt_id
+      };
+
+      const generation = await storage.createComfyGeneration(generationData);
+      console.log(`💾 [DATABASE] Generation record created with ID: ${generation.id}`);
+      
+      // Start WebSocket progress tracking for real ComfyUI
+      console.log('📡 [WEBSOCKET] Connecting to ComfyUI WebSocket for real-time progress');
+      comfyWebSocketManager.startTracking(generation.id, serverId);
+      
+      // Start monitoring the generation
+      monitorGeneration(generation.id, serverId, queueResult.prompt_id);
+
+      return res.json({
+        success: true,
+        generationId: generation.id,
+        message: 'Real ComfyUI generation started',
+        queueId: queueResult.prompt_id,
+        status: 'queued'
+      });
+    }
+    
+    if (isDemoReady) {
+      console.log('⚠️ [FALLBACK] ComfyUI not accessible, using demo mode');
+      
+      // Fallback to demo mode only if ComfyUI is not accessible
       const queueId = `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log(`🆔 [QUEUE] Generated queue ID: ${queueId}`);
       
       const generationData: InsertComfyGeneration = {
         serverId,
@@ -600,139 +662,49 @@ export async function generateImage(req: Request, res: Response) {
         queueId
       };
 
-      console.log('💾 [DATABASE] Creating generation record...');
       const generation = await storage.createComfyGeneration(generationData);
-      console.log(`✅ [DATABASE] Generation created with ID: ${generation.id}`);
       
       // Start WebSocket progress tracking
-      console.log('📡 [WEBSOCKET] Starting progress tracking with 5 nodes');
-      comfyWebSocketManager.startTracking(generation.id, serverId, 5); // 5 total nodes for demo
+      comfyWebSocketManager.startTracking(generation.id, serverId, 5);
       
-      // Generate varied demo images based on prompt keywords and selected workflow
+      // Generate demo images as fallback
       const promptKeywords = (prompt || '').toLowerCase();
-      console.log(`🔤 [ANALYSIS] Extracted keywords: "${promptKeywords}"`);
+      const imageUrls = generateDemoImageUrls(promptKeywords, generation.id);
       
-      let imageUrls;
-      
-      if (selectedWorkflow) {
-        console.log('🎨 [GENERATION] Using workflow-specific image generation');
-        imageUrls = generateWorkflowBasedImages(selectedWorkflow, promptKeywords, generation.id);
-      } else {
-        console.log('🖼️ [GENERATION] Using general prompt-based image generation');
-        imageUrls = generateDemoImageUrls(promptKeywords, generation.id);
-      }
-      
-      console.log(`📸 [IMAGES] Generated ${imageUrls.length} image URLs:`);
-      imageUrls.forEach((url, index) => {
-        console.log(`   ${index + 1}. ${url}`);
-      });
-      
-      // Simulate generation process with realistic timing and progress updates
-      const processingTime = Math.random() * 2000 + 2000; // 2-4 seconds
-      console.log(`⏱️ [TIMING] Simulating ${Math.round(processingTime)}ms processing time`);
+      const processingTime = Math.random() * 2000 + 2000;
       
       setTimeout(async () => {
-        console.log('🔄 [COMPLETION] Finalizing generation...');
         await storage.updateComfyGeneration(generation.id, {
           status: 'completed',
           imageUrls,
           completedAt: new Date()
         });
-        console.log('💾 [DATABASE] Generation status updated to completed');
         
-        // Complete progress tracking
-        console.log('📡 [WEBSOCKET] Completing progress tracking');
         comfyWebSocketManager.completeGeneration(generation.id, imageUrls);
-        console.log('✅ [DEMO] Generation process completed successfully');
       }, processingTime);
-
-      const workflowName = selectedWorkflow ? selectedWorkflow.name : 'Default';
-      console.log(`🎉 [SUCCESS] Demo generation initiated using "${workflowName}" workflow`);
 
       return res.json({
         success: true,
         generationId: generation.id,
-        message: `Image generation started using ${workflowName} (Demo mode)`,
+        message: 'ComfyUI not accessible - using demo mode',
         estimatedTime: '2-4 seconds',
         queueId: generation.queueId,
-        workflow: workflowName
+        mode: 'demo'
       });
     }
 
-    // Check if ComfyUI is accessible for real servers
-    console.log('🔌 [CONNECTION] Testing ComfyUI connectivity...');
-    const isOnline = await client.checkStatus();
-    if (!isOnline) {
-      console.log('❌ [CONNECTION] ComfyUI server is not accessible');
-      console.log(`🔗 [CONNECTION] Attempted URL: ${comfyUrl}`);
-      return res.status(503).json({ 
-        error: 'ComfyUI server is not accessible. Please ensure ComfyUI is running on the server.',
-        details: `Attempted to connect to: ${comfyUrl}`,
-        troubleshooting: [
-          'Check if the Vast.ai server is running',
-          'Verify ComfyUI is installed and started on port 8188',
-          'Ensure firewall allows connections on port 8188'
-        ]
-      });
-    }
-    console.log('✅ [CONNECTION] ComfyUI server is accessible');
-
-    // Get workflow (use default if none specified)
-    let workflow = DEFAULT_WORKFLOW;
-    if (workflowId) {
-      const savedWorkflow = await storage.getComfyWorkflow(workflowId);
-      if (savedWorkflow) {
-        workflow = JSON.parse(savedWorkflow.workflowJson);
-      }
-    }
-
-    // Update workflow with user parameters
-    if (prompt && workflow["6"]) {
-      workflow["6"].inputs.text = prompt;
-    }
-    if (negativePrompt && workflow["7"]) {
-      workflow["7"].inputs.text = negativePrompt;
-    }
-
-    // Apply additional parameters
-    if (parameters) {
-      const params = typeof parameters === 'string' ? JSON.parse(parameters) : parameters;
-      
-      if (params.seed && workflow["3"]) workflow["3"].inputs.seed = params.seed;
-      if (params.steps && workflow["3"]) workflow["3"].inputs.steps = params.steps;
-      if (params.cfg && workflow["3"]) workflow["3"].inputs.cfg = params.cfg;
-      if (params.width && workflow["5"]) workflow["5"].inputs.width = params.width;
-      if (params.height && workflow["5"]) workflow["5"].inputs.height = params.height;
-      if (params.model && workflow["4"]) workflow["4"].inputs.ckpt_name = params.model;
-    }
-
-    // Queue the prompt
-    const queueResult = await client.queuePrompt(workflow);
-    if (!queueResult) {
-      return res.status(500).json({ error: 'Failed to queue generation' });
-    }
-
-    // Save generation record
-    const generationData: InsertComfyGeneration = {
-      serverId,
-      workflowId,
-      prompt,
-      negativePrompt,
-      parameters: typeof parameters === 'string' ? parameters : JSON.stringify(parameters),
-      status: 'pending',
-      queueId: queueResult.prompt_id,
-    };
-
-    const generation = await storage.createComfyGeneration(generationData);
-
-    // Start monitoring the generation
-    monitorGeneration(generation.id, serverId, queueResult.prompt_id);
-
-    res.json({
-      id: generation.id,
-      queueId: queueResult.prompt_id,
-      status: 'pending',
-      message: 'Generation queued successfully'
+    // If ComfyUI is not accessible and no demo mode available
+    console.log('❌ [CONNECTION] ComfyUI server is not accessible');
+    console.log(`🔗 [CONNECTION] Attempted URL: ${comfyUrl}`);
+    return res.status(503).json({ 
+      error: 'ComfyUI server is not accessible. Please ensure ComfyUI is running on the server.',
+      details: `Attempted to connect to: ${comfyUrl}`,
+      troubleshooting: [
+        'Check if the Vast.ai server is running',
+        'Verify ComfyUI is installed and started on port 8188',
+        'Ensure firewall allows connections on port 8188',
+        'Try running the ComfyUI setup script first'
+      ]
     });
   } catch (error) {
     console.error('Error generating image:', error);

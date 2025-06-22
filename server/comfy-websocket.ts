@@ -127,6 +127,24 @@ class ComfyUIWebSocketManager {
     
     if (activeGeneration) {
       activeGeneration.progress = progress;
+      activeGeneration.completedNodes = value;
+      activeGeneration.totalNodes = max;
+      
+      // Enhanced terminal output for real-time monitoring
+      console.log(`\n┌─────────────────────────────────────────────────────────────┐`);
+      console.log(`│ 🎨 ComfyUI Generation Progress - ID: ${activeGeneration.generationId.toString().padEnd(15)} │`);
+      console.log(`├─────────────────────────────────────────────────────────────┤`);
+      console.log(`│ Server: ${serverId.toString().padEnd(8)} │ Progress: ${Math.round(progress).toString().padEnd(3)}% │ Step: ${value}/${max} │`);
+      console.log(`│ Status: Processing    │ Current Node: ${(activeGeneration.currentNode || 'Unknown').padEnd(15)} │`);
+      console.log(`├─────────────────────────────────────────────────────────────┤`);
+      
+      // ASCII progress bar
+      const barLength = 40;
+      const filledLength = Math.round((progress / 100) * barLength);
+      const progressBar = '█'.repeat(filledLength) + '░'.repeat(barLength - filledLength);
+      console.log(`│ [${progressBar}] ${Math.round(progress)}% │`);
+      console.log(`└─────────────────────────────────────────────────────────────┘\n`);
+      
       this.broadcastProgress(activeGeneration);
     }
   }
@@ -141,6 +159,11 @@ class ComfyUIWebSocketManager {
     if (activeGeneration) {
       activeGeneration.currentNode = node;
       activeGeneration.completedNodes = (activeGeneration.completedNodes || 0) + 1;
+      
+      // Enhanced terminal logging for node execution
+      console.log(`🔥 [ComfyUI] Executing Node: ${node} | Generation ID: ${activeGeneration.generationId}`);
+      console.log(`📊 [ComfyUI] Completed Nodes: ${activeGeneration.completedNodes}/${activeGeneration.totalNodes || 'Unknown'}`);
+      
       this.broadcastProgress(activeGeneration);
     }
   }
@@ -244,10 +267,27 @@ class ComfyUIWebSocketManager {
       data: progress
     });
 
+    console.log(`📡 [WebSocket] Broadcasting progress for generation ${progress.generationId} to ${this.clientSockets.size} clients`);
+    
+    // Clean up closed connections and send to active ones
+    const closedSockets = new Set<WebSocket>();
+    
     this.clientSockets.forEach(socket => {
       if (socket.readyState === WebSocket.OPEN) {
-        socket.send(message);
+        try {
+          socket.send(message);
+        } catch (error) {
+          console.error('📡 [WebSocket] Error sending message:', error);
+          closedSockets.add(socket);
+        }
+      } else {
+        closedSockets.add(socket);
       }
+    });
+    
+    // Remove closed connections
+    closedSockets.forEach(socket => {
+      this.clientSockets.delete(socket);
     });
   }
 

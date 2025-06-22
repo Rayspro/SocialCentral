@@ -215,6 +215,47 @@ export function ComfyProgressMonitor({ generationId, className }: ComfyProgressM
           </div>
         )}
 
+        {/* Terminal Progress Display */}
+        {progress.status === 'executing' && (
+          <div className="border rounded-lg bg-black text-green-400 p-3 font-mono text-xs overflow-hidden">
+            <div className="flex items-center mb-2">
+              <div className="flex space-x-1">
+                <div className="w-3 h-3 bg-red-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
+                <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+              </div>
+              <span className="ml-3 text-white">ComfyUI Terminal Output</span>
+            </div>
+            <div className="border-t border-gray-700 pt-2">
+              <div className="space-y-1">
+                <div>┌─────────────────────────────────────────────────────────────┐</div>
+                <div>│ 🎨 ComfyUI Generation Progress - ID: {progress.generationId.toString().padEnd(15)} │</div>
+                <div>├─────────────────────────────────────────────────────────────┤</div>
+                <div>│ Server: {progress.serverId.toString().padEnd(8)} │ Progress: {Math.round(progress.progress || 0).toString().padEnd(3)}% │ Step: {progress.completedNodes || 0}/{progress.totalNodes || 'Unknown'} │</div>
+                <div>│ Status: Processing    │ Current Node: {(progress.currentNode || 'Unknown').padEnd(15)} │</div>
+                <div>├─────────────────────────────────────────────────────────────┤</div>
+                <div className="flex">
+                  <span>│ [</span>
+                  <div className="flex-1 flex">
+                    {Array.from({ length: 40 }, (_, i) => (
+                      <span key={i} className={i < Math.round(((progress.progress || 0) / 100) * 40) ? 'text-green-400' : 'text-gray-600'}>
+                        {i < Math.round(((progress.progress || 0) / 100) * 40) ? '█' : '░'}
+                      </span>
+                    ))}
+                  </div>
+                  <span>] {Math.round(progress.progress || 0)}% │</span>
+                </div>
+                <div>└─────────────────────────────────────────────────────────────┘</div>
+                {progress.currentNode && (
+                  <div className="text-yellow-400 mt-2">
+                    🔥 [ComfyUI] Executing Node: {progress.currentNode} | Generation ID: {progress.generationId}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Execution Time */}
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Execution Time:</span>

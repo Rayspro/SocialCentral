@@ -855,6 +855,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/vast-servers", async (req, res) => {
+    try {
+      const serverData = req.body;
+      
+      // Generate a unique vastId if not provided
+      if (!serverData.vastId) {
+        serverData.vastId = `server_${Date.now()}`;
+      }
+      
+      const newServer = await storage.createVastServer({
+        vastId: serverData.vastId,
+        name: serverData.name,
+        gpu: serverData.gpu,
+        gpuCount: serverData.gpuCount || 1,
+        cpuCores: serverData.cpuCores || 4,
+        ram: serverData.ram || 16,
+        disk: serverData.disk || 50,
+        pricePerHour: serverData.pricePerHour || "0.50",
+        location: serverData.location || "US",
+        isAvailable: true,
+        isLaunched: true,
+        status: "running",
+        serverUrl: serverData.serverUrl,
+        metadata: serverData.metadata || {}
+      });
+      
+      console.log("Created new server:", newServer);
+      res.json(newServer);
+    } catch (error) {
+      console.error('Error creating server:', error);
+      res.status(500).json({ error: 'Failed to create server' });
+    }
+  });
+
   app.get("/api/vast-servers/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
@@ -2639,5 +2673,7 @@ echo "CUDA environment configured!"`,
     }
   });
 
+
+  
   return httpServer;
 }

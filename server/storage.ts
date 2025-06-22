@@ -686,6 +686,43 @@ export class DatabaseStorage implements IStorage {
     }
     return await query;
   }
+
+  // Workflow Analysis operations
+  async getWorkflowAnalysesByServer(serverId: number): Promise<WorkflowAnalysis[]> {
+    return await db.select().from(schema.workflowAnalysis)
+      .where(eq(schema.workflowAnalysis.serverId, serverId))
+      .orderBy(desc(schema.workflowAnalysis.createdAt));
+  }
+
+  async getWorkflowAnalysis(id: number): Promise<WorkflowAnalysis | undefined> {
+    const [analysis] = await db.select().from(schema.workflowAnalysis)
+      .where(eq(schema.workflowAnalysis.id, id));
+    return analysis;
+  }
+
+  async getWorkflowAnalysisById(id: number): Promise<WorkflowAnalysis | undefined> {
+    const [analysis] = await db.select().from(schema.workflowAnalysis)
+      .where(eq(schema.workflowAnalysis.id, id));
+    return analysis;
+  }
+
+  async createWorkflowAnalysis(analysis: InsertWorkflowAnalysis): Promise<WorkflowAnalysis> {
+    const [newAnalysis] = await db.insert(schema.workflowAnalysis).values(analysis).returning();
+    return newAnalysis;
+  }
+
+  async updateWorkflowAnalysis(id: number, analysis: Partial<InsertWorkflowAnalysis>): Promise<WorkflowAnalysis> {
+    const [updatedAnalysis] = await db.update(schema.workflowAnalysis)
+      .set(analysis)
+      .where(eq(schema.workflowAnalysis.id, id))
+      .returning();
+    return updatedAnalysis;
+  }
+
+  async deleteWorkflowAnalysis(id: number): Promise<boolean> {
+    const result = await db.delete(schema.workflowAnalysis).where(eq(schema.workflowAnalysis.id, id));
+    return (result.rowCount || 0) > 0;
+  }
 }
 
 export const storage = new DatabaseStorage();

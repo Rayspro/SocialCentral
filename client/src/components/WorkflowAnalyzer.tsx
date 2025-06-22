@@ -214,12 +214,29 @@ export function WorkflowAnalyzer({ serverId, trigger }: WorkflowAnalyzerProps) {
                 </TableRow>
               ) : (
                 analyses.map((analysis: WorkflowAnalysis) => {
-                  const requiredModels = Array.isArray(analysis.requiredModels) 
-                    ? analysis.requiredModels 
-                    : [];
-                  const missingModels = Array.isArray(analysis.missingModels) 
-                    ? analysis.missingModels 
-                    : [];
+                  // Parse JSON strings if they exist
+                  let requiredModels = [];
+                  let missingModels = [];
+                  
+                  try {
+                    requiredModels = typeof analysis.requiredModels === 'string' 
+                      ? JSON.parse(analysis.requiredModels) 
+                      : Array.isArray(analysis.requiredModels) 
+                        ? analysis.requiredModels 
+                        : [];
+                  } catch (e) {
+                    requiredModels = [];
+                  }
+                  
+                  try {
+                    missingModels = typeof analysis.missingModels === 'string' 
+                      ? JSON.parse(analysis.missingModels) 
+                      : Array.isArray(analysis.missingModels) 
+                        ? analysis.missingModels 
+                        : [];
+                  } catch (e) {
+                    missingModels = [];
+                  }
 
                   return (
                     <TableRow key={analysis.id}>

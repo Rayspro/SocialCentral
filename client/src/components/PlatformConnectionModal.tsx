@@ -100,14 +100,45 @@ export function PlatformConnectionModal({ open, onOpenChange }: PlatformConnecti
     bearerToken: ""
   });
 
-  const handleConnect = () => {
+  const handleConnect = async () => {
     if (!selectedPlatform) return;
     
-    // In a real implementation, this would initiate the OAuth flow
     console.log("Connecting to platform:", selectedPlatform, "with credentials:", credentials);
     
-    // For now, just show a message that this requires proper API setup
-    alert(`To connect to ${selectedPlatform}, you need to:\n\n1. Set up API credentials with the platform\n2. Configure OAuth settings\n3. Implement the authentication flow\n\nThis is currently a demo - accounts can be added manually in the platform management section.`);
+    if (selectedPlatform === 'youtube') {
+      try {
+        if (!credentials.clientId || !credentials.clientSecret) {
+          alert('Please enter both Client ID and Client Secret for YouTube');
+          return;
+        }
+
+        const response = await fetch('/api/auth/youtube/initiate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clientId: credentials.clientId,
+            clientSecret: credentials.clientSecret,
+          }),
+        });
+
+        if (response.ok) {
+          const { authUrl } = await response.json();
+          // Open the YouTube OAuth consent screen
+          window.location.href = authUrl;
+        } else {
+          const error = await response.json();
+          alert(`Failed to initiate YouTube connection: ${error.error}`);
+        }
+      } catch (error) {
+        console.error('YouTube connection error:', error);
+        alert('Failed to connect to YouTube. Please check your credentials and try again.');
+      }
+    } else {
+      // For other platforms, show setup instructions
+      alert(`To connect to ${selectedPlatform}, you need to:\n\n1. Set up API credentials with the platform\n2. Configure OAuth settings\n3. Implement the authentication flow\n\nThis feature is coming soon - accounts can be added manually in the platform management section for now.`);
+    }
     
     onOpenChange(false);
   };

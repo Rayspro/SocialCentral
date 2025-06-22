@@ -8,12 +8,47 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { Link2, Home, ChevronRight, User, Settings, LogOut, Bell } from "lucide-react";
+import { Link2, Home, ChevronRight, User, Settings, LogOut, Bell, CheckCircle, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
+import { useEffect, useState } from "react";
 
 export default function Platforms() {
   const [, setLocation] = useLocation();
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  useEffect(() => {
+    // Check for OAuth callback parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const success = urlParams.get('success');
+    const error = urlParams.get('error');
+
+    if (success === 'youtube_connected') {
+      setMessage({ type: 'success', text: 'YouTube account connected successfully!' });
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (error) {
+      const errorMessages: { [key: string]: string } = {
+        'missing_code_or_state': 'Authentication failed - missing authorization code',
+        'invalid_state': 'Authentication failed - invalid security token',
+        'callback_failed': 'Failed to complete YouTube connection',
+        'platform_not_found': 'Platform configuration error'
+      };
+      setMessage({ 
+        type: 'error', 
+        text: errorMessages[error] || `Authentication failed: ${error}` 
+      });
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Auto-hide message after 5 seconds
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
@@ -93,6 +128,20 @@ export default function Platforms() {
             </div>
           </div>
         </div>
+        
+        {/* Status Messages */}
+        {message && (
+          <Alert className={`${message.type === 'success' ? 'border-green-200 bg-green-50 dark:bg-green-900/20' : 'border-red-200 bg-red-50 dark:bg-red-900/20'}`}>
+            {message.type === 'success' ? (
+              <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+            ) : (
+              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+            )}
+            <AlertDescription className={`${message.type === 'success' ? 'text-green-800 dark:text-green-200' : 'text-red-800 dark:text-red-200'}`}>
+              {message.text}
+            </AlertDescription>
+          </Alert>
+        )}
         
         <div className="grid grid-cols-1 gap-6">
           <PlatformManager />

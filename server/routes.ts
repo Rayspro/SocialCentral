@@ -34,7 +34,7 @@ import { comfyDiagnostics } from "./comfy-diagnostics";
 import { comfyDirectTester } from "./comfy-direct-test";
 import { comfyFallback } from "./comfy-fallback";
 import { comfyWebSocketManager } from "./comfy-websocket";
-import { recommendationEngine } from "./recommendation-engine";
+import { oauthManager } from "./oauth";
 
 // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
 const openai = new OpenAI({ 
@@ -2449,6 +2449,15 @@ echo "CUDA environment configured!"`,
       console.error('Error deleting workflow:', error);
       res.status(500).json({ message: error.message || 'Failed to delete workflow' });
     }
+  });
+
+  // OAuth Authentication Routes
+  app.post('/api/auth/youtube/initiate', async (req: Request, res: Response) => {
+    await oauthManager.initiateYouTubeAuth(req, res);
+  });
+
+  app.get('/api/auth/youtube/callback', async (req: Request, res: Response) => {
+    await oauthManager.handleYouTubeCallback(req, res);
   });
 
   // Real-time ComfyUI progress endpoints

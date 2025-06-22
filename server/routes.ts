@@ -762,29 +762,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
               if (storedServer.vastId) {
                 const vastInstance = instances.find((instance: any) => instance.id.toString() === storedServer.vastId);
                 if (vastInstance) {
-                  // Update existing server with current Vast.ai data
-                  await storage.updateVastServer(storedServer.id, {
-                    status: vastInstance.actual_status === 'running' ? 'running' : 'stopped',
-                    serverUrl: vastInstance.ssh_host ? `http://${vastInstance.ssh_host}:${vastInstance.direct_port_start || 8188}` : storedServer.serverUrl,
-                    sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
-                      ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
-                      : storedServer.sshConnection,
-                    isLaunched: vastInstance.actual_status === 'running',
-                    setupStatus: vastInstance.actual_status === 'running' ? 'ready' : 'pending',
-                    metadata: {
-                      ...storedServer.metadata as any,
-                      vastData: {
-                        machine_id: vastInstance.machine_id,
-                        hostname: vastInstance.hostname,
-                        created_on: vastInstance.start_date,
-                        ssh_host: vastInstance.ssh_host,
-                        ssh_port: vastInstance.ssh_port,
-                        direct_port_start: vastInstance.direct_port_start,
-                        direct_port_end: vastInstance.direct_port_end,
-                        last_synced: new Date().toISOString()
+                  // Only update if localOverride is not set (respect manual changes)
+                  if (!storedServer.localOverride) {
+                    // Update existing server with current Vast.ai data
+                    await storage.updateVastServer(storedServer.id, {
+                      status: vastInstance.actual_status === 'running' ? 'running' : 'stopped',
+                      serverUrl: vastInstance.ssh_host ? `http://${vastInstance.ssh_host}:${vastInstance.direct_port_start || 8188}` : storedServer.serverUrl,
+                      sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
+                        ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
+                        : storedServer.sshConnection,
+                      isLaunched: vastInstance.actual_status === 'running',
+                      setupStatus: vastInstance.actual_status === 'running' ? 'ready' : 'pending',
+                      metadata: {
+                        ...storedServer.metadata as any,
+                        vastData: {
+                          machine_id: vastInstance.machine_id,
+                          hostname: vastInstance.hostname,
+                          created_on: vastInstance.start_date,
+                          ssh_host: vastInstance.ssh_host,
+                          ssh_port: vastInstance.ssh_port,
+                          direct_port_start: vastInstance.direct_port_start,
+                          direct_port_end: vastInstance.direct_port_end,
+                          last_synced: new Date().toISOString()
+                        }
                       }
-                    }
-                  });
+                    });
+                  } else {
+                    console.log(`Skipping sync for server ${storedServer.id} due to localOverride flag`);
+                  }
                 } else {
                   // Server no longer exists on Vast.ai, remove it from our database
                   console.log(`Removing deleted Vast.ai instance: ${storedServer.vastId}`);
@@ -902,9 +907,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Server not found" });
       }
 
-      // Try to sync this specific server with Vast.ai for fresh data
+      // Try to sync this specific server with Vast.ai for fresh data (only if localOverride is not set)
       const vastApiKey = await storage.getApiKeyByService("vast");
-      if (vastApiKey?.keyValue && server.vastId) {
+      if (vastApiKey?.keyValue && server.vastId && !server.localOverride) {
         try {
           const response = await fetch('https://console.vast.ai/api/v0/instances?owner=me', {
             headers: {
@@ -948,6 +953,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (vastError) {
           console.error("Failed to sync server with Vast.ai:", vastError);
         }
+      } else if (server.localOverride) {
+        console.log(`Skipping individual server sync for server ${id} due to localOverride flag`);
       }
       
       res.json(server);
@@ -1110,7 +1117,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       console.log(`Stopping server ${id}: ${server.name}`);
 
-      // Immediately update server to stopped status with local override flag
+      // Get Vast.ai API key and attempt to stop the actual instance
+      const vastApiKey = await storage.getApiKeyByService('vast');
+      console.log(`Vast.ai API key found: ${vastApiKey ? 'Yes' : 'No'}`);
+      console.log(`Server vastId: ${server.vastId}`);
+      
+      if (vastApiKey && vastApiKey.keyValue && server.vastId) {
+        try {
+          console.log(`Initializing Vast.ai service with API key ending in: ${vastApiKey.keyValue.slice(-4)}`);
+          const { VastAIService } = await import('./vast-ai');
+          const vastService = new VastAIService(vastApiKey.keyValue);
+          
+          console.log(`Attempting to stop Vast.ai instance ${server.vastId} via API`);
+          const stopSuccess = await vastService.stopInstance(parseInt(server.vastId));
+          
+          if (stopSuccess) {
+            console.log(`✅ Successfully stopped Vast.ai instance ${server.vastId} on platform`);
+          } else {
+            console.log(`❌ Failed to stop Vast.ai instance ${server.vastId} on platform, updating local status only`);
+          }
+        } catch (error) {
+          console.error('❌ Error stopping Vast.ai instance:', error);
+          // Continue with local update even if API call fails
+        }
+      } else {
+        console.log(`⚠️ Skipping Vast.ai API call - Missing API key: ${!vastApiKey}, Missing vastId: ${!server.vastId}`);
+      }
+
+      // Update server to stopped status with local override flag
       const stoppedServer = await storage.updateVastServer(id, { 
         status: "stopped",
         isLaunched: false,

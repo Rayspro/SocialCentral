@@ -322,6 +322,72 @@ class VastAIService {
     }
   }
 
+  async stopInstance(instanceId: number): Promise<boolean> {
+    try {
+      console.log(`Attempting to stop Vast.ai instance ${instanceId}`);
+      
+      // Try the most common pattern first: PUT to /instances/{id}/ with action parameter
+      let response = await this.makeRequest(`/instances/${instanceId}/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          action: 'stop'
+        })
+      });
+
+      console.log('Stop instance (PUT with action) response:', response);
+      if (response.success === true) {
+        return true;
+      }
+
+      // Alternative 1: Direct state change
+      response = await this.makeRequest(`/instances/${instanceId}/`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          state: 'stopped'
+        })
+      });
+
+      console.log('Stop instance (PUT with state) response:', response);
+      if (response.success === true) {
+        return true;
+      }
+
+      // Alternative 2: POST to stop endpoint
+      response = await this.makeRequest(`/instances/${instanceId}/stop/`, {
+        method: 'POST',
+      });
+
+      console.log('Stop instance (POST to stop/) response:', response);
+      if (response.success === true) {
+        return true;
+      }
+
+      // Alternative 3: PATCH method
+      response = await this.makeRequest(`/instances/${instanceId}/`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          intended_status: 'stopped'
+        })
+      });
+
+      console.log('Stop instance (PATCH) response:', response);
+      return response.success === true;
+
+    } catch (error) {
+      console.error('All stop instance attempts failed:', error);
+      return false;
+    }
+  }
+
   private mapStatus(status: string): 'running' | 'stopped' | 'loading' | 'error' {
     switch (status?.toLowerCase()) {
       case 'running':

@@ -25,7 +25,27 @@ interface YouTubeUserInfo {
   };
 }
 
+interface InstagramUserInfo {
+  id: string;
+  username: string;
+  account_type: string;
+  media_count?: number;
+  followers_count?: number;
+}
+
 class OAuthManager {
+  private getInstagramAuthUrl(credentials: OAuthCredentials, state: string): string {
+    const params = new URLSearchParams({
+      client_id: credentials.clientId,
+      redirect_uri: credentials.redirectUri,
+      scope: 'user_profile,user_media',
+      response_type: 'code',
+      state: state
+    });
+
+    return `https://api.instagram.com/oauth/authorize?${params.toString()}`;
+  }
+
   private getYouTubeAuthUrl(credentials: OAuthCredentials, state: string): string {
     const params = new URLSearchParams({
       client_id: credentials.clientId,
@@ -40,19 +60,33 @@ class OAuthManager {
     return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
   }
 
-  private async exchangeCodeForTokens(code: string, credentials: OAuthCredentials): Promise<any> {
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+  private async exchangeCodeForTokens(code: string, credentials: OAuthCredentials, platform: 'youtube' | 'instagram' = 'youtube'): Promise<any> {
+    const tokenUrl = platform === 'instagram' 
+      ? 'https://api.instagram.com/oauth/access_token'
+      : 'https://oauth2.googleapis.com/token';
+
+    const body = platform === 'instagram'
+      ? new URLSearchParams({
+          client_id: credentials.clientId,
+          client_secret: credentials.clientSecret,
+          code: code,
+          grant_type: 'authorization_code',
+          redirect_uri: credentials.redirectUri,
+        })
+      : new URLSearchParams({
+          client_id: credentials.clientId,
+          client_secret: credentials.clientSecret,
+          code: code,
+          grant_type: 'authorization_code',
+          redirect_uri: credentials.redirectUri,
+        });
+
+    const tokenResponse = await fetch(tokenUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        client_id: credentials.clientId,
-        client_secret: credentials.clientSecret,
-        code: code,
-        grant_type: 'authorization_code',
-        redirect_uri: credentials.redirectUri,
-      }),
+      body: body,
     });
 
     if (!tokenResponse.ok) {
@@ -82,6 +116,119 @@ class OAuthManager {
     }
 
     return data.items[0];
+  }
+
+  private async getInstagramUserInfo(accessToken: string): Promise<InstagramUserInfo> {
+    const response = await fetch(
+      'https://graph.instagram.com/me?fields=id,username,account_type,media_count,followers_count',
+      {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Instagram API request failed: ${response.statusText}`);
+    }
+
+    return await response.json();
+  }
+
+  async initiateInstagramAuth(req: Request, res: Response): Promise<void> {
+    try {
+      const { clientId, clientSecret } = req.body;
+
+      if (!clientId || !clientSecret) {
+        res.status(400).json({ error: 'App ID and App Secret are required' });
+        return;
+      }
+
+      const redirectUri = `${req.protocol}://${req.get('host')}/api/auth/instagram/callback`;
+      const state = Math.random().toString(36).substring(2, 15);
+
+      // Store credentials temporarily
+      const tempStorage = (global as any).tempAuthStorage || {};
+      tempStorage[state] = {
+        clientId,
+        clientSecret,
+        redirectUri,
+        state
+      };
+      (global as any).tempAuthStorage = tempStorage;
+
+      const authUrl = this.getInstagramAuthUrl({ clientId, clientSecret, redirectUri }, state);
+      
+      res.json({ authUrl });
+    } catch (error) {
+      console.error('Instagram auth initiation error:', error);
+      res.status(500).json({ error: 'Failed to initiate Instagram authentication' });
+    }
+  }
+
+  async handleInstagramCallback(req: Request, res: Response): Promise<void> {
+    try {
+      const { code, state, error } = req.query;
+
+      if (error) {
+        res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5000'}/platforms?error=${encodeURIComponent(error as string)}`);
+        return;
+      }
+
+      if (!code || !state) {
+        res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5000'}/platforms?error=missing_code_or_state`);
+        return;
+      }
+
+      const tempStorage = (global as any).tempAuthStorage || {};
+      const authData = tempStorage[state as string];
+      if (!authData || authData.state !== state) {
+        res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5000'}/platforms?error=invalid_state`);
+        return;
+      }
+
+      // Exchange code for tokens
+      const tokens = await this.exchangeCodeForTokens(code as string, authData, 'instagram');
+      
+      // Get user information
+      const userInfo = await this.getInstagramUserInfo(tokens.access_token);
+
+      // Find Instagram platform
+      const instagramPlatform = await db
+        .select()
+        .from(platforms)
+        .where(eq(platforms.name, 'instagram'))
+        .limit(1);
+
+      if (instagramPlatform.length === 0) {
+        res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5000'}/platforms?error=platform_not_found`);
+        return;
+      }
+
+      // Create account record
+      await db.insert(accounts).values({
+        platformId: instagramPlatform[0].id,
+        name: userInfo.username,
+        username: `@${userInfo.username}`,
+        isActive: true,
+        metadata: {
+          instagramId: userInfo.id,
+          accountType: userInfo.account_type,
+          mediaCount: userInfo.media_count || 0,
+          followersCount: userInfo.followers_count || 0,
+          accessToken: tokens.access_token,
+          tokenExpiresAt: new Date(Date.now() + (tokens.expires_in * 1000)),
+        }
+      });
+
+      // Clear temporary storage
+      delete tempStorage[state as string];
+
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5000'}/platforms?success=instagram_connected`);
+    } catch (error) {
+      console.error('Instagram callback error:', error);
+      res.redirect(`${process.env.CLIENT_URL || 'http://localhost:5000'}/platforms?error=callback_failed`);
+    }
   }
 
   async initiateYouTubeAuth(req: Request, res: Response): Promise<void> {

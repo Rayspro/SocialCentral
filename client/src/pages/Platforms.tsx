@@ -28,6 +28,10 @@ export default function Platforms() {
       setMessage({ type: 'success', text: 'YouTube account connected successfully!' });
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (success === 'instagram_connected') {
+      setMessage({ type: 'success', text: 'Instagram account connected successfully!' });
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
     } else if (error) {
       const errorMessages: { [key: string]: string } = {
         'missing_code_or_state': 'Authentication failed - missing authorization code',

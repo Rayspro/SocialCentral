@@ -2577,6 +2577,14 @@ echo "ComfyUI is now running on port 8188"
     await oauthManager.handleYouTubeCallback(req, res);
   });
 
+  app.post('/api/auth/instagram/initiate', async (req: Request, res: Response) => {
+    await oauthManager.initiateInstagramAuth(req, res);
+  });
+
+  app.get('/api/auth/instagram/callback', async (req: Request, res: Response) => {
+    await oauthManager.handleInstagramCallback(req, res);
+  });
+
   // Real-time ComfyUI progress endpoints
   app.get('/api/comfy/progress/:generationId', async (req: Request, res: Response) => {
     try {

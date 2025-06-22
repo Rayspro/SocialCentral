@@ -385,6 +385,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteVastServer(id: number): Promise<void> {
+    // First, delete related server executions to avoid foreign key constraint violation
+    await db.delete(schema.serverExecutions).where(eq(schema.serverExecutions.serverId, id));
+    
+    // Then delete the server
     await db.delete(schema.vastServers).where(eq(schema.vastServers.id, id));
   }
 

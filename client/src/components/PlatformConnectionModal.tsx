@@ -135,6 +135,36 @@ export function PlatformConnectionModal({ open, onOpenChange }: PlatformConnecti
         console.error('YouTube connection error:', error);
         alert('Failed to connect to YouTube. Please check your credentials and try again.');
       }
+    } else if (selectedPlatform === 'instagram') {
+      try {
+        if (!credentials.clientId || !credentials.clientSecret) {
+          alert('Please enter both App ID and App Secret for Instagram');
+          return;
+        }
+
+        const response = await fetch('/api/auth/instagram/initiate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            clientId: credentials.clientId,
+            clientSecret: credentials.clientSecret,
+          }),
+        });
+
+        if (response.ok) {
+          const { authUrl } = await response.json();
+          // Open the Instagram OAuth consent screen
+          window.location.href = authUrl;
+        } else {
+          const error = await response.json();
+          alert(`Failed to initiate Instagram connection: ${error.error}`);
+        }
+      } catch (error) {
+        console.error('Instagram connection error:', error);
+        alert('Failed to connect to Instagram. Please check your credentials and try again.');
+      }
     } else {
       // For other platforms, show setup instructions
       alert(`To connect to ${selectedPlatform}, you need to:\n\n1. Set up API credentials with the platform\n2. Configure OAuth settings\n3. Implement the authentication flow\n\nThis feature is coming soon - accounts can be added manually in the platform management section for now.`);

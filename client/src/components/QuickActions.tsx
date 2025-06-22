@@ -97,39 +97,39 @@ export function QuickActions() {
         <CardHeader>
           <CardTitle className="text-base text-gray-900 dark:text-white">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 sm:space-y-4">
           <Link href="/create">
-            <Button className="w-full justify-start bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0">
-              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
-                <Video className="text-white h-4 w-4" />
+            <Button className="w-full justify-start bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-0 h-12 sm:h-14">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-blue-600 rounded-lg flex items-center justify-center mr-3">
+                <Video className="text-white h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="text-left">
-                <p className="font-medium">Create Video</p>
-                <p className="text-xs text-blue-500 dark:text-blue-300">Text to video generation</p>
+                <p className="font-medium text-sm sm:text-base">Create Video</p>
+                <p className="text-xs sm:text-sm text-blue-500 dark:text-blue-300">Text to video generation</p>
               </div>
             </Button>
           </Link>
           
           <Link href="/create">
-            <Button className="w-full justify-start bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-0">
-              <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
-                <Image className="text-white h-4 w-4" />
+            <Button className="w-full justify-start bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/30 text-purple-600 dark:text-purple-400 border-0 h-12 sm:h-14">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-600 rounded-lg flex items-center justify-center mr-3">
+                <Image className="text-white h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="text-left">
-                <p className="font-medium">Generate Image</p>
-                <p className="text-xs text-purple-500 dark:text-purple-300">AI-powered image creation</p>
+                <p className="font-medium text-sm sm:text-base">Generate Image</p>
+                <p className="text-xs sm:text-sm text-purple-500 dark:text-purple-300">AI-powered image creation</p>
               </div>
             </Button>
           </Link>
           
           <Link href="/schedule">
-            <Button className="w-full justify-start bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400 border-0">
-              <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3">
-                <CalendarPlus className="text-white h-4 w-4" />
+            <Button className="w-full justify-start bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30 text-green-600 dark:text-green-400 border-0 h-12 sm:h-14">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-600 rounded-lg flex items-center justify-center mr-3">
+                <CalendarPlus className="text-white h-4 w-4 sm:h-5 sm:w-5" />
               </div>
               <div className="text-left">
-                <p className="font-medium">Schedule Post</p>
-                <p className="text-xs text-green-500 dark:text-green-300">Plan your content</p>
+                <p className="font-medium text-sm sm:text-base">Schedule Post</p>
+                <p className="text-xs sm:text-sm text-green-500 dark:text-green-300">Plan your content</p>
               </div>
             </Button>
           </Link>

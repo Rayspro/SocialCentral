@@ -3,9 +3,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ExternalLink, Key, Shield } from "lucide-react";
+import { ExternalLink, Key, Shield, Loader2, CheckCircle } from "lucide-react";
 import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import type { Platform } from "@shared/schema";
+import { OAuthTransition } from "./OAuth/OAuthTransition";
+import { OAuthLoadingModal } from "./OAuth/OAuthLoadingModal";
 
 interface PlatformConnectionModalProps {
   open: boolean;
@@ -99,19 +102,28 @@ export function PlatformConnectionModal({ open, onOpenChange }: PlatformConnecti
     apiKey: "",
     bearerToken: ""
   });
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStep, setConnectionStep] = useState<'credentials' | 'oauth' | 'complete'>('credentials');
+  const [authUrl, setAuthUrl] = useState<string>("");
+  const [showOAuthTransition, setShowOAuthTransition] = useState(false);
+  const [showLoadingModal, setShowLoadingModal] = useState(false);
 
   const handleConnect = async () => {
     if (!selectedPlatform) return;
     
-    console.log("Connecting to platform:", selectedPlatform, "with credentials:", credentials);
+    setIsConnecting(true);
     
-    if (selectedPlatform === 'youtube') {
-      try {
+    try {
+      if (selectedPlatform === 'youtube') {
         if (!credentials.clientId || !credentials.clientSecret) {
           alert('Please enter both Client ID and Client Secret for YouTube');
+          setIsConnecting(false);
           return;
         }
 
+        // Show loading modal
+        setShowLoadingModal(true);
+        
         const response = await fetch('/api/auth/youtube/initiate', {
           method: 'POST',
           headers: {
@@ -125,22 +137,27 @@ export function PlatformConnectionModal({ open, onOpenChange }: PlatformConnecti
 
         if (response.ok) {
           const { authUrl } = await response.json();
-          // Open the YouTube OAuth consent screen
-          window.location.href = authUrl;
+          setAuthUrl(authUrl);
+          
+          // Hide loading modal and show OAuth transition
+          setTimeout(() => {
+            setShowLoadingModal(false);
+            setShowOAuthTransition(true);
+          }, 2000);
         } else {
           const error = await response.json();
+          setShowLoadingModal(false);
           alert(`Failed to initiate YouTube connection: ${error.error}`);
         }
-      } catch (error) {
-        console.error('YouTube connection error:', error);
-        alert('Failed to connect to YouTube. Please check your credentials and try again.');
-      }
-    } else if (selectedPlatform === 'instagram') {
-      try {
+      } else if (selectedPlatform === 'instagram') {
         if (!credentials.clientId || !credentials.clientSecret) {
           alert('Please enter both App ID and App Secret for Instagram');
+          setIsConnecting(false);
           return;
         }
+
+        // Show loading modal
+        setShowLoadingModal(true);
 
         const response = await fetch('/api/auth/instagram/initiate', {
           method: 'POST',
@@ -155,22 +172,30 @@ export function PlatformConnectionModal({ open, onOpenChange }: PlatformConnecti
 
         if (response.ok) {
           const { authUrl } = await response.json();
-          // Open the Instagram OAuth consent screen
-          window.location.href = authUrl;
+          setAuthUrl(authUrl);
+          
+          // Hide loading modal and show OAuth transition
+          setTimeout(() => {
+            setShowLoadingModal(false);
+            setShowOAuthTransition(true);
+          }, 2000);
         } else {
           const error = await response.json();
+          setShowLoadingModal(false);
           alert(`Failed to initiate Instagram connection: ${error.error}`);
         }
-      } catch (error) {
-        console.error('Instagram connection error:', error);
-        alert('Failed to connect to Instagram. Please check your credentials and try again.');
+      } else {
+        // For other platforms, show setup instructions
+        setShowLoadingModal(false);
+        alert(`To connect to ${selectedPlatform}, you need to:\n\n1. Set up API credentials with the platform\n2. Configure OAuth settings\n3. Implement the authentication flow\n\nThis feature is coming soon - accounts can be added manually in the platform management section for now.`);
       }
-    } else {
-      // For other platforms, show setup instructions
-      alert(`To connect to ${selectedPlatform}, you need to:\n\n1. Set up API credentials with the platform\n2. Configure OAuth settings\n3. Implement the authentication flow\n\nThis feature is coming soon - accounts can be added manually in the platform management section for now.`);
+    } catch (error) {
+      console.error('Connection error:', error);
+      setShowLoadingModal(false);
+      alert('Failed to connect. Please check your credentials and try again.');
+    } finally {
+      setIsConnecting(false);
     }
-    
-    onOpenChange(false);
   };
 
   const selectedPlatformInfo = platformsInfo.find(p => p.name === selectedPlatform);
@@ -408,14 +433,49 @@ export function PlatformConnectionModal({ open, onOpenChange }: PlatformConnecti
                   <Button 
                     onClick={handleConnect}
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                    disabled={!credentials.clientId && !credentials.apiKey}
+                    disabled={isConnecting || (!credentials.clientId && !credentials.apiKey)}
                   >
-                    Connect {selectedPlatformInfo?.displayName}
+                    {isConnecting ? (
+                      <motion.div
+                        className="flex items-center space-x-2"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Connecting...</span>
+                      </motion.div>
+                    ) : (
+                      <span>Connect {selectedPlatformInfo?.displayName}</span>
+                    )}
                   </Button>
                 </CardContent>
               </Card>
             </div>
           </div>
+        )}
+        
+        {/* OAuth Loading Modal */}
+        <OAuthLoadingModal
+          isOpen={showLoadingModal}
+          platform={selectedPlatform || ''}
+          onClose={() => setShowLoadingModal(false)}
+        />
+        
+        {/* OAuth Transition */}
+        {showOAuthTransition && authUrl && selectedPlatform && (
+          <OAuthTransition
+            platform={selectedPlatform}
+            authUrl={authUrl}
+            onComplete={() => {
+              setShowOAuthTransition(false);
+              setConnectionStep('complete');
+              onOpenChange(false);
+            }}
+            onError={(error) => {
+              setShowOAuthTransition(false);
+              alert(`OAuth error: ${error}`);
+            }}
+          />
         )}
       </DialogContent>
     </Dialog>

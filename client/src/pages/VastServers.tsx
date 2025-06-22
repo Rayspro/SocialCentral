@@ -144,7 +144,7 @@ export default function VastServers() {
   // Stop server mutation
   const stopMutation = useMutation({
     mutationFn: async (serverId: number) => {
-      const response = await fetch(`/api/vast-servers/stop/${serverId}`, {
+      const response = await fetch(`/api/vast-servers/${serverId}/stop`, {
         method: 'POST',
       });
       if (!response.ok) throw new Error('Failed to stop server');

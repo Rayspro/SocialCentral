@@ -29,8 +29,20 @@ class ServerScheduler {
 
     console.log(`Starting scheduler monitoring for server ${serverId}: ${server.name}`);
 
-    // Log scheduler start (remove audit log to avoid foreign key constraint)
-    console.log(`Scheduler started for server ${serverId}: ${server.name}`);
+    // Log scheduler start
+    await storage.createAuditLog({
+      category: 'system_event',
+      userId: 1,
+      action: 'scheduler_started',
+      resource: 'vast_server',
+      resourceId: serverId.toString(),
+      details: {
+        serverName: server.name,
+        checkInterval: this.CHECK_INTERVAL,
+        maxChecks: this.MAX_CHECKS
+      },
+      severity: 'info'
+    });
 
     const intervalId = setInterval(async () => {
       await this.checkServerStatus(serverId);
@@ -84,7 +96,20 @@ class ServerScheduler {
       console.log(`Scheduler check ${scheduledServer.checkCount} for server ${serverId}: ${server.status}`);
 
       // Log status check
-      console.log(`Status check ${scheduledServer.checkCount} for server ${serverId}: ${previousStatus} -> ${server.status}`);
+      await storage.createAuditLog({
+        category: 'system_event',
+        userId: 1,
+        action: 'scheduler_status_check',
+        resource: 'vast_server',
+        resourceId: serverId.toString(),
+        details: {
+          checkNumber: scheduledServer.checkCount,
+          currentStatus: server.status,
+          previousStatus,
+          serverName: server.name
+        },
+        severity: 'info'
+      });
 
       // If server is running and ComfyUI not set up, initiate setup
       if (server.status === 'running' && server.setupStatus !== 'ready') {
@@ -114,7 +139,18 @@ class ServerScheduler {
       console.error(`Error checking server ${serverId} status:`, error);
       
       // Log error and continue monitoring
-      console.error(`Scheduler error for server ${serverId}:`, error instanceof Error ? error.message : 'Unknown error');
+      await storage.createAuditLog({
+        category: 'system_event',
+        userId: 1,
+        action: 'scheduler_error',
+        resource: 'vast_server',
+        resourceId: serverId.toString(),
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          checkNumber: scheduledServer.checkCount
+        },
+        severity: 'error'
+      });
     }
   }
 
@@ -132,7 +168,18 @@ class ServerScheduler {
       });
 
       // Log ComfyUI setup initiation
-      console.log(`ComfyUI setup initiated for server ${serverId}: ${server.name} (auto-setup)`);
+      await storage.createAuditLog({
+        category: 'system_event',
+        userId: 1,
+        action: 'comfyui_setup_initiated',
+        resource: 'vast_server',
+        resourceId: serverId.toString(),
+        details: {
+          serverName: server.name,
+          trigger: 'scheduler_auto_setup'
+        },
+        severity: 'info'
+      });
 
       // Get ComfyUI setup script
       const setupScripts = await storage.getSetupScripts();
@@ -168,7 +215,19 @@ class ServerScheduler {
             });
 
             // Log successful setup
-            console.log(`ComfyUI setup completed successfully for server ${serverId}: ${server.name}`);
+            await storage.createAuditLog({
+              category: 'system_event',
+              userId: 1,
+              action: 'comfyui_setup_completed',
+              resource: 'vast_server',
+              resourceId: serverId.toString(),
+              details: {
+                serverName: server.name,
+                setupDuration: '5 minutes',
+                trigger: 'scheduler_auto_setup'
+              },
+              severity: 'info'
+            });
 
           } else {
             await storage.updateServerExecution(execution.id, {
@@ -184,7 +243,18 @@ class ServerScheduler {
             });
 
             // Log failed setup
-            console.error(`ComfyUI setup failed for server ${serverId}: ${server.name} - Setup script execution failed`);
+            await storage.createAuditLog({
+              category: 'system_event',
+              userId: 1,
+              action: 'comfyui_setup_failed',
+              resource: 'vast_server',
+              resourceId: serverId.toString(),
+              details: {
+                serverName: server.name,
+                error: 'Setup script execution failed'
+              },
+              severity: 'error'
+            });
           }
         } catch (error) {
           console.error('Error during ComfyUI setup:', error);
@@ -194,7 +264,17 @@ class ServerScheduler {
     } catch (error) {
       console.error(`Error initiating ComfyUI setup for server ${serverId}:`, error);
       
-      console.error(`ComfyUI setup error for server ${serverId}:`, error instanceof Error ? error.message : 'Unknown error');
+      await storage.createAuditLog({
+        category: 'system_event',
+        userId: 1,
+        action: 'comfyui_setup_error',
+        resource: 'vast_server',
+        resourceId: serverId.toString(),
+        details: {
+          error: error instanceof Error ? error.message : 'Unknown error'
+        },
+        severity: 'error'
+      });
     }
   }
 

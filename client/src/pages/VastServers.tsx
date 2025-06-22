@@ -498,56 +498,202 @@ export default function VastServers() {
           ) : launchedServers && launchedServers.length > 0 ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {launchedServers.map((server) => (
-                <Card key={server.id}>
+                <Card 
+                  key={server.id} 
+                  className="cursor-pointer hover:shadow-lg hover:scale-[1.02] transition-all duration-200 transform hover:border-blue-300 dark:hover:border-blue-600"
+                  onClick={() => {
+                    window.location.href = `/server/${server.id}`;
+                  }}
+                >
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">{server.name}</CardTitle>
-                      <Badge className={getStatusColor(server.status)}>
-                        {server.status}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(server.status)}>
+                          {server.status}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => queryClient.invalidateQueries({ queryKey: ['/api/vast-servers'] })}
+                          className="h-6 w-6 p-0"
+                        >
+                          <RefreshCw className="h-3 w-3" />
+                        </Button>
+                      </div>
                     </div>
                     <CardDescription className="text-xs">
                       {server.gpu} × {server.gpuCount} | {server.location}
                     </CardDescription>
+                    {server.setupStatus && server.setupStatus !== 'pending' && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Badge variant="outline" className={getSetupStatusColor(server.setupStatus)}>
+                          Setup: {server.setupStatus}
+                        </Badge>
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span>CPU:</span>
-                        <span>{server.cpuCores} cores</span>
+                    <div className="space-y-3">
+                      {/* Server Status Indicators */}
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800">
+                          <div className={`w-2 h-2 rounded-full ${getStatusIndicator(server.status)}`}></div>
+                          <span className="font-medium">Server: {server.status}</span>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 rounded bg-gray-50 dark:bg-gray-800">
+                          <div className={`w-2 h-2 rounded-full ${getStatusIndicator(server.setupStatus || 'pending')}`}></div>
+                          <span className="font-medium">Setup: {server.setupStatus || 'pending'}</span>
+                        </div>
                       </div>
-                      <div className="flex justify-between">
-                        <span>RAM:</span>
-                        <span>{server.ram} GB</span>
+
+                      {/* Server Specs */}
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>CPU Cores:</span>
+                          <span>{server.cpuCores}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>RAM:</span>
+                          <span>{server.ram} GB</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Storage:</span>
+                          <span>{server.disk} GB</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Cost:</span>
+                          <span className="font-semibold">{formatPrice(server.pricePerHour)}</span>
+                        </div>
+                        {server.launchedAt && (
+                          <div className="flex justify-between">
+                            <span>Launched:</span>
+                            <span className="text-xs">{new Date(server.launchedAt).toLocaleString()}</span>
+                          </div>
+                        )}
+                        {server.serverUrl && (
+                          <div className="flex justify-between">
+                            <span>SSH:</span>
+                            <code className="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">
+                              {server.sshConnection?.replace('ssh ', '') || server.serverUrl}
+                            </code>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex justify-between">
-                        <span>Storage:</span>
-                        <span>{server.disk} GB</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Cost:</span>
-                        <span className="font-semibold">{formatPrice(server.pricePerHour)}</span>
-                      </div>
+
+                      {/* Loading Animation for Active States */}
+                      {['launching', 'configuring', 'stopping'].includes(server.status) && (
+                        <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded animate-pulse">
+                          <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                          <span className="text-sm text-blue-600 dark:text-blue-400">
+                            {server.status === 'launching' && 'Launching server instance...'}
+                            {server.status === 'configuring' && 'Configuring server environment...'}
+                            {server.status === 'stopping' && 'Stopping server instance...'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Setup Status Animation */}
+                      {server.setupStatus === 'installing' && (
+                        <div className="flex items-center gap-2 p-2 bg-purple-50 dark:bg-purple-900/20 rounded animate-pulse">
+                          <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
+                          <span className="text-sm text-purple-600 dark:text-purple-400">Installing ComfyUI...</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-2 mt-4">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => stopMutation.mutate(server.id)}
-                        disabled={stopMutation.isPending}
-                      >
-                        <Square className="h-4 w-4 mr-1" />
-                        Stop
-                      </Button>
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={() => deleteMutation.mutate(server.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" />
-                        Delete
-                      </Button>
+
+                    <div className="flex flex-col gap-2 mt-4">
+                      {/* Primary actions row */}
+                      <div className="flex gap-2">
+                        {server.status === 'running' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              queryClient.invalidateQueries({ queryKey: [`/api/vast-servers/${server.id}`] });
+                            }}
+                            className="flex-1"
+                          >
+                            <RefreshCw className="h-4 w-4 mr-1" />
+                            Refresh
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `/server-detail/${server.id}`;
+                          }}
+                          className="flex-1"
+                        >
+                          <Timer className="h-4 w-4 mr-1" />
+                          Monitor
+                          </Button>
+                      </div>
+                      
+
+
+                      {/* Secondary actions row */}
+                      {server.isLaunched && ['launching', 'running', 'configuring'].includes(server.status) && (
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => stopMutation.mutate(server.id)}
+                            disabled={stopMutation.isPending || server.status === 'stopping'}
+                            className="flex-1"
+                          >
+                            <Square className="h-4 w-4 mr-1" />
+                            {server.status === 'stopping' ? 'Stopping...' : 'Stop'}
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteMutation.mutate(server.id)}
+                            disabled={deleteMutation.isPending}
+                            className="flex-1"
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      )}
+                      
+                      {/* Start and Delete buttons for stopped servers */}
+                      {(!server.isLaunched || !['launching', 'running', 'configuring'].includes(server.status)) && (
+                        <div className="flex gap-2">
+                          {server.status === 'stopped' && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                startMutation.mutate(server.id);
+                              }}
+                              disabled={startMutation.isPending}
+                              className="flex-1"
+                            >
+                              <Play className="h-4 w-4 mr-1" />
+                              {startMutation.isPending ? 'Starting...' : 'Start'}
+                            </Button>
+                          )}
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMutation.mutate(server.id);
+                            }}
+                            disabled={deleteMutation.isPending}
+                            className={server.status === 'stopped' ? 'flex-1' : 'w-full'}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>

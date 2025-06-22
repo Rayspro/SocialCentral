@@ -20,6 +20,25 @@ export class ServerScheduler {
 
     console.log(`Starting scheduler monitoring for server ${serverId}: ${server.name}`);
 
+    // Log scheduler start
+    try {
+      await storage.createAuditLog({
+        category: 'system_event',
+        userId: null,
+        action: 'scheduler_started',
+        resource: 'vast_server',
+        resourceId: serverId.toString(),
+        details: {
+          serverName: server.name,
+          checkInterval: this.CHECK_INTERVAL,
+          maxChecks: this.MAX_CHECKS
+        },
+        severity: 'info'
+      });
+    } catch (error) {
+      console.error('Error logging scheduler start:', error);
+    }
+
     const intervalId = setInterval(async () => {
       await this.checkServerStatus(serverId);
     }, this.CHECK_INTERVAL);
@@ -174,6 +193,28 @@ export class ServerScheduler {
 
   getActiveSchedulers(): number[] {
     return Array.from(this.schedulers.keys());
+  }
+
+  async getSchedulerInfo(serverId: number): Promise<any> {
+    const server = await storage.getVastServer(serverId);
+    if (!server) {
+      return null;
+    }
+
+    const isActive = this.schedulers.has(serverId);
+    
+    return {
+      serverId,
+      isActive,
+      schedulerActive: server.schedulerActive,
+      schedulerStarted: server.schedulerStarted,
+      schedulerLastCheck: server.schedulerLastCheck,
+      schedulerChecks: server.schedulerChecks || 0,
+      maxChecks: this.MAX_CHECKS,
+      checkInterval: this.CHECK_INTERVAL,
+      status: server.status,
+      setupStatus: server.setupStatus
+    };
   }
 }
 

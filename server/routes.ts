@@ -1882,8 +1882,8 @@ echo "CUDA environment configured!"`,
         return res.status(404).json({ error: 'Server not found' });
       }
 
-      const schedulerInfo = serverScheduler.getSchedulerInfo(serverId);
-      const allSchedulers = serverScheduler.getAllScheduledServers();
+      const schedulerInfo = await serverScheduler.getSchedulerInfo(serverId);
+      const allSchedulers = serverScheduler.getActiveSchedulers();
 
       res.json({
         server: {
@@ -2814,6 +2814,73 @@ echo "Server is ready for fresh ComfyUI installation"
     } catch (error) {
       console.error('Error fetching interactions:', error);
       res.status(500).json({ error: 'Failed to fetch interactions' });
+    }
+  });
+
+  // Test route to create audit log
+  app.post('/api/test-audit-log', async (req: Request, res: Response) => {
+    try {
+      const testLog = await storage.createAuditLog({
+        category: 'system_event',
+        userId: null, // System event, no user
+        action: 'test_audit_creation',
+        resource: 'audit_system',
+        resourceId: 'test',
+        details: { message: 'Testing audit log creation', timestamp: new Date().toISOString() },
+        severity: 'info'
+      });
+      
+      console.log('Test audit log created:', testLog);
+      res.json({ success: true, log: testLog });
+    } catch (error) {
+      console.error('Error creating test audit log:', error);
+      res.status(500).json({ error: 'Failed to create test audit log', details: error.message });
+    }
+  });
+
+  // Initialize sample audit logs
+  app.post('/api/init-audit-logs', async (req: Request, res: Response) => {
+    try {
+      const sampleLogs = [
+        {
+          category: 'user_action',
+          userId: 2,
+          action: 'server_launched',
+          resource: 'vast_server',
+          resourceId: '12',
+          details: { serverName: 'RTX 4080 Server', vastId: '20231024' },
+          severity: 'info'
+        },
+        {
+          category: 'system_event',
+          userId: null,
+          action: 'scheduler_started',
+          resource: 'vast_server',
+          resourceId: '12',
+          details: { checkInterval: 30000, maxChecks: 20 },
+          severity: 'info'
+        },
+        {
+          category: 'security_event',
+          userId: 2,
+          action: 'api_key_accessed',
+          resource: 'vast_api',
+          resourceId: 'vast_ai_key',
+          details: { endpoint: '/api/vast-servers/launch' },
+          severity: 'warning'
+        }
+      ];
+
+      const createdLogs = [];
+      for (const logData of sampleLogs) {
+        const log = await storage.createAuditLog(logData);
+        createdLogs.push(log);
+      }
+
+      res.json({ success: true, created: createdLogs.length, logs: createdLogs });
+    } catch (error) {
+      console.error('Error initializing audit logs:', error);
+      res.status(500).json({ error: 'Failed to initialize audit logs', details: error.message });
     }
   });
 

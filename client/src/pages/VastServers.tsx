@@ -641,7 +641,10 @@ export default function VastServers() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => stopMutation.mutate(server.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              stopMutation.mutate(server.id);
+                            }}
                             disabled={stopMutation.isPending || server.status === 'stopping'}
                             className="flex-1"
                           >
@@ -651,7 +654,10 @@ export default function VastServers() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => deleteMutation.mutate(server.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMutation.mutate(server.id);
+                            }}
                             disabled={deleteMutation.isPending}
                             className="flex-1"
                           >

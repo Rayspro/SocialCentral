@@ -90,6 +90,7 @@ export const vastServers = pgTable("vast_servers", {
   sshConnection: text("ssh_connection"), // SSH connection string
   status: text("status").notNull().default("available"), // available, launching, running, stopping, stopped, configuring
   setupStatus: text("setup_status").default("pending"), // pending, installing, ready, failed
+  localOverride: boolean("local_override").default(false), // prevents sync from overriding local status changes
   comfyuiPort: integer("comfyui_port").default(8188),
   schedulerActive: boolean("scheduler_active").default(false),
   schedulerChecks: integer("scheduler_checks").default(0),

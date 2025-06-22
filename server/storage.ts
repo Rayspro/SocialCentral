@@ -790,10 +790,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Missing vast server methods
-  async stopVastServer(id: number): Promise<void> {
-    await db.update(schema.vastServers)
-      .set({ status: 'stopped' })
-      .where(eq(schema.vastServers.id, id));
+  async stopVastServer(id: number): Promise<VastServer> {
+    const [updatedServer] = await db.update(schema.vastServers)
+      .set({ 
+        status: 'stopped',
+        isLaunched: false,
+        localOverride: true,
+        updatedAt: new Date()
+      })
+      .where(eq(schema.vastServers.id, id))
+      .returning();
+    return updatedServer;
   }
 
   // Missing setup script methods

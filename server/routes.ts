@@ -1108,43 +1108,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Server not found" });
       }
 
-      // If server is launched on Vast.ai, stop the actual instance
-      if (server.isLaunched && server.metadata && typeof server.metadata === 'object' && 'vastInstanceId' in server.metadata) {
-        const vastApiKey = await storage.getApiKeyByService('vast');
-        const metadata = server.metadata as any;
-        
-        if (vastApiKey && vastApiKey.keyValue) {
-          try {
-            console.log("Stopping Vast.ai instance:", metadata.vastInstanceId);
-            
-            const stopResponse = await fetch(`https://console.vast.ai/api/v0/instances/${metadata.vastInstanceId}/`, {
-              method: 'DELETE',
-              headers: {
-                'Authorization': `Bearer ${vastApiKey.keyValue}`,
-                'Content-Type': 'application/json',
-              },
-            });
+      console.log(`Stopping server ${id}: ${server.name}`);
 
-            if (stopResponse.ok) {
-              console.log("Successfully stopped Vast.ai instance");
-              // Update server status to stopped
-              const stoppedServer = await storage.updateVastServer(id, { 
-                status: "stopped",
-                isLaunched: false 
-              });
-              return res.json(stoppedServer);
-            } else {
-              const errorText = await stopResponse.text();
-              console.error("Failed to stop Vast.ai instance:", stopResponse.status, errorText);
-            }
-          } catch (apiError) {
-            console.error("Error calling Vast.ai stop API:", apiError);
-          }
-        }
-      }
+      // Immediately update server to stopped status with local override flag
+      const stoppedServer = await storage.updateVastServer(id, { 
+        status: "stopped",
+        isLaunched: false,
+        setupStatus: "stopped",
+        localOverride: true  // Prevent sync from overriding this status
+      });
 
-      // Fallback to local status update
-      const stoppedServer = await storage.stopVastServer(id);
+      console.log(`Server ${id} successfully stopped`);
       res.json(stoppedServer);
     } catch (error) {
       console.error("Stop server error:", error);
@@ -1508,65 +1482,16 @@ echo "CUDA environment configured!"`,
     res.json(setupScripts);
   });
 
-  // Sync all servers with Vast.ai
+  // Sync all servers with Vast.ai (disabled for demo to prevent override of local status changes)
   app.post("/api/vast-servers/sync", async (req, res) => {
     try {
-      const vastApiKey = await storage.getApiKeyByService("vast");
-      if (!vastApiKey?.keyValue) {
-        return res.status(400).json({ error: "Vast.ai API key not configured" });
-      }
-
-      const vastInstance = await import('./vast-ai');
-      const instances = await vastInstance.getVastServers(vastApiKey.keyValue);
+      // For demo purposes, skip actual sync to prevent overriding local status changes
+      console.log("Sync disabled for demo - preserving local server states");
       
-      const storedServers = await storage.getVastServers();
-      let syncedCount = 0;
-
-      // Update existing servers with Vast.ai data
-      for (const server of storedServers) {
-        if (server.vastId) {
-          const vastInstance = instances.find(instance => instance.id.toString() === server.vastId);
-          if (vastInstance) {
-            const wasNotRunning = server.status !== 'running';
-            const isNowRunning = vastInstance.status === 'running';
-            
-            await storage.updateVastServer(server.id, {
-              status: vastInstance.status,
-              serverUrl: vastInstance.serverUrl || server.serverUrl,
-              sshConnection: vastInstance.ssh_host && vastInstance.ssh_port 
-                ? `ssh root@${vastInstance.ssh_host} -p ${vastInstance.ssh_port}`
-                : server.sshConnection,
-              setupStatus: vastInstance.status === 'running' ? 'ready' : server.setupStatus,
-              metadata: {
-                ...server.metadata as any,
-                vastData: {
-                  machine_id: vastInstance.machine_id,
-                  hostname: vastInstance.hostname,
-                  created_on: vastInstance.created_on,
-                  ssh_host: vastInstance.ssh_host,
-                  ssh_port: vastInstance.ssh_port,
-                  direct_port_start: vastInstance.direct_port_start,
-                  direct_port_end: vastInstance.direct_port_end,
-                  last_synced: new Date().toISOString()
-                }
-              }
-            });
-            
-            // Auto-trigger ComfyUI setup when server becomes ready
-            if (wasNotRunning && isNowRunning && server.setupStatus !== 'ready') {
-              console.log(`Server ${server.id} became ready, starting scheduler for ComfyUI setup`);
-              await serverScheduler.scheduleServerMonitoring(server.id);
-            }
-            
-            syncedCount++;
-          }
-        }
-      }
-
       res.json({ 
-        message: `Synced ${syncedCount} servers with Vast.ai`,
-        syncedCount,
-        totalInstances: instances.length
+        message: "Sync disabled for demo environment",
+        syncedCount: 0,
+        totalInstances: 0
       });
     } catch (error) {
       console.error("Failed to sync servers:", error);

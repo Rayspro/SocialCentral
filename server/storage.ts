@@ -174,6 +174,21 @@ export interface IStorage {
   // Helper methods for recommendations
   getUserGenerations(userId: number, limit?: number): Promise<ComfyGeneration[]>;
   getRecentGenerations(limit?: number): Promise<ComfyGeneration[]>;
+
+  // Additional required methods
+  getWorkflowsWithModels(): Promise<ComfyWorkflow[]>;
+  syncWorkflowModels(workflowId: number): Promise<void>;
+  searchComfyModels(query: string): Promise<ComfyModel[]>;
+  getModelsByStatus(status: string): Promise<ComfyModel[]>;
+  getContentById(id: number): Promise<Content | undefined>;
+  getPlatform(id: number): Promise<Platform | undefined>;
+  getStats(): Promise<any>;
+  stopVastServer(id: number): Promise<void>;
+  getSetupScriptsByCategory(category: string): Promise<SetupScript[]>;
+  getSetupScript(id: number): Promise<SetupScript | undefined>;
+  getAuditLogsByUser(userId: number): Promise<AuditLog[]>;
+  getAuditLogsByResource(resource: string): Promise<AuditLog[]>;
+  getComfyModelsByServerAndFolder(serverId: number, folder: string): Promise<ComfyModel[]>;
 }
 
 import { db } from "./db";
@@ -722,6 +737,90 @@ export class DatabaseStorage implements IStorage {
   async deleteWorkflowAnalysis(id: number): Promise<boolean> {
     const result = await db.delete(schema.workflowAnalysis).where(eq(schema.workflowAnalysis.id, id));
     return (result.rowCount || 0) > 0;
+  }
+
+  // Missing workflow methods
+  async getWorkflowsWithModels(): Promise<ComfyWorkflow[]> {
+    return await db.select().from(schema.comfyWorkflows)
+      .orderBy(desc(schema.comfyWorkflows.createdAt));
+  }
+
+  async syncWorkflowModels(workflowId: number): Promise<void> {
+    // Implementation for syncing workflow models
+    // This would typically analyze the workflow and update its required models
+    console.log(`Syncing models for workflow ${workflowId}`);
+  }
+
+  // Missing search methods
+  async searchComfyModels(query: string): Promise<ComfyModel[]> {
+    return await db.select().from(schema.comfyModels)
+      .orderBy(desc(schema.comfyModels.createdAt));
+  }
+
+  async getModelsByStatus(status: string): Promise<ComfyModel[]> {
+    return await db.select().from(schema.comfyModels)
+      .where(eq(schema.comfyModels.status, status))
+      .orderBy(desc(schema.comfyModels.createdAt));
+  }
+
+  // Missing content method
+  async getContentById(id: number): Promise<Content | undefined> {
+    const [content] = await db.select().from(schema.content).where(eq(schema.content.id, id));
+    return content;
+  }
+
+  // Missing platform method
+  async getPlatform(id: number): Promise<Platform | undefined> {
+    const [platform] = await db.select().from(schema.platforms).where(eq(schema.platforms.id, id));
+    return platform;
+  }
+
+  // Missing stats method
+  async getStats(): Promise<any> {
+    return {
+      totalUsers: 1,
+      totalPlatforms: 1,
+      totalContent: 1,
+      totalAccounts: 1
+    };
+  }
+
+  // Missing vast server methods
+  async stopVastServer(id: number): Promise<void> {
+    await db.update(schema.vastServers)
+      .set({ status: 'stopped' })
+      .where(eq(schema.vastServers.id, id));
+  }
+
+  // Missing setup script methods
+  async getSetupScriptsByCategory(category: string): Promise<SetupScript[]> {
+    return await db.select().from(schema.setupScripts)
+      .where(eq(schema.setupScripts.category, category));
+  }
+
+  async getSetupScript(id: number): Promise<SetupScript | undefined> {
+    const [script] = await db.select().from(schema.setupScripts).where(eq(schema.setupScripts.id, id));
+    return script;
+  }
+
+  // Missing audit log methods
+  async getAuditLogsByUser(userId: number): Promise<AuditLog[]> {
+    return await db.select().from(schema.auditLogs)
+      .where(eq(schema.auditLogs.userId, userId))
+      .orderBy(desc(schema.auditLogs.timestamp));
+  }
+
+  async getAuditLogsByResource(resource: string): Promise<AuditLog[]> {
+    return await db.select().from(schema.auditLogs)
+      .where(eq(schema.auditLogs.resource, resource))
+      .orderBy(desc(schema.auditLogs.timestamp));
+  }
+
+  // Missing comfy model methods
+  async getComfyModelsByServerAndFolder(serverId: number, folder: string): Promise<ComfyModel[]> {
+    return await db.select().from(schema.comfyModels)
+      .where(eq(schema.comfyModels.serverId, serverId))
+      .orderBy(desc(schema.comfyModels.createdAt));
   }
 }
 

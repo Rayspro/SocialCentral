@@ -733,7 +733,7 @@ export default function ComfyUI() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
+      <div className="container mx-auto px-4 lg:px-6 py-4 space-y-4 lg:space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <nav className="flex items-center space-x-2 text-sm">

@@ -10,16 +10,19 @@ export function StatsGrid() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
         {Array.from({ length: 4 }).map((_, i) => (
-          <Card key={i}>
-            <CardContent className="pt-4 sm:pt-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-6 sm:h-8 w-12" />
+          <Card key={i} className="border-0 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm">
+            <CardContent className="p-4 lg:p-6">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-8 w-8 rounded-lg" />
+                  <Skeleton className="h-3 w-12" />
                 </div>
-                <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg" />
+                <div className="space-y-1">
+                  <Skeleton className="h-8 w-16" />
+                  <Skeleton className="h-3 w-20" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -63,19 +66,31 @@ export function StatsGrid() {
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6">
       {statItems.map((item) => {
         const Icon = item.icon;
         return (
-          <Card key={item.label} className="border border-gray-200 dark:border-slate-700">
-            <CardContent className="pt-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-600 dark:text-gray-400 text-xs">{item.label}</p>
-                  <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{item.value}</p>
+          <Card key={item.label} className="border-0 bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow duration-200">
+            <CardContent className="p-4 lg:p-6">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${colorClasses[item.color as keyof typeof colorClasses]}`}>
+                    <Icon className="h-4 w-4" />
+                  </div>
+                  <p className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    {item.label.split(' ').pop()}
+                  </p>
                 </div>
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center ${colorClasses[item.color as keyof typeof colorClasses]}`}>
-                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
+                <div>
+                  <p className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+                    {item.value}
+                  </p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400 lg:hidden">
+                    {item.label.replace(item.label.split(' ').pop() || '', '').trim()}
+                  </p>
+                  <p className="text-sm text-slate-600 dark:text-slate-400 hidden lg:block">
+                    {item.label}
+                  </p>
                 </div>
               </div>
             </CardContent>

@@ -78,18 +78,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Enhanced Header */}
-        <div className="space-y-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div className="p-2 sm:p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl w-fit">
-              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+        {/* Enhanced Header - Professional mobile design */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-slate-900 to-slate-700 dark:from-slate-100 dark:to-slate-300 rounded-xl flex items-center justify-center shadow-sm">
+              <BarChart3 className="h-6 w-6 text-white dark:text-slate-900" />
             </div>
             <div>
-              <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
+              <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
                 Dashboard
               </h1>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
-                Manage your social media presence and AI workloads
+              <p className="text-sm text-slate-600 dark:text-slate-400 leading-tight">
+                Analytics & Control Center
               </p>
             </div>
           </div>

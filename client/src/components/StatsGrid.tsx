@@ -10,16 +10,16 @@ export function StatsGrid() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {Array.from({ length: 4 }).map((_, i) => (
           <Card key={i}>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 sm:pt-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-2">
                   <Skeleton className="h-4 w-20" />
-                  <Skeleton className="h-8 w-12" />
+                  <Skeleton className="h-6 sm:h-8 w-12" />
                 </div>
-                <Skeleton className="h-12 w-12 rounded-lg" />
+                <Skeleton className="h-10 w-10 sm:h-12 sm:w-12 rounded-lg" />
               </div>
             </CardContent>
           </Card>
@@ -63,7 +63,7 @@ export function StatsGrid() {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
       {statItems.map((item) => {
         const Icon = item.icon;
         return (
@@ -72,10 +72,10 @@ export function StatsGrid() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-gray-600 dark:text-gray-400 text-xs">{item.label}</p>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">{item.value}</p>
+                  <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{item.value}</p>
                 </div>
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClasses[item.color as keyof typeof colorClasses]}`}>
-                  <Icon className="h-5 w-5" />
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center ${colorClasses[item.color as keyof typeof colorClasses]}`}>
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
               </div>
             </CardContent>

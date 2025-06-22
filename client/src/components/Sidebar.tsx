@@ -16,7 +16,9 @@ import {
   Workflow,
   Brain,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Menu,
+  X
 } from "lucide-react";
 
 const navigationItems = [
@@ -45,18 +47,61 @@ const sectionTitles = {
 export function Sidebar() {
   const [location] = useLocation();
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Update CSS custom property for main content margin with smooth transition
+  // Close mobile menu when route changes
   useEffect(() => {
-    document.documentElement.style.setProperty('--sidebar-width', isCollapsed ? '4rem' : '16rem');
-    // Add transition property to root for smoother animation
-    document.documentElement.style.transition = 'margin 500ms cubic-bezier(0.4, 0.0, 0.2, 1)';
-  }, [isCollapsed]);
+    setIsMobileOpen(false);
+  }, [location]);
+
+  // Handle escape key for mobile menu
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsMobileOpen(false);
+      }
+    };
+
+    if (isMobileOpen) {
+      document.addEventListener('keydown', handleEscape);
+      // Prevent body scroll when mobile menu is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isMobileOpen]);
 
   return (
-    <aside className={`fixed left-0 top-0 h-full bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 transition-all duration-500 ease-in-out transform ${
-      isCollapsed ? 'w-16' : 'w-64'
-    }`}>
+    <>
+      {/* Mobile menu button */}
+      <button
+        onClick={() => setIsMobileOpen(true)}
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-slate-900 dark:bg-slate-100 text-slate-100 dark:text-slate-900 rounded-md shadow-lg hover:shadow-xl transition-all duration-300"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Mobile overlay */}
+      {isMobileOpen && (
+        <div
+          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity duration-300"
+          onClick={() => setIsMobileOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside className={`fixed left-0 top-0 h-full bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 transition-all duration-500 ease-in-out transform ${
+        // Desktop behavior
+        isCollapsed ? 'lg:w-16' : 'lg:w-64'
+      } ${
+        // Mobile behavior
+        isMobileOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:translate-x-0'
+      }`}>
       <div className="p-6">
         <div className={`flex items-center gap-3 mb-10 transition-all duration-300 ${isCollapsed ? 'justify-center' : ''}`}>
           <div className="w-9 h-9 bg-slate-900 dark:bg-slate-100 rounded-md flex items-center justify-center flex-shrink-0 transition-all duration-300">
@@ -69,6 +114,13 @@ export function Sidebar() {
           >
             SocialSync
           </span>
+          {/* Mobile close button */}
+          <button
+            onClick={() => setIsMobileOpen(false)}
+            className="lg:hidden ml-auto p-1 text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
         
         {/* Toggle Button */}
@@ -154,5 +206,6 @@ export function Sidebar() {
         </nav>
       </div>
     </aside>
+    </>
   );
 }

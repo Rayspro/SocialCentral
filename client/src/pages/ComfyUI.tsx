@@ -733,9 +733,9 @@ export default function ComfyUI() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-6 py-4 space-y-6">
+      <div className="container mx-auto px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <nav className="flex items-center space-x-2 text-sm">
             <span className="text-slate-600 dark:text-slate-400">
               <Home className="h-4 w-4" />
@@ -747,7 +747,7 @@ export default function ComfyUI() {
             </span>
           </nav>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeSwitcher />
             <Button variant="ghost" size="sm" className="p-1.5">
               <Bell className="h-3.5 w-3.5" />
@@ -1445,8 +1445,8 @@ export default function ComfyUI() {
             </TabsContent>
 
             {/* Models Tab */}
-            <TabsContent value="models" className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-2">
+            <TabsContent value="models" className="space-y-4 sm:space-y-6">
+              <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
                 {/* Add Model */}
                 <Card>
                   <CardHeader>
@@ -1964,13 +1964,13 @@ export default function ComfyUI() {
                           )}
                           
                           {generation.imageUrls && Array.isArray(generation.imageUrls) && generation.imageUrls.length > 0 && (
-                            <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-3">
+                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                               {generation.imageUrls.map((url: string, index: number) => (
                                 <img 
                                   key={index} 
                                   src={url} 
                                   alt={`Generated image ${index + 1}`}
-                                  className="w-full h-48 object-cover rounded"
+                                  className="w-full h-32 sm:h-40 lg:h-48 object-cover rounded"
                                 />
                               ))}
                             </div>

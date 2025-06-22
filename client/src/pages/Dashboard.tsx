@@ -22,9 +22,9 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-6 py-4 space-y-6">
+      <div className="container mx-auto px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
         {/* Header with Breadcrumb and Profile */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-2">
           <nav className="flex items-center space-x-2 text-sm">
             <span className="text-slate-900 dark:text-slate-100 font-medium flex items-center gap-1">
               <Home className="h-4 w-4" />

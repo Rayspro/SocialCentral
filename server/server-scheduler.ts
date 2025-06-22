@@ -1,24 +1,15 @@
-import { storage } from './storage';
-import { auditLogger } from './audit-logger';
+import { storage } from "./storage";
 
-interface ScheduledServer {
-  serverId: number;
-  intervalId: NodeJS.Timeout;
-  checkCount: number;
-  lastStatus: string;
-  createdAt: Date;
-  lastCheckedAt: Date;
-}
-
-class ServerScheduler {
-  private scheduledServers: Map<number, ScheduledServer> = new Map();
+export class ServerScheduler {
+  private schedulers = new Map<number, NodeJS.Timeout>();
   private readonly CHECK_INTERVAL = 30000; // 30 seconds
-  private readonly MAX_CHECKS = 40; // 20 minutes max (40 * 30s)
+  private readonly MAX_CHECKS = 20; // 10 minutes total
 
   async scheduleServerMonitoring(serverId: number): Promise<void> {
-    // Don't schedule if already monitoring
-    if (this.scheduledServers.has(serverId)) {
-      return;
+    // Remove any existing scheduler
+    if (this.schedulers.has(serverId)) {
+      clearInterval(this.schedulers.get(serverId)!);
+      this.schedulers.delete(serverId);
     }
 
     const server = await storage.getVastServer(serverId);
@@ -29,128 +20,67 @@ class ServerScheduler {
 
     console.log(`Starting scheduler monitoring for server ${serverId}: ${server.name}`);
 
-    // Log scheduler start
-    await storage.createAuditLog({
-      category: 'system_event',
-      userId: 1,
-      action: 'scheduler_started',
-      resource: 'vast_server',
-      resourceId: serverId.toString(),
-      details: {
-        serverName: server.name,
-        checkInterval: this.CHECK_INTERVAL,
-        maxChecks: this.MAX_CHECKS
-      },
-      severity: 'info'
-    });
-
     const intervalId = setInterval(async () => {
       await this.checkServerStatus(serverId);
     }, this.CHECK_INTERVAL);
 
-    const scheduledServer: ScheduledServer = {
-      serverId,
-      intervalId,
-      checkCount: 0,
-      lastStatus: server.status || 'unknown',
-      createdAt: new Date(),
-      lastCheckedAt: new Date()
-    };
+    this.schedulers.set(serverId, intervalId);
 
-    this.scheduledServers.set(serverId, scheduledServer);
-
-    // Update server with scheduler info
+    // Update server scheduler status
     await storage.updateVastServer(serverId, {
       schedulerActive: true,
-      schedulerChecks: 0,
-      schedulerStarted: new Date()
+      schedulerStarted: new Date(),
+      schedulerChecks: 0
     });
   }
 
-  async checkServerStatus(serverId: number): Promise<void> {
-    const scheduledServer = this.scheduledServers.get(serverId);
-    if (!scheduledServer) {
-      return;
-    }
-
+  private async checkServerStatus(serverId: number): Promise<void> {
     try {
-      scheduledServer.checkCount++;
-      scheduledServer.lastCheckedAt = new Date();
-
       const server = await storage.getVastServer(serverId);
       if (!server) {
-        console.error(`Server ${serverId} not found during status check`);
         this.removeScheduler(serverId);
         return;
       }
 
-      const previousStatus = scheduledServer.lastStatus;
-      scheduledServer.lastStatus = server.status || 'unknown';
+      // Check if we've exceeded max checks
+      if (server.schedulerChecks >= this.MAX_CHECKS) {
+        console.log(`Max checks reached for server ${serverId}, stopping scheduler`);
+        this.removeScheduler(serverId);
+        return;
+      }
 
-      // Update server with check count
+      // Update check count
       await storage.updateVastServer(serverId, {
-        schedulerChecks: scheduledServer.checkCount,
+        schedulerChecks: server.schedulerChecks + 1,
         schedulerLastCheck: new Date()
       });
 
-      console.log(`Scheduler check ${scheduledServer.checkCount} for server ${serverId}: ${server.status}`);
-
-      // Log status check
-      await storage.createAuditLog({
-        category: 'system_event',
-        userId: 1,
-        action: 'scheduler_status_check',
-        resource: 'vast_server',
-        resourceId: serverId.toString(),
-        details: {
-          checkNumber: scheduledServer.checkCount,
-          currentStatus: server.status,
-          previousStatus,
-          serverName: server.name
-        },
-        severity: 'info'
-      });
+      console.log(`Scheduler check ${server.schedulerChecks + 1} for server ${serverId}: ${server.status}`);
 
       // If server is running and ComfyUI not set up, initiate setup
       if (server.status === 'running' && server.setupStatus !== 'ready') {
-        console.log(`Server ${serverId} is running, initiating ComfyUI setup`);
         await this.initiateComfyUISetup(serverId);
         this.removeScheduler(serverId);
         return;
       }
 
-      // If server is stopped or error state, stop monitoring
-      if (server.status === 'stopped' || server.status === 'error') {
-        console.log(`Server ${serverId} is in terminal state: ${server.status}, stopping scheduler`);
-        await this.logSchedulerCompletion(serverId, `server_${server.status}`);
+      // If server setup is complete, stop monitoring
+      if (server.setupStatus === 'ready') {
+        console.log(`Server ${serverId} setup complete, stopping scheduler`);
         this.removeScheduler(serverId);
         return;
       }
 
-      // If max checks reached, stop monitoring
-      if (scheduledServer.checkCount >= this.MAX_CHECKS) {
-        console.log(`Max checks reached for server ${serverId}, stopping scheduler`);
-        await this.logSchedulerCompletion(serverId, 'max_checks_reached');
+      // If server is in error state, stop monitoring
+      if (server.status === 'error' || server.setupStatus === 'failed') {
+        console.log(`Server ${serverId} in error state, stopping scheduler`);
         this.removeScheduler(serverId);
         return;
       }
 
     } catch (error) {
       console.error(`Error checking server ${serverId} status:`, error);
-      
-      // Log error and continue monitoring
-      await storage.createAuditLog({
-        category: 'system_event',
-        userId: 1,
-        action: 'scheduler_error',
-        resource: 'vast_server',
-        resourceId: serverId.toString(),
-        details: {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          checkNumber: scheduledServer.checkCount
-        },
-        severity: 'error'
-      });
+      // Continue monitoring on errors, will eventually timeout
     }
   }
 
@@ -167,172 +97,83 @@ class ServerScheduler {
         setupStatus: 'installing'
       });
 
-      // Log ComfyUI setup initiation
-      await storage.createAuditLog({
-        category: 'system_event',
-        userId: 1,
-        action: 'comfyui_setup_initiated',
-        resource: 'vast_server',
-        resourceId: serverId.toString(),
-        details: {
-          serverName: server.name,
-          trigger: 'scheduler_auto_setup'
-        },
-        severity: 'info'
-      });
-
       // Get ComfyUI setup script
       const setupScripts = await storage.getSetupScripts();
-      const comfyUIScript = setupScripts.find(s => s.name === 'ComfyUI Setup');
+      const comfyUIScript = setupScripts.find(s => s.name.toLowerCase().includes('comfy'));
       
       if (!comfyUIScript) {
-        throw new Error('ComfyUI setup script not found');
+        console.error('ComfyUI setup script not found');
+        return;
       }
 
       // Create execution record
       const execution = await storage.createServerExecution({
-        serverId,
+        serverId: serverId,
         scriptId: comfyUIScript.id,
-        status: 'pending',
-        startedAt: new Date(),
+        status: 'running',
+        startedAt: new Date()
       });
 
-      // Simulate ComfyUI setup process
+      // Execute setup (simulate for now)
       setTimeout(async () => {
         try {
-          const isSuccess = Math.random() > 0.1; // 90% success rate for auto setup
-          
-          if (isSuccess) {
-            await storage.updateServerExecution(execution.id, {
-              status: 'completed',
-              output: `ComfyUI setup completed successfully!\n\nAutomatic installation triggered by scheduler.\n\nComfyUI is now running at http://server:8188`,
-              completedAt: new Date(),
-            });
+          await storage.updateServerExecution(execution.id, {
+            status: 'completed',
+            completedAt: new Date(),
+            output: 'ComfyUI setup completed successfully'
+          });
 
-            await storage.updateVastServer(serverId, {
-              status: 'running',
-              setupStatus: 'ready'
-            });
+          await storage.updateVastServer(serverId, {
+            status: 'running',
+            setupStatus: 'ready'
+          });
 
-            // Log successful setup
-            await storage.createAuditLog({
-              category: 'system_event',
-              userId: 1,
-              action: 'comfyui_setup_completed',
-              resource: 'vast_server',
-              resourceId: serverId.toString(),
-              details: {
-                serverName: server.name,
-                setupDuration: '5 minutes',
-                trigger: 'scheduler_auto_setup'
-              },
-              severity: 'info'
-            });
-
-          } else {
-            await storage.updateServerExecution(execution.id, {
-              status: 'failed',
-              output: 'ComfyUI setup failed. Please try manual setup.',
-              errorMessage: 'Setup script execution failed',
-              completedAt: new Date(),
-            });
-
-            await storage.updateVastServer(serverId, {
-              status: 'running',
-              setupStatus: 'failed'
-            });
-
-            // Log failed setup
-            await storage.createAuditLog({
-              category: 'system_event',
-              userId: 1,
-              action: 'comfyui_setup_failed',
-              resource: 'vast_server',
-              resourceId: serverId.toString(),
-              details: {
-                serverName: server.name,
-                error: 'Setup script execution failed'
-              },
-              severity: 'error'
-            });
-          }
+          console.log(`ComfyUI setup completed for server ${serverId}`);
         } catch (error) {
-          console.error('Error during ComfyUI setup:', error);
+          console.error(`Error completing setup for server ${serverId}:`, error);
+          
+          await storage.updateServerExecution(execution.id, {
+            status: 'failed',
+            completedAt: new Date(),
+            errorLog: error instanceof Error ? error.message : 'Setup failed'
+          });
+
+          await storage.updateVastServer(serverId, {
+            status: 'error',
+            setupStatus: 'failed'
+          });
         }
-      }, 5000); // 5 second setup simulation
+      }, 60000); // 1 minute setup simulation
 
     } catch (error) {
       console.error(`Error initiating ComfyUI setup for server ${serverId}:`, error);
+    }
+  }
+
+  private removeScheduler(serverId: number): void {
+    if (this.schedulers.has(serverId)) {
+      clearInterval(this.schedulers.get(serverId)!);
+      this.schedulers.delete(serverId);
       
-      await storage.createAuditLog({
-        category: 'system_event',
-        userId: 1,
-        action: 'comfyui_setup_error',
-        resource: 'vast_server',
-        resourceId: serverId.toString(),
-        details: {
-          error: error instanceof Error ? error.message : 'Unknown error'
-        },
-        severity: 'error'
+      // Update server scheduler status
+      storage.updateVastServer(serverId, {
+        schedulerActive: false
+      }).catch(error => {
+        console.error(`Error updating scheduler status for server ${serverId}:`, error);
       });
     }
   }
 
-  async logSchedulerCompletion(serverId: number, reason: string): Promise<void> {
-    const scheduledServer = this.scheduledServers.get(serverId);
-    if (!scheduledServer) {
-      return;
-    }
-
-    const duration = Date.now() - scheduledServer.createdAt.getTime();
-    
-    await storage.createAuditLog({
-      category: 'system_event',
-      userId: 1,
-      action: 'scheduler_completed',
-      resource: 'vast_server',
-      resourceId: serverId.toString(),
-      details: {
-        reason,
-        totalChecks: scheduledServer.checkCount,
-        duration: `${Math.round(duration / 1000)}s`,
-        finalStatus: scheduledServer.lastStatus
-      },
-      severity: 'info'
-    });
-  }
-
-  removeScheduler(serverId: number): void {
-    const scheduledServer = this.scheduledServers.get(serverId);
-    if (!scheduledServer) {
-      return;
-    }
-
-    clearInterval(scheduledServer.intervalId);
-    this.scheduledServers.delete(serverId);
-
-    // Update server to remove scheduler info
-    storage.updateVastServer(serverId, {
-      schedulerActive: false
-    }).catch(error => {
-      console.error(`Error updating server ${serverId} scheduler status:`, error);
-    });
-
-    console.log(`Scheduler removed for server ${serverId}`);
-  }
-
-  getSchedulerInfo(serverId: number): ScheduledServer | null {
-    return this.scheduledServers.get(serverId) || null;
-  }
-
-  getAllScheduledServers(): ScheduledServer[] {
-    return Array.from(this.scheduledServers.values());
-  }
-
   stopAllSchedulers(): void {
-    for (const serverId of this.scheduledServers.keys()) {
-      this.removeScheduler(serverId);
+    for (const [serverId, intervalId] of this.schedulers) {
+      clearInterval(intervalId);
+      console.log(`Stopped scheduler for server ${serverId}`);
     }
+    this.schedulers.clear();
+  }
+
+  getActiveSchedulers(): number[] {
+    return Array.from(this.schedulers.keys());
   }
 }
 

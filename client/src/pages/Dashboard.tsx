@@ -22,7 +22,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 sm:px-6 py-4 space-y-4 sm:space-y-6">
+      <div className="container mx-auto px-4 lg:px-6 py-4 space-y-4 sm:space-y-6">
         {/* Header with Breadcrumb and Profile */}
         <div className="flex items-center justify-between flex-wrap gap-2">
           <nav className="flex items-center space-x-2 text-sm">
@@ -80,15 +80,15 @@ export default function Dashboard() {
 
         {/* Enhanced Header */}
         <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl">
-              <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="p-2 sm:p-2.5 bg-blue-100 dark:bg-blue-900/50 rounded-xl w-fit">
+              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
             </div>
             <div>
-              <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+              <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100">
                 Dashboard
               </h1>
-              <p className="text-xs text-slate-600 dark:text-slate-400">
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400">
                 Manage your social media presence and AI workloads
               </p>
             </div>
@@ -97,9 +97,13 @@ export default function Dashboard() {
 
         <StatsGrid />
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <PlatformManager />
-          <QuickActions />
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          <div className="md:col-span-2 lg:col-span-1">
+            <PlatformManager />
+          </div>
+          <div className="md:col-span-2 lg:col-span-2">
+            <QuickActions />
+          </div>
         </div>
 
         <ServerAnalytics />

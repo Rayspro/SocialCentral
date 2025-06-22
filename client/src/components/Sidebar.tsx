@@ -95,11 +95,11 @@ export function Sidebar() {
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed left-0 top-0 h-full bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 transition-all duration-500 ease-in-out transform ${
+      <aside className={`fixed left-0 top-0 h-full bg-slate-50 dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 z-50 transition-all duration-300 ease-in-out transform ${
         // Desktop behavior
         isCollapsed ? 'lg:w-16' : 'lg:w-64'
       } ${
-        // Mobile behavior
+        // Mobile behavior - simplified for better performance
         isMobileOpen ? 'w-64 translate-x-0' : 'w-64 -translate-x-full lg:translate-x-0'
       }`}>
       <div className="p-6">
@@ -123,10 +123,10 @@ export function Sidebar() {
           </button>
         </div>
         
-        {/* Toggle Button */}
+        {/* Toggle Button - Hidden on mobile */}
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="absolute top-6 -right-3 w-6 h-6 bg-slate-900 dark:bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-800 dark:hover:bg-slate-200 transition-all duration-300 hover:scale-110 shadow-lg hover:shadow-xl"
+          className="hidden lg:block absolute top-6 -right-3 w-6 h-6 bg-slate-900 dark:bg-slate-100 rounded-full flex items-center justify-center hover:bg-slate-800 dark:hover:bg-slate-200 transition-all duration-300 hover:scale-110 shadow-lg hover:shadow-xl"
         >
           <div className="transition-transform duration-300">
             {isCollapsed ? (

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
 import { LoadingSpinner, LoadingCard } from "@/components/ui/loading-spinner";
 import { LoadingMascot, MascotPresets } from "@/components/ui/loading-mascot";
@@ -474,6 +475,46 @@ export default function ComfyUI() {
       toast({
         title: "Setup Failed",
         description: error.message || "Failed to start ComfyUI setup",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetComfyUIMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedServer) throw new Error('No server selected');
+      
+      const response = await fetch(`/api/comfy/${selectedServer.id}/reset`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to reset ComfyUI');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Reset Started",
+        description: `ComfyUI cleanup initiated. Estimated time: ${data.estimatedTime}`,
+      });
+      
+      // Refresh executions to show progress
+      refetchExecutions();
+      
+      // Clear models cache since they will be removed
+      queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/models`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/comfy/${selectedServer?.id}/available-models`] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Reset Failed",
+        description: error.message || "Failed to reset ComfyUI installation",
         variant: "destructive",
       });
     },
@@ -993,25 +1034,50 @@ export default function ComfyUI() {
                           Auto-Setup ComfyUI
                         </h4>
                         <p className="text-blue-700 dark:text-blue-300 mb-3">
-                          ComfyUI server is not running. Click below to automatically install and start ComfyUI on your server:
+                          ComfyUI server is not running. Install ComfyUI or reset a broken installation:
                         </p>
-                        <Button 
-                          onClick={() => handleAutoSetupComfyUI()}
-                          disabled={autoSetupMutation.isPending}
-                          className="w-full bg-blue-600 hover:bg-blue-700"
-                        >
-                          {autoSetupMutation.isPending ? (
-                            <>
-                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                              Setting up ComfyUI...
-                            </>
-                          ) : (
-                            <>
-                              <Download className="h-4 w-4 mr-2" />
-                              Auto-Install ComfyUI
-                            </>
-                          )}
-                        </Button>
+                        <TooltipProvider>
+                          <div className="flex gap-2">
+                            <Button 
+                              onClick={() => handleAutoSetupComfyUI()}
+                              disabled={autoSetupMutation.isPending || resetComfyUIMutation.isPending}
+                              className="flex-1 bg-blue-600 hover:bg-blue-700"
+                            >
+                              {autoSetupMutation.isPending ? (
+                                <>
+                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  Setting up ComfyUI...
+                                </>
+                              ) : (
+                                <>
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Auto-Install ComfyUI
+                                </>
+                              )}
+                            </Button>
+                            
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  onClick={() => resetComfyUIMutation.mutate()}
+                                  disabled={resetComfyUIMutation.isPending || autoSetupMutation.isPending}
+                                  variant="destructive"
+                                  className="flex-shrink-0"
+                                >
+                                  {resetComfyUIMutation.isPending ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="h-4 w-4" />
+                                  )}
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Reset ComfyUI installation</p>
+                                <p className="text-xs opacity-75">Removes ComfyUI and all models</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </div>
+                        </TooltipProvider>
                         
                         <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
                           <p className="text-xs text-blue-600 dark:text-blue-400">

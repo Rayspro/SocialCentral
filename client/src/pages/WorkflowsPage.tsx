@@ -114,9 +114,19 @@ export default function WorkflowsPage() {
   // Delete workflow mutation
   const deleteWorkflowMutation = useMutation({
     mutationFn: async (workflowId: number) => {
-      return apiRequest(`/api/workflows/${workflowId}`, {
-        method: "DELETE"
+      const response = await fetch(`/api/workflows/${workflowId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json"
+        }
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to delete workflow');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows/with-models"] });

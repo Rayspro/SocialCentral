@@ -91,9 +91,19 @@ export default function WorkflowsPage() {
   // Sync workflow models mutation
   const syncModelsMutation = useMutation({
     mutationFn: async (workflowId: number) => {
-      return apiRequest(`/api/workflows/${workflowId}/sync-models`, {
-        method: "POST"
+      const response = await fetch(`/api/workflows/${workflowId}/sync-models`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        }
       });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to sync models');
+      }
+      
+      return response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/workflows/with-models"] });
@@ -153,7 +163,7 @@ export default function WorkflowsPage() {
   });
 
   // Get unique categories
-  const categories = Array.from(new Set(workflows.map((w: WorkflowWithModels) => w.category).filter(Boolean)));
+  const categories = Array.from(new Set(workflows.map((w: WorkflowWithModels) => w.category).filter(Boolean))) as string[];
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
@@ -247,9 +257,9 @@ export default function WorkflowsPage() {
               className="px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-md bg-white dark:bg-gray-800 text-sm"
             >
               <option value="all">All Categories</option>
-              {categories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
+              {categories.map((category, index) => (
+                <option key={`${category}-${index}`} value={String(category || '')}>
+                  {String(category)}
                 </option>
               ))}
             </select>
@@ -500,7 +510,7 @@ function WorkflowDetailsModal({
       {/* Model Dependencies */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h4 className="font-medium">Model Dependencies ({workflow.modelInstances.length})</h4>
+          <h4 className="font-medium">Model Dependencies ({workflow.modelInstances?.length || 0})</h4>
           <Button
             variant="outline"
             size="sm"
@@ -512,13 +522,13 @@ function WorkflowDetailsModal({
           </Button>
         </div>
         
-        {workflow.modelInstances.length === 0 ? (
+        {!workflow.modelInstances || workflow.modelInstances.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
             No model dependencies found
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {workflow.modelInstances.map((model) => (
+            {workflow.modelInstances?.map((model) => (
               <Card key={model.id} className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-sm">{model.name}</span>
@@ -553,7 +563,7 @@ function WorkflowDetailsModal({
         <div>
           <h4 className="font-medium mb-4">Analysis History</h4>
           <div className="space-y-3">
-            {workflow.analysisResults.map((analysis) => (
+            {workflow.analysisResults?.map((analysis) => (
               <Card key={analysis.id} className="p-4">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-medium text-sm">Analysis #{analysis.id}</span>
@@ -564,10 +574,10 @@ function WorkflowDetailsModal({
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <strong>Required Models:</strong> {analysis.requiredModels.length}
+                    <strong>Required Models:</strong> {analysis.requiredModels?.length || 0}
                   </div>
                   <div>
-                    <strong>Missing Models:</strong> {analysis.missingModels.length}
+                    <strong>Missing Models:</strong> {analysis.missingModels?.length || 0}
                   </div>
                 </div>
               </Card>

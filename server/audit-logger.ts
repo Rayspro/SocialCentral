@@ -1,13 +1,7 @@
 import { storage } from "./storage";
 import type { InsertAuditLog } from "@shared/schema";
 import type { Request } from "express";
-
-export interface AuditContext {
-  userId?: number;
-  ipAddress?: string;
-  userAgent?: string;
-  request?: Request;
-}
+import type { AuditContext } from "./types/shared/core.js";
 
 export class AuditLogger {
   private static instance: AuditLogger;

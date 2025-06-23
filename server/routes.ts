@@ -31,7 +31,7 @@ import {
 import { startupComfyUI } from "./routes-comfy-startup";
 import { comfyDiagnostics } from "./comfy-diagnostics";
 import { comfyDirectTester } from "./comfy-direct-test";
-import { comfyFallback } from "./comfy-fallback";
+
 import { comfyWebSocketManager } from "./comfy-websocket";
 import { oauthManager } from "./oauth";
 

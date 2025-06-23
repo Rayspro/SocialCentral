@@ -2,14 +2,16 @@ import { Request, Response } from 'express';
 import { storage } from './storage.js';
 import { InsertComfyModel, InsertComfyWorkflow, InsertComfyGeneration } from '../shared/schema.js';
 import { comfyWebSocketManager } from './comfy-websocket.js';
+import { scriptManager } from './scripts/script-manager.js';
+import { COMFYUI_CONFIG, GENERATION_CONFIG, ERROR_MESSAGES, SUCCESS_MESSAGES, STATUS, VAST_CONFIG } from './constants/index.js';
 
-// Default text-to-image workflow template
+// Default text-to-image workflow template using centralized constants
 const DEFAULT_WORKFLOW = {
   "3": {
     "inputs": {
-      "seed": 42,
-      "steps": 20,
-      "cfg": 8,
+      "seed": Math.floor(Math.random() * (GENERATION_CONFIG.SEED_RANGE.MAX - GENERATION_CONFIG.SEED_RANGE.MIN) + GENERATION_CONFIG.SEED_RANGE.MIN),
+      "steps": COMFYUI_CONFIG.DEFAULT_STEPS,
+      "cfg": COMFYUI_CONFIG.DEFAULT_CFG_SCALE,
       "sampler_name": "euler",
       "scheduler": "normal",
       "denoise": 1,
@@ -34,8 +36,8 @@ const DEFAULT_WORKFLOW = {
   },
   "5": {
     "inputs": {
-      "width": 512,
-      "height": 512,
+      "width": COMFYUI_CONFIG.DEFAULT_WIDTH,
+      "height": COMFYUI_CONFIG.DEFAULT_HEIGHT,
       "batch_size": 1
     },
     "class_type": "EmptyLatentImage",
@@ -55,7 +57,7 @@ const DEFAULT_WORKFLOW = {
   },
   "7": {
     "inputs": {
-      "text": "text, watermark",
+      "text": GENERATION_CONFIG.DEFAULT_NEGATIVE_PROMPT,
       "clip": ["4", 1]
     },
     "class_type": "CLIPTextEncode",
@@ -285,7 +287,7 @@ export async function generateImage(req: Request, res: Response) {
 
     // Step 4: Setup ComfyUI connection
     const serverHost = server.serverUrl.replace(/^https?:\/\//, '').replace(/:\d+$/, '');
-    const comfyUrl = `http://${serverHost}:8188`;
+    const comfyUrl = `http://${serverHost}:${COMFYUI_CONFIG.DEFAULT_PORT}`;
     const client = new ComfyUIClient(comfyUrl);
 
     console.log(`ComfyUI Target URL: ${comfyUrl}`);
@@ -482,15 +484,12 @@ export async function autoSetupComfyUI(req: Request, res: Response) {
       return res.status(404).json({ error: 'Server not found' });
     }
 
-    // Create setup execution record
-    const setupScript = `#!/bin/bash
-echo "Starting ComfyUI setup..."
-cd /workspace
-git clone https://github.com/comfyanonymous/ComfyUI.git
-cd ComfyUI
-python -m pip install torch torchvision torchaudio --extra-index-url https://download.pytorch.org/whl/cu121
-python -m pip install -r requirements.txt
-echo "ComfyUI setup completed"`;
+    // Get setup script from script manager
+    const setupScript = scriptManager.generateComfyUISetupScript();
+    
+    if (!setupScript) {
+      return res.status(500).json({ error: 'Setup script not available' });
+    }
 
     const executionData = {
       serverId,
@@ -510,8 +509,8 @@ echo "ComfyUI setup completed"`;
     res.json({
       success: true,
       executionId: execution.id,
-      message: 'ComfyUI setup started',
-      estimatedTime: '10-15 minutes'
+      message: SUCCESS_MESSAGES.SETUP_INITIATED,
+      estimatedTime: `${Math.floor(VAST_CONFIG.SETUP_TIMEOUT / 60000)} minutes`
     });
   } catch (error) {
     console.error('Error starting ComfyUI setup:', error);

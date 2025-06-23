@@ -284,17 +284,17 @@ export function ComfyUISetupTab({
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || 'Reset failed');
+        throw new Error(errorData.error || 'Reset failed');
       }
       
       return response.json();
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast({
-        title: "Reset Complete",
-        description: "ComfyUI has been cleaned up. You can now start a fresh setup.",
+        title: "Reset Started",
+        description: `ComfyUI cleanup initiated. Estimated time: ${data.estimatedTime || '30-60 seconds'}`,
       });
-      // Reset local state
+      // Reset local state to pending
       setSetupSteps(prev => prev.map(step => ({
         ...step,
         status: 'pending',

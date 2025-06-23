@@ -261,7 +261,7 @@ class ComfyUIWebSocketManager {
     }
   }
 
-  private broadcastProgress(progress: ComfyUIProgress) {
+  broadcastProgress(progress: ComfyUIProgress) {
     const message = JSON.stringify({
       type: 'comfy_progress',
       data: progress

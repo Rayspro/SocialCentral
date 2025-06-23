@@ -2676,7 +2676,9 @@ echo "Server is ready for fresh ComfyUI installation"
         const progress = Math.round((step / total) * 100);
         const progressOutput = `Step ${step}/${total}: ${message}\n`;
         
-        const currentOutput = (await storage.getServerExecution(executionId))?.output || '';
+        const currentExecution = await storage.getServerExecution(executionId);
+        const currentOutput = currentExecution?.output || '';
+        
         await storage.updateServerExecution(executionId, {
           output: currentOutput + progressOutput
         });
@@ -2693,13 +2695,19 @@ echo "Server is ready for fresh ComfyUI installation"
           output: currentOutput + progressOutput
         };
         
-        // Send to all connected WebSocket clients
-        if (wss) {
-          wss.clients.forEach(client => {
-            if (client.readyState === 1) { // WebSocket.OPEN
-              client.send(JSON.stringify(progressUpdate));
-            }
-          });
+        // Send to ComfyUI WebSocket manager for broadcasting
+        if (typeof comfyWebSocketManager !== 'undefined' && comfyWebSocketManager.broadcastProgress) {
+          const progressData = {
+            generationId: executionId,
+            serverId,
+            status: 'executing' as const,
+            currentNode: message,
+            totalNodes: total,
+            completedNodes: step - 1,
+            progress: progress,
+            executionTime: Date.now()
+          };
+          comfyWebSocketManager.broadcastProgress(progressData);
         }
 
         // Simulate step execution time
@@ -2707,27 +2715,27 @@ echo "Server is ready for fresh ComfyUI installation"
       }
 
       // Mark as completed
-      const finalOutput = (await storage.getServerExecution(executionId))?.output + '\n=== ComfyUI Cleanup Complete ===\nServer is ready for fresh ComfyUI installation\n';
+      const currentExecution = await storage.getServerExecution(executionId);
+      const finalOutput = (currentExecution?.output || '') + '\n=== ComfyUI Cleanup Complete ===\nServer is ready for fresh ComfyUI installation\n';
+      
       await storage.updateServerExecution(executionId, {
         status: 'completed',
         output: finalOutput
       });
 
       // Broadcast completion
-      const completionUpdate = {
-        type: 'execution_complete',
-        executionId,
-        serverId,
-        status: 'completed',
-        output: finalOutput
-      };
-      
-      if (wss) {
-        wss.clients.forEach(client => {
-          if (client.readyState === 1) {
-            client.send(JSON.stringify(completionUpdate));
-          }
-        });
+      if (typeof comfyWebSocketManager !== 'undefined' && comfyWebSocketManager.broadcastProgress) {
+        const completionData = {
+          generationId: executionId,
+          serverId,
+          status: 'completed' as const,
+          currentNode: 'Reset complete',
+          totalNodes: 4,
+          completedNodes: 4,
+          progress: 100,
+          executionTime: Date.now()
+        };
+        comfyWebSocketManager.broadcastProgress(completionData);
       }
 
       // Reset server setup status
@@ -2743,28 +2751,28 @@ echo "Server is ready for fresh ComfyUI installation"
       console.log(`ComfyUI cleanup completed for server ${serverId}`);
     } catch (error) {
       console.error(`ComfyUI cleanup failed for server ${serverId}:`, error);
-      const errorOutput = (await storage.getServerExecution(executionId))?.output + `\nERROR: Cleanup failed - ${error}\n`;
+      const currentExecution = await storage.getServerExecution(executionId);
+      const errorOutput = (currentExecution?.output || '') + `\nERROR: Cleanup failed - ${error instanceof Error ? error.message : String(error)}\n`;
+      
       await storage.updateServerExecution(executionId, {
         status: 'failed',
         output: errorOutput
       });
 
       // Broadcast error
-      const errorUpdate = {
-        type: 'execution_error',
-        executionId,
-        serverId,
-        status: 'failed',
-        error: String(error),
-        output: errorOutput
-      };
-      
-      if (wss) {
-        wss.clients.forEach(client => {
-          if (client.readyState === 1) {
-            client.send(JSON.stringify(errorUpdate));
-          }
-        });
+      if (typeof comfyWebSocketManager !== 'undefined' && comfyWebSocketManager.broadcastProgress) {
+        const errorData = {
+          generationId: executionId,
+          serverId,
+          status: 'failed' as const,
+          currentNode: 'Reset failed',
+          totalNodes: 4,
+          completedNodes: 0,
+          progress: 0,
+          errorMessage: error instanceof Error ? error.message : String(error),
+          executionTime: Date.now()
+        };
+        comfyWebSocketManager.broadcastProgress(errorData);
       }
     }
   }

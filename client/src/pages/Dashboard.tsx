@@ -3,22 +3,13 @@ import { PlatformManager } from "@/components/PlatformManager";
 import { QuickActions } from "@/components/QuickActions";
 import { ServerAnalytics } from "@/components/ServerAnalyticsFixed";
 import { Button } from "@/components/ui/button";
-import { BarChart3, Home, ChevronRight, User, Settings, LogOut, Bell } from "lucide-react";
+import { BarChart3, Home, Bell } from "lucide-react";
 import { useLocation } from "wouter";
-import { 
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
-import { useAuth } from "@/contexts/AuthContext";
+import { UserProfileDropdown } from "@/components/UserProfileDropdown";
 
 export default function Dashboard() {
   const [, setLocation] = useLocation();
-  const { logout } = useAuth();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
@@ -39,42 +30,7 @@ export default function Dashboard() {
               <Bell className="h-3.5 w-3.5" />
             </Button>
             
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="p-0 w-7 h-7 rounded-full">
-                  <div className="w-7 h-7 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center cursor-pointer hover:scale-105 transition-transform">
-                    <span className="text-white text-xs font-medium">JD</span>
-                  </div>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">John Doe</p>
-                    <p className="text-xs leading-none text-muted-foreground">
-                      john@example.com
-                    </p>
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => setLocation('/settings')}>
-                  <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLocation('/settings')}>
-                  <Settings className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => {
-                  logout();
-                  setLocation('/signin');
-                }}>
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <UserProfileDropdown />
           </div>
         </div>
 

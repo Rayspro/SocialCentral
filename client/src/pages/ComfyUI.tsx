@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Slider } from "@/components/ui/slider";
+import { Progress } from "@/components/ui/progress";
 import { LoadingSpinner, LoadingCard } from "@/components/ui/loading-spinner";
 import { LoadingMascot, MascotPresets } from "@/components/ui/loading-mascot";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -97,10 +98,61 @@ export default function ComfyUI() {
   // Workflow analyzer state
   const [analyzeWorkflowJson, setAnalyzeWorkflowJson] = useState("");
   const [analysisResult, setAnalysisResult] = useState<any>(null);
+
+  // Real-time progress state
+  const [realtimeProgress, setRealtimeProgress] = useState<any>(null);
+  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+
+  // WebSocket connection for real-time progress updates
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    
+    const ws = new WebSocket(wsUrl);
+    
+    ws.onopen = () => {
+      console.log('WebSocket connected for workflow logs');
+      setWsConnection(ws);
+    };
+    
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        if (data.type === 'execution_progress' && data.serverId === selectedServer?.id) {
+          setRealtimeProgress(data);
+          // Invalidate execution queries to refresh the UI
+          queryClient.invalidateQueries({ queryKey: [`/api/server-executions/${data.serverId}`] });
+        } else if (data.type === 'execution_complete' && data.serverId === selectedServer?.id) {
+          setRealtimeProgress(null);
+          queryClient.invalidateQueries({ queryKey: [`/api/server-executions/${data.serverId}`] });
+        } else if (data.type === 'execution_error' && data.serverId === selectedServer?.id) {
+          setRealtimeProgress(null);
+          queryClient.invalidateQueries({ queryKey: [`/api/server-executions/${data.serverId}`] });
+        }
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
+    
+    ws.onclose = () => {
+      console.log('WebSocket connection closed');
+      setWsConnection(null);
+      setRealtimeProgress(null);
+    };
+    
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+    };
+    
+    return () => {
+      ws.close();
+    };
+  }, [selectedServer?.id, queryClient]);
+  
   const [isDownloading, setIsDownloading] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
-  const [wsConnection, setWsConnection] = useState<WebSocket | null>(null);
   
   // Setup progress tracking
   const [setupProgress, setSetupProgress] = useState<any>(null);
@@ -828,48 +880,70 @@ export default function ComfyUI() {
                   {executions[0]?.output || "Initializing setup..."}
                 </pre>
               </div>
-              {/* Dynamic Progress Bar */}
+              {/* Dynamic Progress Bar with Real-time Updates */}
               {(() => {
                 const latestExecution = executions[0];
                 if (!latestExecution?.output) return null;
                 
-                const output = latestExecution.output;
+                // Prioritize real-time WebSocket data over execution output
                 let progress = 0;
+                let currentStep = '';
+                let operationType = 'Setup Progress';
                 
-                // Calculate progress based on steps
-                if (latestExecution.scriptId === 2) {
-                  // Reset operation progress
-                  if (output.includes('Step 1/4')) progress = Math.max(progress, 25);
-                  if (output.includes('Step 2/4')) progress = Math.max(progress, 50);
-                  if (output.includes('Step 3/4')) progress = Math.max(progress, 75);
-                  if (output.includes('Step 4/4') || output.includes('Cleanup Complete')) progress = 100;
+                if (realtimeProgress && realtimeProgress.executionId === latestExecution.id) {
+                  // Use real-time WebSocket data
+                  progress = realtimeProgress.progress;
+                  currentStep = realtimeProgress.message;
+                  operationType = latestExecution.scriptId === 2 ? 'Reset Progress' : 'Setup Progress';
                 } else {
-                  // Setup operation progress
-                  if (output.includes('Step 1/6') || output.includes('Step 2/6')) progress = Math.max(progress, 17);
-                  if (output.includes('Step 3/6')) progress = Math.max(progress, 33);
-                  if (output.includes('Step 4/6')) progress = Math.max(progress, 50);
-                  if (output.includes('Step 5/6')) progress = Math.max(progress, 67);
-                  if (output.includes('Step 6/6')) progress = Math.max(progress, 83);
-                  if (output.includes('Setup Complete') || output.includes('SUCCESS')) progress = 100;
+                  // Fallback to parsing execution output
+                  const output = latestExecution.output;
+                  
+                  if (latestExecution.scriptId === 2) {
+                    // Reset operation progress
+                    operationType = 'Reset Progress';
+                    if (output.includes('Step 1/4')) progress = Math.max(progress, 25);
+                    if (output.includes('Step 2/4')) progress = Math.max(progress, 50);
+                    if (output.includes('Step 3/4')) progress = Math.max(progress, 75);
+                    if (output.includes('Step 4/4') || output.includes('Cleanup Complete')) progress = 100;
+                  } else {
+                    // Setup operation progress
+                    if (output.includes('Step 1/6') || output.includes('Step 2/6')) progress = Math.max(progress, 17);
+                    if (output.includes('Step 3/6')) progress = Math.max(progress, 33);
+                    if (output.includes('Step 4/6')) progress = Math.max(progress, 50);
+                    if (output.includes('Step 5/6')) progress = Math.max(progress, 67);
+                    if (output.includes('Step 6/6')) progress = Math.max(progress, 83);
+                    if (output.includes('Setup Complete') || output.includes('SUCCESS')) progress = 100;
+                  }
                 }
                 
-                const isRunning = latestExecution.status === 'running' || 
-                                 (latestExecution.status === 'completed' && progress < 100);
+                const isRunning = realtimeProgress ? true : 
+                                 (latestExecution.status === 'running' || 
+                                  (latestExecution.status === 'completed' && progress < 100));
                 
                 return (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">
-                        {latestExecution.scriptId === 2 ? 'Reset Progress' : 'Setup Progress'}
-                      </span>
+                      <span className="font-medium">{operationType}</span>
                       <span className="text-muted-foreground">{progress}%</span>
                     </div>
                     <Progress value={progress} className="w-full h-2" />
+                    {currentStep && (
+                      <div className="text-xs text-muted-foreground">
+                        {currentStep}
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                       <Badge variant="outline" className="text-xs">
-                        {latestExecution.status === 'completed' ? 'Completed' : 
+                        {realtimeProgress ? 'In Progress' :
+                         latestExecution.status === 'completed' ? 'Completed' : 
                          isRunning ? 'In Progress' : 'Ready'}
                       </Badge>
+                      {wsConnection && (
+                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                          Live
+                        </Badge>
+                      )}
                     </div>
                   </div>
                 );

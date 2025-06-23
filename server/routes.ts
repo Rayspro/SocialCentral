@@ -2674,19 +2674,59 @@ echo "Server is ready for fresh ComfyUI installation"
         const progress = Math.round((step / total) * 100);
         const progressOutput = `Step ${step}/${total}: ${message}\n`;
         
+        const currentOutput = (await storage.getServerExecution(executionId))?.output || '';
         await storage.updateServerExecution(executionId, {
-          output: (await storage.getServerExecution(executionId))?.output + progressOutput
+          output: currentOutput + progressOutput
         });
 
+        // Broadcast progress update via WebSocket
+        const progressUpdate = {
+          type: 'execution_progress',
+          executionId,
+          serverId,
+          step,
+          total,
+          progress,
+          message,
+          output: currentOutput + progressOutput
+        };
+        
+        // Send to all connected WebSocket clients
+        if (wss) {
+          wss.clients.forEach(client => {
+            if (client.readyState === 1) { // WebSocket.OPEN
+              client.send(JSON.stringify(progressUpdate));
+            }
+          });
+        }
+
         // Simulate step execution time
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        await new Promise(resolve => setTimeout(resolve, 2000));
       }
 
       // Mark as completed
+      const finalOutput = (await storage.getServerExecution(executionId))?.output + '\n=== ComfyUI Cleanup Complete ===\nServer is ready for fresh ComfyUI installation\n';
       await storage.updateServerExecution(executionId, {
         status: 'completed',
-        output: (await storage.getServerExecution(executionId))?.output + '\n=== ComfyUI Cleanup Complete ===\nServer is ready for fresh ComfyUI installation\n'
+        output: finalOutput
       });
+
+      // Broadcast completion
+      const completionUpdate = {
+        type: 'execution_complete',
+        executionId,
+        serverId,
+        status: 'completed',
+        output: finalOutput
+      };
+      
+      if (wss) {
+        wss.clients.forEach(client => {
+          if (client.readyState === 1) {
+            client.send(JSON.stringify(completionUpdate));
+          }
+        });
+      }
 
       // Reset server setup status
       await storage.updateVastServer(serverId, {
@@ -2701,10 +2741,29 @@ echo "Server is ready for fresh ComfyUI installation"
       console.log(`ComfyUI cleanup completed for server ${serverId}`);
     } catch (error) {
       console.error(`ComfyUI cleanup failed for server ${serverId}:`, error);
+      const errorOutput = (await storage.getServerExecution(executionId))?.output + `\nERROR: Cleanup failed - ${error}\n`;
       await storage.updateServerExecution(executionId, {
         status: 'failed',
-        output: (await storage.getServerExecution(executionId))?.output + `\nERROR: Cleanup failed - ${error}\n`
+        output: errorOutput
       });
+
+      // Broadcast error
+      const errorUpdate = {
+        type: 'execution_error',
+        executionId,
+        serverId,
+        status: 'failed',
+        error: String(error),
+        output: errorOutput
+      };
+      
+      if (wss) {
+        wss.clients.forEach(client => {
+          if (client.readyState === 1) {
+            client.send(JSON.stringify(errorUpdate));
+          }
+        });
+      }
     }
   }
 

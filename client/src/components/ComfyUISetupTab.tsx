@@ -127,64 +127,87 @@ export function ComfyUISetupTab({
       const updatedSteps = [...setupSteps];
       let completedSteps = 0;
       
-      logs.forEach((log: string) => {
-        if (log.includes('Installing system dependencies') || log.includes('apt-get')) {
-          updatedSteps[0].status = 'running';
-          updatedSteps[0].progress = 50;
-          setCurrentStep('deps');
-        } else if (log.includes('Python environment') || log.includes('virtualenv')) {
-          updatedSteps[0].status = 'completed';
-          updatedSteps[0].progress = 100;
-          updatedSteps[1].status = 'running';
-          updatedSteps[1].progress = 50;
-          setCurrentStep('environment');
-          completedSteps = 1;
-        } else if (log.includes('Cloning ComfyUI') || log.includes('git clone')) {
-          updatedSteps[1].status = 'completed';
-          updatedSteps[1].progress = 100;
-          updatedSteps[2].status = 'running';
-          updatedSteps[2].progress = 30;
-          setCurrentStep('comfyui');
-          completedSteps = 2;
-        } else if (log.includes('Installing ComfyUI requirements') || log.includes('pip install')) {
-          updatedSteps[2].status = 'completed';
-          updatedSteps[2].progress = 100;
-          updatedSteps[3].status = 'running';
-          updatedSteps[3].progress = 20;
-          setCurrentStep('requirements');
-          completedSteps = 3;
-        } else if (log.includes('Downloading') && log.includes('model')) {
-          updatedSteps[3].status = 'completed';
-          updatedSteps[3].progress = 100;
-          updatedSteps[4].status = 'running';
-          updatedSteps[4].progress = 60;
-          setCurrentStep('models');
-          completedSteps = 4;
-        } else if (log.includes('Starting ComfyUI server') || log.includes('main.py')) {
-          updatedSteps[4].status = 'completed';
-          updatedSteps[4].progress = 100;
-          updatedSteps[5].status = 'running';
-          updatedSteps[5].progress = 80;
-          setCurrentStep('startup');
-          completedSteps = 5;
-        } else if (log.includes('Setup Complete') || log.includes('SUCCESS')) {
-          updatedSteps.forEach(step => {
-            step.status = 'completed';
-            step.progress = 100;
-          });
-          setCurrentStep(null);
-          completedSteps = 6;
-        } else if (log.includes('ERROR') || log.includes('FAILED')) {
-          const currentStepIndex = updatedSteps.findIndex(step => step.status === 'running');
-          if (currentStepIndex >= 0) {
-            updatedSteps[currentStepIndex].status = 'failed';
-            updatedSteps[currentStepIndex].error = log;
-          }
-        }
-      });
+      // Check if this is a reset operation
+      const isResetOperation = latestExecution.scriptId === 2 || 
+                              logs.some(log => log.includes('cleanup') || log.includes('reset'));
       
-      setSetupSteps(updatedSteps);
-      setOverallProgress((completedSteps / 6) * 100);
+      if (isResetOperation) {
+        // Handle reset progress - count completed steps
+        logs.forEach((log: string) => {
+          if (log.includes('Step 1/4')) {
+            completedSteps = Math.max(completedSteps, 1);
+          } else if (log.includes('Step 2/4')) {
+            completedSteps = Math.max(completedSteps, 2);
+          } else if (log.includes('Step 3/4')) {
+            completedSteps = Math.max(completedSteps, 3);
+          } else if (log.includes('Step 4/4')) {
+            completedSteps = Math.max(completedSteps, 4);
+          } else if (log.includes('Cleanup Complete')) {
+            completedSteps = 4;
+          }
+        });
+        setOverallProgress((completedSteps / 4) * 100);
+      } else {
+        // Handle setup progress - original logic
+        logs.forEach((log: string) => {
+          if (log.includes('Installing system dependencies') || log.includes('Step 1/6') || log.includes('Step 2/6')) {
+            updatedSteps[0].status = 'running';
+            updatedSteps[0].progress = 50;
+            setCurrentStep('deps');
+          } else if (log.includes('Python environment') || log.includes('Step 3/6')) {
+            updatedSteps[0].status = 'completed';
+            updatedSteps[0].progress = 100;
+            updatedSteps[1].status = 'running';
+            updatedSteps[1].progress = 50;
+            setCurrentStep('environment');
+            completedSteps = 1;
+          } else if (log.includes('Cloning ComfyUI') || log.includes('Step 4/6')) {
+            updatedSteps[1].status = 'completed';
+            updatedSteps[1].progress = 100;
+            updatedSteps[2].status = 'running';
+            updatedSteps[2].progress = 30;
+            setCurrentStep('comfyui');
+            completedSteps = 2;
+          } else if (log.includes('Installing ComfyUI requirements') || log.includes('Step 5/6')) {
+            updatedSteps[2].status = 'completed';
+            updatedSteps[2].progress = 100;
+            updatedSteps[3].status = 'running';
+            updatedSteps[3].progress = 20;
+            setCurrentStep('requirements');
+            completedSteps = 3;
+          } else if (log.includes('Downloading') && log.includes('model') || log.includes('Step 6/6')) {
+            updatedSteps[3].status = 'completed';
+            updatedSteps[3].progress = 100;
+            updatedSteps[4].status = 'running';
+            updatedSteps[4].progress = 60;
+            setCurrentStep('models');
+            completedSteps = 4;
+          } else if (log.includes('Starting ComfyUI server') || log.includes('main.py')) {
+            updatedSteps[4].status = 'completed';
+            updatedSteps[4].progress = 100;
+            updatedSteps[5].status = 'running';
+            updatedSteps[5].progress = 80;
+            setCurrentStep('startup');
+            completedSteps = 5;
+          } else if (log.includes('Setup Complete') || log.includes('SUCCESS')) {
+            updatedSteps.forEach(step => {
+              step.status = 'completed';
+              step.progress = 100;
+            });
+            setCurrentStep(null);
+            completedSteps = 6;
+          } else if (log.includes('ERROR') || log.includes('FAILED')) {
+            const currentStepIndex = updatedSteps.findIndex(step => step.status === 'running');
+            if (currentStepIndex >= 0) {
+              updatedSteps[currentStepIndex].status = 'failed';
+              updatedSteps[currentStepIndex].error = log;
+            }
+          }
+        });
+        
+        setSetupSteps(updatedSteps);
+        setOverallProgress((completedSteps / 6) * 100);
+      }
     }
   }, [latestExecution?.output]);
 

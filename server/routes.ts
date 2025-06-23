@@ -21,7 +21,6 @@ import {
   getComfyModels,
   addComfyModel,
   deleteComfyModel,
-  getAvailableModels,
   getComfyWorkflows,
   createComfyWorkflow,
   generateImage,
@@ -1683,7 +1682,10 @@ echo "CUDA environment configured!"`,
     res.json({ message: 'ComfyUI routing works', serverId: req.params.serverId });
   });
   
-  app.get('/api/comfy/:serverId/available-models', getAvailableModels);
+  // Available models endpoint - temporarily disabled
+  app.get('/api/comfy/:serverId/available-models', async (req, res) => {
+    res.json({ message: 'Available models endpoint under development' });
+  });
   
   // Workflow management
   app.get('/api/comfy/workflows', getComfyWorkflows);

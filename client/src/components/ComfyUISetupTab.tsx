@@ -105,10 +105,18 @@ export function ComfyUISetupTab({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get latest execution for this server
-  const latestExecution = executions
-    ?.filter(e => e.scriptId === 1) // ComfyUI setup script
+  // Get latest setup execution (scriptId 1) and latest reset execution (scriptId 2)
+  const setupExecutions = executions?.filter(e => e.scriptId === 1) || [];
+  const resetExecutions = executions?.filter(e => e.scriptId === 2) || [];
+  
+  const latestSetupExecution = setupExecutions
     ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  
+  const latestResetExecution = resetExecutions
+    ?.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
+  
+  // Use setup execution for setup logs, reset execution for reset logs
+  const latestExecution = latestSetupExecution;
 
   // Determine setup status
   const setupStatus = serverData?.setupStatus || 'pending';
@@ -121,33 +129,19 @@ export function ComfyUISetupTab({
   useEffect(() => {
     if (latestExecution?.output) {
       const logs = latestExecution.output.split('\n').filter((line: string) => line.trim());
-      setSetupLogs(logs);
+      // Only show setup logs for setup executions (scriptId 1)
+      if (latestExecution.scriptId === 1) {
+        setSetupLogs(logs);
+      } else {
+        setSetupLogs([]); // Clear logs if not a setup execution
+      }
       
       // Update steps based on logs
       const updatedSteps = [...setupSteps];
       let completedSteps = 0;
       
-      // Check if this is a reset operation
-      const isResetOperation = latestExecution.scriptId === 2 || 
-                              logs.some(log => log.includes('cleanup') || log.includes('reset'));
-      
-      if (isResetOperation) {
-        // Handle reset progress - count completed steps
-        logs.forEach((log: string) => {
-          if (log.includes('Step 1/4')) {
-            completedSteps = Math.max(completedSteps, 1);
-          } else if (log.includes('Step 2/4')) {
-            completedSteps = Math.max(completedSteps, 2);
-          } else if (log.includes('Step 3/4')) {
-            completedSteps = Math.max(completedSteps, 3);
-          } else if (log.includes('Step 4/4')) {
-            completedSteps = Math.max(completedSteps, 4);
-          } else if (log.includes('Cleanup Complete')) {
-            completedSteps = 4;
-          }
-        });
-        setOverallProgress((completedSteps / 4) * 100);
-      } else {
+      // Handle setup progress - only process setup executions
+      if (latestExecution?.scriptId === 1) {
         // Handle setup progress - original logic
         logs.forEach((log: string) => {
           if (log.includes('Installing system dependencies') || log.includes('Step 1/6') || log.includes('Step 2/6')) {
@@ -210,6 +204,40 @@ export function ComfyUISetupTab({
       }
     }
   }, [latestExecution?.output]);
+
+  // Calculate reset progress separately
+  const getResetProgress = () => {
+    if (!latestResetExecution?.output) return { progress: 0, currentStep: '', isRunning: false };
+    
+    const logs = latestResetExecution.output.split('\n').filter((line: string) => line.trim());
+    let completedSteps = 0;
+    let currentStep = '';
+    
+    logs.forEach((log: string) => {
+      if (log.includes('Step 1/4')) {
+        completedSteps = Math.max(completedSteps, 1);
+        currentStep = 'Stopping ComfyUI processes...';
+      } else if (log.includes('Step 2/4')) {
+        completedSteps = Math.max(completedSteps, 2);
+        currentStep = 'Removing ComfyUI installation...';
+      } else if (log.includes('Step 3/4')) {
+        completedSteps = Math.max(completedSteps, 3);
+        currentStep = 'Cleaning up models and cache...';
+      } else if (log.includes('Step 4/4')) {
+        completedSteps = Math.max(completedSteps, 4);
+        currentStep = 'Resetting server status...';
+      } else if (log.includes('Cleanup Complete')) {
+        completedSteps = 4;
+        currentStep = 'Reset complete';
+      }
+    });
+    
+    return {
+      progress: (completedSteps / 4) * 100,
+      currentStep,
+      isRunning: latestResetExecution.status === 'running'
+    };
+  };
 
   // Setup ComfyUI mutation
   const setupMutation = useMutation({
@@ -497,6 +525,54 @@ export function ComfyUISetupTab({
           )}
         </CardContent>
       </Card>
+
+      {/* Reset Progress Display */}
+      {(resetMutation.isPending || getResetProgress().isRunning) && latestResetExecution && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RotateCcw className="h-5 w-5" />
+              Reset Progress
+            </CardTitle>
+            <CardDescription>
+              ComfyUI cleanup and reset operation in progress
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center gap-3">
+                <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+                <span className="text-sm font-medium">
+                  {getResetProgress().currentStep || 'Initializing reset...'}
+                </span>
+              </div>
+              <Progress value={getResetProgress().progress} className="w-full" />
+              <p className="text-xs text-muted-foreground">
+                Progress: {Math.round(getResetProgress().progress)}% complete
+              </p>
+              
+              {/* Reset Logs */}
+              <div className="mt-4">
+                <h4 className="text-sm font-medium mb-2">Reset Logs</h4>
+                <ScrollArea className="h-32 w-full border rounded-md p-3 bg-black text-red-400 font-mono text-xs">
+                  {latestResetExecution.output?.split('\n').filter((line: string) => line.trim()).map((log, index) => (
+                    <div key={index} className="mb-1">
+                      <span className="text-gray-500">[{format(new Date(), 'HH:mm:ss')}]</span> {log}
+                    </div>
+                  ))}
+                  {getResetProgress().isRunning && (
+                    <div className="mb-1 flex items-center gap-2">
+                      <span className="text-gray-500">[{format(new Date(), 'HH:mm:ss')}]</span>
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span className="animate-pulse">Resetting...</span>
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Detailed Step Progress */}
       {(isSetupRunning || isSetupComplete || isSetupFailed) && (

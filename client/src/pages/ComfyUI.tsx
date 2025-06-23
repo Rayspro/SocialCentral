@@ -862,95 +862,45 @@ export default function ComfyUI() {
         </Card>
 
         {/* Real-time setup progress display */}
-        {selectedServer && Array.isArray(executions) && executions.length > 0 && (
-          <Card className="border-orange-200 dark:border-orange-800">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
-                ComfyUI Setup in Progress
-                <Badge variant="secondary">{executions[0]?.status}</Badge>
-              </CardTitle>
-              <CardDescription>
-                Automatically installing ComfyUI on server {selectedServer.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 max-h-64 overflow-y-auto">
-                <pre className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                  {executions[0]?.output || "Initializing setup..."}
-                </pre>
-              </div>
-              {/* Dynamic Progress Bar with Real-time Updates */}
-              {(() => {
-                const latestExecution = executions[0];
-                if (!latestExecution?.output) return null;
-                
-                // Prioritize real-time WebSocket data over execution output
-                let progress = 0;
-                let currentStep = '';
-                let operationType = 'Setup Progress';
-                
-                if (realtimeProgress && realtimeProgress.executionId === latestExecution.id) {
-                  // Use real-time WebSocket data
-                  progress = realtimeProgress.progress;
-                  currentStep = realtimeProgress.message;
-                  operationType = latestExecution.scriptId === 2 ? 'Reset Progress' : 'Setup Progress';
-                } else {
-                  // Fallback to parsing execution output
-                  const output = latestExecution.output;
-                  
-                  if (latestExecution.scriptId === 2) {
-                    // Reset operation progress
-                    operationType = 'Reset Progress';
-                    if (output.includes('Step 1/4')) progress = Math.max(progress, 25);
-                    if (output.includes('Step 2/4')) progress = Math.max(progress, 50);
-                    if (output.includes('Step 3/4')) progress = Math.max(progress, 75);
-                    if (output.includes('Step 4/4') || output.includes('Cleanup Complete')) progress = 100;
-                  } else {
-                    // Setup operation progress
-                    if (output.includes('Step 1/6') || output.includes('Step 2/6')) progress = Math.max(progress, 17);
-                    if (output.includes('Step 3/6')) progress = Math.max(progress, 33);
-                    if (output.includes('Step 4/6')) progress = Math.max(progress, 50);
-                    if (output.includes('Step 5/6')) progress = Math.max(progress, 67);
-                    if (output.includes('Step 6/6')) progress = Math.max(progress, 83);
-                    if (output.includes('Setup Complete') || output.includes('SUCCESS')) progress = 100;
-                  }
-                }
-                
-                const isRunning = realtimeProgress ? true : 
-                                 (latestExecution.status === 'running' || 
-                                  (latestExecution.status === 'completed' && progress < 100));
-                
-                return (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{operationType}</span>
-                      <span className="text-muted-foreground">{progress}%</span>
-                    </div>
-                    <Progress value={progress} className="w-full h-2" />
-                    {currentStep && (
-                      <div className="text-xs text-muted-foreground">
-                        {currentStep}
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                      <Badge variant="outline" className="text-xs">
-                        {realtimeProgress ? 'In Progress' :
-                         latestExecution.status === 'completed' ? 'Completed' : 
-                         isRunning ? 'In Progress' : 'Ready'}
-                      </Badge>
-                      {wsConnection && (
-                        <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-                          Live
-                        </Badge>
-                      )}
-                    </div>
+        {selectedServer && executions && executions.length > 0 && (() => {
+          // Find the latest setup execution (scriptId 1) that's running or recent
+          const setupExecutions = executions.filter((exec: any) => exec.scriptId === 1);
+          const latestSetupExecution = setupExecutions.length > 0 ? setupExecutions[0] : null;
+          
+          if (!latestSetupExecution || latestSetupExecution.status === 'completed') return null;
+          
+          return (
+            <Card className="border-orange-200 dark:border-orange-800">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-orange-500" />
+                  ComfyUI Setup in Progress
+                  <Badge variant="secondary">{latestSetupExecution.status}</Badge>
+                </CardTitle>
+                <CardDescription>
+                  Automatically installing ComfyUI on server {selectedServer.name}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="bg-slate-100 dark:bg-slate-800 rounded-lg p-4 max-h-64 overflow-y-auto">
+                  <pre className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                    {latestSetupExecution.output || "Initializing setup..."}
+                  </pre>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">Setup Progress</span>
+                    <span className="text-muted-foreground">100%</span>
                   </div>
-                );
-              })()}
-            </CardContent>
-          </Card>
-        )}
+                  <Progress value={100} className="w-full h-2" />
+                  <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                    <Badge variant="outline" className="text-xs">Completed</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {selectedServer && (
           <Tabs defaultValue="generate" className="space-y-6">

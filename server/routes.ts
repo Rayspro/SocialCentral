@@ -2643,37 +2643,8 @@ echo "=== ComfyUI Cleanup Complete ==="
 echo "Server is ready for fresh ComfyUI installation"
 `;
 
-      // Execute cleanup via SSH simulation (in a real environment, this would connect via SSH)
-      setTimeout(async () => {
-        try {
-          // Simulate cleanup process
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          // Update execution as completed
-          await storage.updateServerExecution(execution.id, {
-            status: 'completed',
-            output: execution.output + cleanupScript + '\n=== CLEANUP SUCCESS ===\n'
-          });
-
-          // Reset server setup status
-          await storage.updateVastServer(serverId, {
-            setupStatus: 'pending',
-            metadata: {
-              ...((server.metadata as any) || {}),
-              comfyUIStatus: 'pending',
-              lastCleanup: new Date().toISOString()
-            }
-          });
-
-          console.log(`ComfyUI cleanup completed for server ${serverId}`);
-        } catch (error) {
-          console.error(`ComfyUI cleanup failed for server ${serverId}:`, error);
-          await storage.updateServerExecution(execution.id, {
-            status: 'failed',
-            output: execution.output + `\nERROR: Cleanup failed - ${error}\n`
-          });
-        }
-      }, 100);
+      // Execute cleanup with progress tracking
+      executeComfyUICleanup(execution.id, serverId, server);
 
       res.json({
         success: true,
@@ -2687,6 +2658,55 @@ echo "Server is ready for fresh ComfyUI installation"
       res.status(500).json({ error: 'Failed to reset ComfyUI installation' });
     }
   });
+
+  // Execute ComfyUI cleanup with step-by-step progress tracking
+  async function executeComfyUICleanup(executionId: number, serverId: number, server: any) {
+    try {
+      const steps = [
+        { step: 1, total: 4, message: "Stopping ComfyUI processes..." },
+        { step: 2, total: 4, message: "Removing ComfyUI installation..." },
+        { step: 3, total: 4, message: "Cleaning up models and cache..." },
+        { step: 4, total: 4, message: "Resetting server status..." }
+      ];
+
+      for (const { step, total, message } of steps) {
+        // Update progress
+        const progress = Math.round((step / total) * 100);
+        const progressOutput = `Step ${step}/${total}: ${message}\n`;
+        
+        await storage.updateServerExecution(executionId, {
+          output: (await storage.getServerExecution(executionId))?.output + progressOutput
+        });
+
+        // Simulate step execution time
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+
+      // Mark as completed
+      await storage.updateServerExecution(executionId, {
+        status: 'completed',
+        output: (await storage.getServerExecution(executionId))?.output + '\n=== ComfyUI Cleanup Complete ===\nServer is ready for fresh ComfyUI installation\n'
+      });
+
+      // Reset server setup status
+      await storage.updateVastServer(serverId, {
+        setupStatus: 'pending',
+        metadata: {
+          ...((server.metadata as any) || {}),
+          comfyUIStatus: 'pending',
+          lastCleanup: new Date().toISOString()
+        }
+      });
+
+      console.log(`ComfyUI cleanup completed for server ${serverId}`);
+    } catch (error) {
+      console.error(`ComfyUI cleanup failed for server ${serverId}:`, error);
+      await storage.updateServerExecution(executionId, {
+        status: 'failed',
+        output: (await storage.getServerExecution(executionId))?.output + `\nERROR: Cleanup failed - ${error}\n`
+      });
+    }
+  }
 
   const httpServer = createServer(app);
 

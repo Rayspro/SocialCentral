@@ -828,12 +828,52 @@ export default function ComfyUI() {
                   {executions[0]?.output || "Initializing setup..."}
                 </pre>
               </div>
-              <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                <span>Progress automatically tracked when server becomes ready</span>
-                <Badge variant="outline" className="text-xs">
-                  {executions[0]?.status === 'completed' ? 'Ready' : 'Installing'}
-                </Badge>
-              </div>
+              {/* Dynamic Progress Bar */}
+              {(() => {
+                const latestExecution = executions[0];
+                if (!latestExecution?.output) return null;
+                
+                const output = latestExecution.output;
+                let progress = 0;
+                
+                // Calculate progress based on steps
+                if (latestExecution.scriptId === 2) {
+                  // Reset operation progress
+                  if (output.includes('Step 1/4')) progress = Math.max(progress, 25);
+                  if (output.includes('Step 2/4')) progress = Math.max(progress, 50);
+                  if (output.includes('Step 3/4')) progress = Math.max(progress, 75);
+                  if (output.includes('Step 4/4') || output.includes('Cleanup Complete')) progress = 100;
+                } else {
+                  // Setup operation progress
+                  if (output.includes('Step 1/6') || output.includes('Step 2/6')) progress = Math.max(progress, 17);
+                  if (output.includes('Step 3/6')) progress = Math.max(progress, 33);
+                  if (output.includes('Step 4/6')) progress = Math.max(progress, 50);
+                  if (output.includes('Step 5/6')) progress = Math.max(progress, 67);
+                  if (output.includes('Step 6/6')) progress = Math.max(progress, 83);
+                  if (output.includes('Setup Complete') || output.includes('SUCCESS')) progress = 100;
+                }
+                
+                const isRunning = latestExecution.status === 'running' || 
+                                 (latestExecution.status === 'completed' && progress < 100);
+                
+                return (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="font-medium">
+                        {latestExecution.scriptId === 2 ? 'Reset Progress' : 'Setup Progress'}
+                      </span>
+                      <span className="text-muted-foreground">{progress}%</span>
+                    </div>
+                    <Progress value={progress} className="w-full h-2" />
+                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                      <Badge variant="outline" className="text-xs">
+                        {latestExecution.status === 'completed' ? 'Completed' : 
+                         isRunning ? 'In Progress' : 'Ready'}
+                      </Badge>
+                    </div>
+                  </div>
+                );
+              })()}
             </CardContent>
           </Card>
         )}
